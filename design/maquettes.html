@@ -1,0 +1,481 @@
+<title>Gestion Commerciale Desktop</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* ---------- Page (adapts to viewer theme) ---------- */
+:root{
+  --pg-bg:#F6F8FC; --pg-surface:#FFFFFF; --pg-text:#0F1A2E; --pg-muted:#7C8AA5;
+  --pg-line:#E2E8F4; --pg-brand:#2450E0; --pg-gold:#E89B0C;
+  --pg-shadow:0 4px 16px rgb(15 26 46 / .07);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --pg-bg:#0B1220; --pg-surface:#111A2E; --pg-text:#E9EEF7; --pg-muted:#8093B0;
+    --pg-line:#22304C; --pg-brand:#7C9BF2; --pg-gold:#F6B93B; --pg-shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --pg-bg:#0B1220; --pg-surface:#111A2E; --pg-text:#E9EEF7; --pg-muted:#8093B0;
+  --pg-line:#22304C; --pg-brand:#7C9BF2; --pg-gold:#F6B93B; --pg-shadow:none;
+}
+*{box-sizing:border-box}
+body{background:var(--pg-bg);color:var(--pg-text);font-family:"Plus Jakarta Sans",system-ui,sans-serif;margin:0;line-height:1.55}
+.wrap{max-width:1160px;margin:0 auto;padding:48px 28px 80px}
+.prose{max-width:760px}
+h1{font-size:34px;font-weight:800;letter-spacing:-.5px;margin:8px 0 6px;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:56px 0 6px;letter-spacing:-.3px}
+h3{font-size:15px;font-weight:700;margin:28px 0 10px}
+p{margin:6px 0;color:var(--pg-muted)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--pg-brand)}
+.kicker{display:flex;gap:10px;align-items:center;margin-bottom:4px}
+.kicker .bar{width:34px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--pg-brand),var(--pg-gold))}
+.note{font-size:13px;border-left:3px solid var(--pg-gold);padding:8px 14px;background:var(--pg-surface);border-radius:0 8px 8px 0;margin:14px 0;color:var(--pg-text)}
+.note b{color:var(--pg-text)}
+/* swatches */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:12px;margin:16px 0}
+.sw{border-radius:10px;overflow:hidden;border:1px solid var(--pg-line);background:var(--pg-surface)}
+.sw .chip{height:56px}
+.sw .lbl{padding:8px 10px;font-size:11.5px;font-weight:600}
+.sw .lbl span{display:block;font-family:"JetBrains Mono",monospace;font-weight:400;color:var(--pg-muted);font-size:10.5px}
+/* type specimen */
+.spec{background:var(--pg-surface);border:1px solid var(--pg-line);border-radius:12px;padding:22px 26px;box-shadow:var(--pg-shadow)}
+.spec .row{display:flex;gap:18px;align-items:baseline;padding:10px 0;border-bottom:1px dashed var(--pg-line)}
+.spec .row:last-child{border-bottom:0}
+.spec .tag{font-size:10.5px;color:var(--pg-muted);width:150px;flex:none;font-family:"JetBrains Mono",monospace}
+/* mockup frame */
+.frame{margin:18px 0 8px;border:1px solid var(--pg-line);border-radius:14px;background:var(--pg-surface);box-shadow:var(--pg-shadow);overflow-x:auto}
+.frame-inner{min-width:1180px}
+.caption{font-size:13px;color:var(--pg-muted);margin:8px 2px 0}
+.titlebar{display:flex;align-items:center;gap:7px;padding:9px 14px;border-bottom:1px solid var(--pg-line)}
+.titlebar i{width:11px;height:11px;border-radius:50%;display:inline-block;opacity:.85}
+.titlebar .t{margin-left:10px;font-size:11.5px;color:var(--pg-muted);font-weight:600}
+
+/* ---------- App tokens (mockups keep their own explicit theme) ---------- */
+.app{
+  --bg:#F6F8FC; --surface:#FFFFFF; --raised:#FFFFFF; --line-soft:#EDF1F8; --line:#D5DDEC;
+  --muted:#7C8AA5; --label:#42536F; --text:#0F1A2E;
+  --b50:#EEF3FE; --b100:#DCE6FD; --b300:#7C9BF2; --b500:#3B66F5; --b700:#2450E0; --b900:#1E3FB5;
+  --gold:#F6B93B; --gold6:#E89B0C;
+  --ok:#16A34A; --warn:#D97706; --bad:#DC2626; --teal:#14B8A6; --violet:#8B5CF6; --orange:#F97316;
+  --okbg:#E8F7EE; --warnbg:#FDF3E4; --badbg:#FDEBEB; --tealbg:#E4F7F4; --violetbg:#F1EBFD; --orangebg:#FEF0E5;
+  --sh:0 1px 3px rgb(15 26 46 / .06); --shc:0 4px 12px rgb(15 26 46 / .08);
+  background:var(--bg);color:var(--text);font-size:12.5px;display:flex;min-height:640px;
+  font-family:"Plus Jakarta Sans",system-ui,sans-serif;
+}
+.app.dark{
+  --bg:#0B1220; --surface:#111A2E; --raised:#16213A; --line-soft:#1C2942; --line:#31415F;
+  --muted:#8093B0; --label:#B7C3D9; --text:#E9EEF7;
+  --b50:#17223D; --b100:#1D2C52; --b300:#4F6ECB;
+  --okbg:#122B1E; --warnbg:#2E2312; --badbg:#2F1616; --tealbg:#0F2A27; --violetbg:#221A38; --orangebg:#2E1D10;
+  --sh:none; --shc:none;
+}
+.mono{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+/* sidebar */
+.sb{width:212px;flex:none;background:var(--surface);border-right:1px solid var(--line-soft);display:flex;flex-direction:column;padding:14px 10px 12px}
+.sb .brand{display:flex;gap:9px;align-items:center;padding:2px 8px 14px;border-bottom:1px solid var(--line-soft);margin-bottom:10px}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#3B66F5,#2450E0 55%,#1E3FB5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:13px;position:relative}
+.logo::after{content:"";position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:var(--gold);border:2px solid var(--surface)}
+.sb .brand b{font-size:13px;letter-spacing:-.2px}
+.sb .brand span{display:block;font-size:9.5px;color:var(--muted);font-weight:600;letter-spacing:.6px}
+.grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:12px 10px 4px}
+.it{display:flex;align-items:center;gap:9px;padding:6.5px 10px;border-radius:8px;color:var(--label);font-weight:600;font-size:12px}
+.it svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.85}
+.it.on{background:var(--b50);color:var(--b700)}
+.app.dark .it.on{color:#AFC2FA}
+.it.on::before{content:"";width:3px;height:16px;border-radius:2px;background:var(--b700);margin-left:-10px;margin-right:1px}
+.it .n{margin-left:auto;background:var(--badbg);color:var(--bad);font-size:10px;font-weight:700;border-radius:99px;padding:1px 7px}
+.sb .foot{margin-top:auto;border-top:1px solid var(--line-soft);padding-top:10px;font-size:11px}
+.sb .foot .dossier{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;font-weight:600;color:var(--label)}
+.sb .foot .dossier b{color:var(--text)}
+/* topbar + main */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.top{height:50px;flex:none;background:var(--surface);border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:14px;padding:0 18px}
+.search{flex:1;max-width:380px;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:6.5px 12px;color:var(--muted);font-size:12px}
+.kbd{margin-left:auto;font-family:"JetBrains Mono",monospace;font-size:10px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:var(--surface)}
+.agent{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:var(--label);margin-left:auto}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px var(--okbg)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--b100);color:var(--b700);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.body{padding:18px 20px;display:flex;flex-direction:column;gap:16px;flex:1}
+/* hero + kpi */
+.hero{border-radius:14px;background:linear-gradient(120deg,#3B66F5,#2450E0 55%,#1E3FB5);color:#fff;padding:18px 22px;display:flex;align-items:center;gap:26px;position:relative;overflow:hidden}
+.hero::before,.hero::after{content:"";position:absolute;border-radius:50%;border:1.5px solid rgb(255 255 255 / .14)}
+.hero::before{width:210px;height:210px;right:-60px;top:-90px}
+.hero::after{width:130px;height:130px;right:120px;bottom:-70px}
+.hero .h-l{flex:1}
+.hero .hi{font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;opacity:.75}
+.hero .ca{font-size:30px;font-weight:800;letter-spacing:-.5px;margin:2px 0}
+.hero .sub{font-size:12px;opacity:.8}
+.hero .delta{background:rgb(255 255 255 / .16);border-radius:99px;padding:3px 10px;font-size:11px;font-weight:700}
+.hero .delta b{color:var(--gold)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.kpi{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:13px 15px;box-shadow:var(--sh)}
+.kpi .k-top{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.badge{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px}
+.kpi .lbl{font-size:11px;font-weight:600;color:var(--muted)}
+.kpi .val{font-size:19px;font-weight:800;letter-spacing:-.3px}
+.kpi .d{font-size:10.5px;font-weight:700}
+.up{color:var(--ok)} .dn{color:var(--bad)}
+/* cards & tables */
+.card{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;box-shadow:var(--sh)}
+.card .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line-soft);font-weight:700;font-size:13px}
+.card .hd .more{margin-left:auto;font-size:11px;color:var(--b700);font-weight:600}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--line-soft)}
+td{padding:7.5px 14px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.money{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;font-weight:500}
+.money.neg{color:var(--bad)}
+.pill{font-size:10px;font-weight:700;border-radius:99px;padding:2.5px 9px;display:inline-block}
+.pill.ok{background:var(--okbg);color:var(--ok)} .pill.warn{background:var(--warnbg);color:var(--warn)}
+.pill.bad{background:var(--badbg);color:var(--bad)} .pill.mut{background:var(--line-soft);color:var(--muted)}
+.doc{font-size:10px;font-weight:700;border-radius:6px;padding:2.5px 7px;display:inline-block;letter-spacing:.4px}
+.doc.fa{background:var(--b100);color:var(--b700)} .doc.bl{background:var(--tealbg);color:var(--teal)}
+.doc.bc{background:var(--violetbg);color:var(--violet)} .doc.fp{background:var(--line-soft);color:var(--muted)}
+.doc.av{background:var(--badbg);color:var(--bad)} .doc.ach{background:var(--orangebg);color:var(--orange)}
+.app.dark .doc.fa{color:#AFC2FA}
+/* buttons & inputs */
+.btn{display:inline-flex;align-items:center;gap:7px;border-radius:9px;padding:7px 14px;font-weight:700;font-size:12px;border:1px solid transparent}
+.btn.pri{background:var(--b700);color:#fff;box-shadow:var(--sh)}
+.btn.sec{background:var(--surface);border-color:var(--line);color:var(--label)}
+.btn.ghost{color:var(--b700)}
+.btn.danger{background:var(--badbg);color:var(--bad)}
+.btn.gold{background:var(--gold);color:#3A2A05}
+.inp{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:12px;color:var(--text);font-family:inherit;min-width:0}
+.inp.focus{border-color:var(--b500);box-shadow:0 0 0 2px var(--b100)}
+.field label{display:block;font-size:10.5px;font-weight:700;color:var(--label);margin-bottom:4px;letter-spacing:.3px}
+/* tabs / toolbar */
+.tabs{display:flex;gap:2px;background:var(--surface);border:1px solid var(--line-soft);border-radius:10px;padding:3px;width:max-content}
+.tab{padding:6px 13px;border-radius:8px;font-size:11.5px;font-weight:700;color:var(--muted)}
+.tab.on{background:var(--b700);color:#fff}
+.tab .c{font-family:"JetBrains Mono",monospace;font-size:10px;opacity:.75;margin-left:5px}
+.toolbar{display:flex;align-items:center;gap:10px}
+.chart-bars{display:flex;align-items:flex-end;gap:10px;height:120px;padding:10px 16px 6px}
+.chart-bars .b{flex:1;border-radius:5px 5px 2px 2px;background:var(--b100)}
+.chart-bars .b.hi{background:linear-gradient(180deg,var(--b500),var(--b700))}
+.chart-x{display:flex;gap:10px;padding:0 16px 12px}
+.chart-x span{flex:1;text-align:center;font-size:9.5px;color:var(--muted);font-weight:600}
+.legend{display:flex;flex-direction:column;gap:9px;font-size:11.5px}
+.legend .li{display:flex;align-items:center;gap:8px}
+.legend .sw2{width:9px;height:9px;border-radius:3px}
+.legend .v{margin-left:auto}
+/* doc editor */
+.lines th:first-child,.lines td:first-child{padding-left:16px}
+.rowsel td{background:var(--b50)}
+.cellinput{border:1px solid var(--b500);background:var(--surface);border-radius:6px;padding:3px 8px;display:inline-block;box-shadow:0 0 0 2px var(--b100)}
+.totals{width:290px;flex:none;display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;box-shadow:var(--sh);overflow:hidden}
+.totals .tr2{display:flex;justify-content:space-between;padding:8px 16px;font-size:12px;color:var(--label);border-bottom:1px dashed var(--line-soft)}
+.totals .big{background:linear-gradient(120deg,#3B66F5,#2450E0);color:#fff;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:16px;border-bottom:0}
+.fkeys{display:flex;gap:8px;font-size:10.5px;color:var(--muted);align-items:center}
+.fkeys .kbd{margin:0}
+/* login */
+.login{display:flex;align-items:center;justify-content:center;background:
+  radial-gradient(600px 320px at 85% -10%, rgb(59 102 245 / .18), transparent),
+  radial-gradient(500px 300px at -10% 110%, rgb(246 185 59 / .12), transparent), var(--bg);min-height:560px}
+.lcard{width:390px;background:var(--surface);border:1px solid var(--line-soft);border-radius:16px;box-shadow:var(--shc);padding:26px 28px}
+.steps{display:flex;gap:6px;margin:14px 0 18px}
+.steps i{height:4px;border-radius:2px;flex:1;background:var(--line-soft)}
+.steps i.on{background:var(--b700)}
+.agentrow{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:11px;padding:11px 13px;margin-bottom:9px}
+.agentrow.sel{border-color:var(--b500);background:var(--b50);box-shadow:0 0 0 2px var(--b100)}
+.agentrow .ic{width:34px;height:34px;border-radius:9px;background:var(--b100);color:var(--b700);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+.agentrow b{font-size:12.5px;display:block}
+.agentrow span{font-size:10.5px;color:var(--muted)}
+.agentrow .st{margin-left:auto}
+/* misc */
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.flexrow{display:flex;gap:14px;align-items:flex-start}
+.mini{font-size:10.5px;color:var(--muted)}
+.acct{border:1px solid var(--line-soft);border-radius:12px;background:var(--surface);padding:13px 15px;box-shadow:var(--sh);flex:1}
+.acct.on{border-color:var(--b500);box-shadow:0 0 0 2px var(--b100)}
+.acct .nm{font-size:11px;font-weight:700;color:var(--muted)}
+.acct .amt{font-size:17px;font-weight:800;margin-top:3px}
+.tierhead{display:flex;align-items:center;gap:16px;padding:16px 18px;border-bottom:1px solid var(--line-soft)}
+.tierhead .avatar{width:44px;height:44px;font-size:15px;border-radius:12px}
+.tabline{display:flex;gap:20px;padding:0 18px;border-bottom:1px solid var(--line-soft);font-size:12px;font-weight:700;color:var(--muted)}
+.tabline span{padding:10px 2px}
+.tabline .on{color:var(--b700);box-shadow:inset 0 -2px 0 var(--b700)}
+.app.dark .tabline .on{color:#AFC2FA}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--pg-line);font-size:12px;color:var(--pg-muted)}
+@media (prefers-reduced-motion: no-preference){ .btn,.tab,.it{transition:background .15s ease,color .15s ease} }
+</style>
+
+<div class="wrap">
+  <div class="kicker"><span class="bar"></span><span class="eyebrow">Proposition de design · Phase 0</span></div>
+  <h1>Gestion Commerciale Desktop</h1>
+  <div class="prose">
+    <p>Charte graphique et maquettes de la nouvelle application <b style="color:var(--pg-text)">Electron + React + GraphQL</b> (Windows · macOS · Ubuntu), connectée au cloud SOFTLY → agent PC. La charte prolonge le design system « POS/fintech » de l'app mobile gérant (bleu roi, neutres froids, Plus Jakarta Sans) et reprend l'accent or du logo Gestion Commerciale.</p>
+  </div>
+
+  <h2>1 · Palette</h2>
+  <p class="prose">Primaire bleu roi (actions, navigation, documents FA), accent or réservé aux moments « valeur » (KPI, croissance, bouton Encaisser). Neutres gris-bleu froids. Chaque type de document garde sa couleur partout dans l'app.</p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#2450E0"></div><div class="lbl">brand.700 · primaire<span>#2450E0</span></div></div>
+    <div class="sw"><div class="chip" style="background:#3B66F5"></div><div class="lbl">brand.500<span>#3B66F5</span></div></div>
+    <div class="sw"><div class="chip" style="background:#1E3FB5"></div><div class="lbl">brand.900<span>#1E3FB5</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F6B93B"></div><div class="lbl">gold.400 · accent logo<span>#F6B93B</span></div></div>
+    <div class="sw"><div class="chip" style="background:#0F1A2E"></div><div class="lbl">neutral.900 · texte<span>#0F1A2E</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F6F8FC;border-bottom:1px solid #E2E8F4"></div><div class="lbl">neutral.0 · fond<span>#F6F8FC</span></div></div>
+    <div class="sw"><div class="chip" style="background:#16A34A"></div><div class="lbl">success · payé<span>#16A34A</span></div></div>
+    <div class="sw"><div class="chip" style="background:#D97706"></div><div class="lbl">warning · partiel<span>#D97706</span></div></div>
+    <div class="sw"><div class="chip" style="background:#DC2626"></div><div class="lbl">danger · impayé<span>#DC2626</span></div></div>
+    <div class="sw"><div class="chip" style="background:#14B8A6"></div><div class="lbl">teal · BL<span>#14B8A6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#8B5CF6"></div><div class="lbl">violet · BC<span>#8B5CF6</span></div></div>
+    <div class="sw"><div class="chip" style="background:#F97316"></div><div class="lbl">orange · achats<span>#F97316</span></div></div>
+  </div>
+
+  <h2>2 · Typographie & composants</h2>
+  <div class="spec">
+    <div class="row"><span class="tag">Titre écran · 20/700</span><span style="font-size:20px;font-weight:700">Documents de vente</span></div>
+    <div class="row"><span class="tag">KPI · 28/800</span><span style="font-size:28px;font-weight:800;letter-spacing:-.5px">1 254 300,00 DA</span></div>
+    <div class="row"><span class="tag">Corps · 13/400</span><span style="font-size:13px">Le règlement a été réparti sur 3 factures, reliquat versé en avance.</span></div>
+    <div class="row"><span class="tag">Montants · mono</span><span class="mono" style="font-size:13px">FA-2026-00318&nbsp;&nbsp;·&nbsp;&nbsp;84 520,50 DA&nbsp;&nbsp;·&nbsp;&nbsp;<span style="color:#DC2626">−12 400,00</span></span></div>
+    <div class="row"><span class="tag">Label · 11/600</span><span style="font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--pg-muted)">Reste à payer</span></div>
+    <div class="row" style="flex-wrap:wrap;row-gap:10px">
+      <span class="tag">Boutons & badges</span>
+      <span class="app" style="display:flex;gap:9px;background:transparent;min-height:0;flex-wrap:wrap;align-items:center">
+        <span class="btn pri">Nouvelle facture</span><span class="btn gold">Encaisser · F10</span><span class="btn sec">Imprimer</span><span class="btn danger">Supprimer</span>
+        <span class="doc fa">FA</span><span class="doc bl">BL</span><span class="doc bc">BC</span><span class="doc fp">FP</span><span class="doc av">AVOIR</span>
+        <span class="pill ok">Payée</span><span class="pill warn">Partiel</span><span class="pill bad">Impayée</span>
+      </span>
+    </div>
+  </div>
+  <div class="note"><b>Raccourcis hérités du Delphi</b> : ⌘K palette · F2 article · F3 client · F10 encaisser · Ctrl+N nouvelle pièce · Ctrl+P imprimer — navigation clavier complète dans les grilles.</div>
+
+  <h2>3 · Connexion & choix de l'agent</h2>
+  <p class="prose">Login en 2 étapes (compte cloud → agent/pharmacie → dossier & utilisateur dossier), équivalent moderne de l'écran de connexion Delphi. Gestion des états : agent hors ligne, session existante (forcer), quota d'appareils.</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Gestion Commerciale — Connexion</span></div>
+    <div class="app"><div class="login" style="flex:1">
+      <div class="lcard">
+        <div style="display:flex;gap:11px;align-items:center"><span class="logo" style="width:38px;height:38px;font-size:15px">GC</span>
+          <div><b style="font-size:15px">Gestion Commerciale</b><div class="mini">Étape 2 sur 3 — choisissez votre pharmacie</div></div></div>
+        <div class="steps"><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="agentrow sel"><span class="ic">PH</span><div><b>Pharmacie El Baraka</b><span>khaled-70706c · dossier « bon 2026 »</span></div><span class="st pill ok">En ligne</span></div>
+        <div class="agentrow"><span class="ic" style="background:var(--line-soft);color:var(--muted)">PH</span><div><b>Pharmacie Centre-ville</b><span>amine-3f21b0 · vu il y a 2 j</span></div><span class="st pill mut">Hors ligne</span></div>
+        <div style="display:flex;gap:10px;margin-top:16px"><span class="btn sec" style="flex:1;justify-content:center">Retour</span><span class="btn pri" style="flex:2;justify-content:center">Continuer</span></div>
+        <div class="mini" style="text-align:center;margin-top:12px">Ou appairer par QR code depuis l'agent du PC</div>
+      </div>
+    </div></div>
+  </div></div>
+
+  <h2>4 · Tableau de bord</h2>
+  <p class="prose">Sidebar par domaines (mapping des 10 onglets du ribbon Delphi), hero dégradé signature, KPI du jour, alertes actionnables (stock, péremption, créances) — les tuiles du GCHome Delphi, remises en scène.</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Gestion Commerciale — Tableau de bord</span></div>
+    <div class="app">
+      <aside class="sb">
+        <div class="brand"><span class="logo">GC</span><div><b>Gestion Com.</b><span>DESKTOP</span></div></div>
+        <div class="it on"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Tableau de bord</div>
+        <div class="grp">Activité</div>
+        <div class="it"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Ventes</div>
+        <div class="it"><svg viewBox="0 0 24 24"><path d="M6 6h15l-1.5 8.5H8L6 3H3"/><circle cx="9" cy="20" r="1.6"/><circle cx="18" cy="20" r="1.6"/></svg>Achats</div>
+        <div class="it"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>Stock<span class="n">8</span></div>
+        <div class="it"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 9h5M17 13h5"/></svg>Tiers</div>
+        <div class="it"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="8" cy="15" r="1.4"/></svg>Trésorerie</div>
+        <div class="grp">Analyse</div>
+        <div class="it"><svg viewBox="0 0 24 24"><path d="M4 20V9M10 20V4M16 20v-7M21 20H3"/></svg>Statistiques</div>
+        <div class="grp">Configuration</div>
+        <div class="it"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Référentiels</div>
+        <div class="it"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.5-2-3.4-2.3 1a7 7 0 0 0-2.8-1.6L13.4 2h-3l-.4 2.9a7 7 0 0 0-2.7 1.6l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12"/></svg>Paramètres</div>
+        <div class="foot"><div class="dossier">📁 <div><b>bon 2026</b><div class="mini">Exercice 01/01 → 31/12</div></div></div></div>
+      </aside>
+      <div class="main">
+        <div class="top">
+          <div class="search">🔍 Rechercher client, article, pièce…<span class="kbd">⌘K</span></div>
+          <div class="agent"><span class="dot"></span>Agent connecté · El Baraka</div>
+          <span class="avatar">KA</span>
+        </div>
+        <div class="body">
+          <div class="hero">
+            <div class="h-l"><div class="hi">Chiffre d'affaires — Août 2026</div><div class="ca mono">12 458 300,00 DA</div>
+              <div class="sub">Encaissé : <b class="mono">9 731 240,00 DA</b> · 412 pièces · marge 14,2 %</div></div>
+            <span class="delta"><b>▲ +8,4 %</b> vs juillet</span>
+            <span class="btn gold">＋ Nouvelle vente</span>
+          </div>
+          <div class="kpis">
+            <div class="kpi"><div class="k-top"><span class="badge" style="background:var(--b100);color:var(--b700)">◔</span><span class="lbl">Ventes du jour</span></div><div class="val mono">318 450 DA</div><div class="d up">▲ 12 % vs hier</div></div>
+            <div class="kpi"><div class="k-top"><span class="badge" style="background:var(--okbg);color:var(--ok)">⛁</span><span class="lbl">Caisse principale</span></div><div class="val mono">1 204 700 DA</div><div class="d mini">3 comptes · arrêté 19 h</div></div>
+            <div class="kpi"><div class="k-top"><span class="badge" style="background:var(--badbg);color:var(--bad)">⚠</span><span class="lbl">Créances clients</span></div><div class="val mono">2 941 080 DA</div><div class="d dn">37 débiteurs · 12 en retard</div></div>
+            <div class="kpi"><div class="k-top"><span class="badge" style="background:var(--warnbg);color:var(--warn)">⏳</span><span class="lbl">Alertes stock</span></div><div class="val">8 articles</div><div class="d mini">+ 5 péremptions &lt; 60 j</div></div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <div class="hd">CA des 7 derniers jours<span class="more">Statistiques →</span></div>
+              <div class="chart-bars"><span class="b" style="height:46%"></span><span class="b" style="height:64%"></span><span class="b" style="height:38%"></span><span class="b" style="height:74%"></span><span class="b" style="height:58%"></span><span class="b hi" style="height:96%"></span><span class="b" style="height:30%"></span></div>
+              <div class="chart-x"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div>
+            </div>
+            <div class="card">
+              <div class="hd">Ventes par famille</div>
+              <div style="display:flex;gap:18px;align-items:center;padding:14px 18px">
+                <svg width="110" height="110" viewBox="0 0 42 42" role="img" aria-label="Répartition par famille">
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--line-soft)" stroke-width="6"/>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="#2450E0" stroke-width="6" stroke-dasharray="42 58" stroke-dashoffset="25" stroke-linecap="round"/>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="#14B8A6" stroke-width="6" stroke-dasharray="24 76" stroke-dashoffset="83" stroke-linecap="round"/>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="#F6B93B" stroke-width="6" stroke-dasharray="17 83" stroke-dashoffset="59" stroke-linecap="round"/>
+                  <text x="21" y="23.5" text-anchor="middle" font-size="7" font-weight="800" fill="var(--text)">42%</text>
+                </svg>
+                <div class="legend" style="flex:1">
+                  <div class="li"><span class="sw2" style="background:#2450E0"></span>Médicaments<span class="v mono">5,2 M</span></div>
+                  <div class="li"><span class="sw2" style="background:#14B8A6"></span>Parapharmacie<span class="v mono">3,0 M</span></div>
+                  <div class="li"><span class="sw2" style="background:#F6B93B"></span>Dispositifs<span class="v mono">2,1 M</span></div>
+                  <div class="li"><span class="sw2" style="background:#8B5CF6"></span>Autres<span class="v mono">2,1 M</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div>
+
+  <h2>5 · Documents de vente — liste unifiée</h2>
+  <p class="prose">Un seul écran pour les 7 types de pièces (comme <span class="mono" style="font-size:12px">TListeVente</span>), filtré par onglets. Grille dense 32 px, totaux en pied, actions contextuelles (transformer BC→BL→FA dès la Phase 6 serveur).</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Ventes — Documents</span></div>
+    <div class="app"><div class="main" style="width:100%">
+      <div class="top"><div style="font-size:15px;font-weight:800">Documents de vente</div>
+        <div class="fkeys" style="margin-left:18px"><span class="kbd">Ctrl+N</span> nouveau · <span class="kbd">F2</span> article · <span class="kbd">Ctrl+P</span> imprimer</div>
+        <div class="agent"><span class="dot"></span>El Baraka</div></div>
+      <div class="body">
+        <div class="toolbar">
+          <div class="tabs">
+            <span class="tab on">Factures<span class="c">128</span></span><span class="tab">BL<span class="c">96</span></span><span class="tab">Comptoir<span class="c">741</span></span><span class="tab">Commandes<span class="c">14</span></span><span class="tab">Proforma<span class="c">9</span></span><span class="tab">Retours / Avoirs<span class="c">11</span></span>
+          </div>
+          <span class="inp" style="display:inline-flex;align-items:center;gap:7px;color:var(--muted)">📅 01/08/2026 → 25/08/2026</span>
+          <span class="inp" style="color:var(--muted)">Tous les clients ▾</span>
+          <span style="flex:1"></span>
+          <span class="btn sec">Exporter</span><span class="btn pri">＋ Nouvelle facture</span>
+        </div>
+        <div class="card">
+          <table>
+            <thead><tr><th>N° pièce</th><th>Date</th><th>Client</th><th>Utilisateur</th><th class="r">Total TTC</th><th class="r">Réglé</th><th class="r">Reste</th><th>Statut</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00318</span></td><td>25/08/2026</td><td><b>EPH Hôpital Central</b></td><td>karim</td><td class="r money">184 520,50</td><td class="r money">184 520,50</td><td class="r money">0,00</td><td><span class="pill ok">Payée</span></td><td class="mini">⋯</td></tr>
+              <tr class="rowsel"><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00317</span></td><td>25/08/2026</td><td><b>Pharmacie Es-Salem</b></td><td>karim</td><td class="r money">96 210,00</td><td class="r money">50 000,00</td><td class="r money" style="color:var(--warn)">46 210,00</td><td><span class="pill warn">Partiel</span></td><td class="mini">⋯</td></tr>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00316</span></td><td>24/08/2026</td><td><b>Clinique El Amel</b></td><td>samia</td><td class="r money">312 940,00</td><td class="r money">0,00</td><td class="r money" style="color:var(--bad)">312 940,00</td><td><span class="pill bad">Impayée</span></td><td class="mini">⋯</td></tr>
+              <tr><td><span class="doc av">FAV</span> <span class="mono">FAV-2026-00021</span></td><td>24/08/2026</td><td><b>Cabinet Dr Meziane</b></td><td>karim</td><td class="r money neg">−12 400,00</td><td class="r money">—</td><td class="r money">—</td><td><span class="pill mut">Avoir</span></td><td class="mini">⋯</td></tr>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00315</span></td><td>23/08/2026</td><td><b>Parapharmacie Rania</b></td><td>samia</td><td class="r money">45 780,00</td><td class="r money">45 780,00</td><td class="r money">0,00</td><td><span class="pill ok">Payée</span></td><td class="mini">⋯</td></tr>
+            </tbody>
+            <tbody><tr style="background:var(--bg);font-weight:700"><td colspan="4">128 pièces</td><td class="r money">14 892 340,00</td><td class="r money">11 951 260,00</td><td class="r money" style="color:var(--bad)">2 941 080,00</td><td colspan="2"></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div></div>
+  </div></div>
+
+  <h2>6 · Éditeur de pièce — Facture de vente</h2>
+  <p class="prose">L'écran le plus utilisé : saisie clavier-first (code-barres ou F2), remise par ligne + remise globale, panneau totaux vivant, règlement immédiat au F10. Verrou « modifications non enregistrées » avant de quitter.</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Nouvelle facture — FA-2026-00319</span></div>
+    <div class="app"><div class="main" style="width:100%">
+      <div class="top"><span class="doc fa" style="font-size:11px">FA</span><div style="font-size:15px;font-weight:800">Facture <span class="mono" style="font-weight:600;color:var(--muted)">FA-2026-00319</span></div>
+        <span class="pill mut">Brouillon</span><span style="flex:1"></span>
+        <span class="btn sec">Aperçu</span><span class="btn pri">Enregistrer</span><span class="btn gold">Encaisser · F10</span></div>
+      <div class="body">
+        <div class="card" style="padding:14px 16px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px">
+          <div class="field"><label>Client · F3</label><span class="inp focus" style="display:flex;justify-content:space-between"><b>Pharmacie Es-Salem</b><span class="mini">Solde : <span class="money" style="color:var(--warn)">46 210,00 DA</span></span></span></div>
+          <div class="field"><label>Date</label><span class="inp" style="display:block">25/08/2026</span></div>
+          <div class="field"><label>Dépôt</label><span class="inp" style="display:block">Dépôt principal ▾</span></div>
+          <div class="field"><label>Mode de paiement</label><span class="inp" style="display:block">Espèces ▾</span></div>
+        </div>
+        <div class="flexrow">
+          <div class="card lines" style="flex:1;overflow:hidden">
+            <table>
+              <thead><tr><th style="width:34%">Article · F2 ou code-barres</th><th class="r">Stock</th><th class="r">Qté</th><th class="r">P.U. HT</th><th class="r">Rem. %</th><th class="r">TVA</th><th class="r">Total TTC</th></tr></thead>
+              <tbody>
+                <tr><td><b>Doliprane 1000 mg</b> <span class="mini mono">B/8 · lot L2412</span></td><td class="r money">142</td><td class="r money">10</td><td class="r money">185,00</td><td class="r money">0</td><td class="r money">9 %</td><td class="r money">2 016,50</td></tr>
+                <tr><td><b>Amoxicilline 500 mg</b> <span class="mini mono">B/12 · lot L2439</span></td><td class="r money" style="color:var(--warn)">18</td><td class="r money">6</td><td class="r money">320,00</td><td class="r money">5</td><td class="r money">9 %</td><td class="r money">1 988,45</td></tr>
+                <tr class="rowsel"><td><span class="cellinput">vento<span style="opacity:.4">…</span></span> <span class="mini">Ventoline spray · Ventolase…</span></td><td class="r money">—</td><td class="r money">1</td><td class="r money">—</td><td class="r money">—</td><td class="r money">—</td><td class="r money">—</td></tr>
+                <tr><td colspan="7" class="mini" style="padding:10px 16px">↵ Entrée : ligne suivante · Suppr : retirer la ligne · F4 : lots / péremption</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="totals">
+            <div class="tr2"><span>Total HT</span><span class="money">3 674,26</span></div>
+            <div class="tr2"><span>Remises lignes</span><span class="money neg">−96,00</span></div>
+            <div class="tr2"><span>Remise globale <span class="mini">(2 %)</span></span><span class="money neg">−73,49</span></div>
+            <div class="tr2"><span>TVA 9 %</span><span class="money">324,43</span></div>
+            <div class="tr2"><span>Timbre</span><span class="money">40,00</span></div>
+            <div class="big"><span>Net à payer</span><span class="mono">3 869,20 DA</span></div>
+            <div class="tr2" style="border-bottom:0"><span>Marge estimée</span><span class="money" style="color:var(--ok)">+18,3 %</span></div>
+          </div>
+        </div>
+      </div>
+    </div></div>
+  </div></div>
+
+  <h2>7 · Fiche client 360° — mode sombre</h2>
+  <p class="prose">Relevé, factures non réglées, règlement par lettrage FIFO (avec aperçu avant validation), avances. Présentée ici en <b style="color:var(--pg-text)">mode sombre</b> : mêmes tokens, ombres remplacées par des bordures.</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Clients — Pharmacie Es-Salem</span></div>
+    <div class="app dark"><div class="main" style="width:100%">
+      <div class="top"><div style="font-size:15px;font-weight:800">Fiche client</div><div class="agent"><span class="dot"></span>El Baraka</div><span class="avatar">KA</span></div>
+      <div class="body">
+        <div class="card">
+          <div class="tierhead">
+            <span class="avatar">ES</span>
+            <div><b style="font-size:15px">Pharmacie Es-Salem</b><div class="mini">C-00047 · Sétif · 0561 44 32 10 · plafond crédit 500 000 DA</div></div>
+            <span style="flex:1"></span>
+            <div style="text-align:right"><div class="mini">Solde actuel</div><div class="mono" style="font-size:19px;font-weight:800;color:var(--warn)">46 210,00 DA</div></div>
+            <span class="btn pri">Régler · F10</span><span class="btn sec">Relevé PDF</span>
+          </div>
+          <div class="tabline"><span class="on">Factures non réglées</span><span>Relevé</span><span>Règlements</span><span>Avances</span><span>Informations</span></div>
+          <table>
+            <thead><tr><th>Pièce</th><th>Date</th><th>Échéance</th><th class="r">Montant</th><th class="r">Réglé</th><th class="r">Reste</th><th>Retard</th></tr></thead>
+            <tbody>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00281</span></td><td>02/07/2026</td><td>01/08/2026</td><td class="r money">120 000,00</td><td class="r money">120 000,00</td><td class="r money">0,00</td><td><span class="pill ok">Soldée</span></td></tr>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00302</span></td><td>28/07/2026</td><td>27/08/2026</td><td class="r money">32 400,00</td><td class="r money">20 000,00</td><td class="r money" style="color:var(--warn)">12 400,00</td><td><span class="pill warn">J-2</span></td></tr>
+              <tr><td><span class="doc fa">FA</span> <span class="mono">FA-2026-00317</span></td><td>25/08/2026</td><td>24/09/2026</td><td class="r money">96 210,00</td><td class="r money">62 400,00</td><td class="r money" style="color:var(--bad)">33 810,00</td><td><span class="pill bad">+9 j</span></td></tr>
+            </tbody>
+            <tbody><tr style="font-weight:700"><td colspan="3">Total dû</td><td class="r money">248 610,00</td><td class="r money">202 400,00</td><td class="r money" style="color:var(--bad)">46 210,00</td><td></td></tr></tbody>
+          </table>
+        </div>
+        <div class="mini">Règlement distribué automatiquement des factures les plus anciennes aux plus récentes (aperçu <span class="mono">dry_run</span> avant validation) — reliquat en avance client.</div>
+      </div>
+    </div></div>
+  </div></div>
+
+  <h2>8 · Trésorerie</h2>
+  <p class="prose">Les comptes/caisses de la table <span class="mono" style="font-size:12px">banks</span> en sélecteur (équivalent des boutons dynamiques du ribbon), transactions unifiées, transfert entre comptes et arrêté de caisse protégés par mot de passe.</p>
+  <div class="frame"><div class="frame-inner">
+    <div class="titlebar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><span class="t">Trésorerie</span></div>
+    <div class="app"><div class="main" style="width:100%">
+      <div class="top"><div style="font-size:15px;font-weight:800">Trésorerie</div><span style="flex:1"></span>
+        <span class="btn sec">Transfert entre comptes</span><span class="btn sec">Arrêté de caisse 🔒</span><span class="btn pri">＋ Mouvement</span></div>
+      <div class="body">
+        <div class="flexrow">
+          <div class="acct on"><div class="nm">💵 Caisse principale</div><div class="amt mono">1 204 700,00 DA</div><div class="mini up">▲ +86 400 aujourd'hui</div></div>
+          <div class="acct"><div class="nm">💵 Caisse comptoir</div><div class="amt mono">148 250,00 DA</div><div class="mini">dernier arrêté hier 19 h 02</div></div>
+          <div class="acct"><div class="nm">🏦 El Baraka 402</div><div class="amt mono">3 962 110,00 DA</div><div class="mini">2 chèques en attente</div></div>
+        </div>
+        <div class="card">
+          <div class="hd">Caisse principale — aujourd'hui
+            <span style="margin-left:14px" class="tabs"><span class="tab on">Jour</span><span class="tab">Semaine</span><span class="tab">Mois</span><span class="tab">Dates…</span></span>
+            <span class="more">Exporter</span></div>
+          <table>
+            <thead><tr><th>Heure</th><th>Catégorie</th><th>Tiers / libellé</th><th>Mode</th><th>Utilisateur</th><th class="r">Montant</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">17:42</td><td><span class="doc" style="background:var(--okbg);color:var(--ok)">RÈGLEMENT</span></td><td>Pharmacie Es-Salem · <span class="mono mini">FA-2026-00317</span></td><td>Espèces</td><td>karim</td><td class="r money" style="color:var(--ok)">+50 000,00</td></tr>
+              <tr><td class="mono">16:10</td><td><span class="doc fa">VENTE</span></td><td>Comptoir · <span class="mono mini">BCT-2026-07412</span></td><td>Espèces</td><td>samia</td><td class="r money" style="color:var(--ok)">+8 420,00</td></tr>
+              <tr><td class="mono">14:55</td><td><span class="doc" style="background:var(--badbg);color:var(--bad)">CHARGE</span></td><td>Électricité — Sonelgaz août</td><td>Virement</td><td>karim</td><td class="r money neg">−23 600,00</td></tr>
+              <tr><td class="mono">11:20</td><td><span class="doc ach">ACHAT</span></td><td>Hydrapharm · <span class="mono mini">FA-A-2026-00188</span></td><td>Chèque</td><td>karim</td><td class="r money neg">−148 000,00</td></tr>
+              <tr><td class="mono">09:05</td><td><span class="doc" style="background:var(--violetbg);color:var(--violet)">TRANSFERT</span></td><td>Caisse comptoir → Caisse principale</td><td>—</td><td>admin</td><td class="r money" style="color:var(--ok)">+120 000,00</td></tr>
+            </tbody>
+            <tbody><tr style="background:var(--bg);font-weight:700"><td colspan="5">Solde du jour</td><td class="r money" style="color:var(--ok)">+86 420,00</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div></div>
+  </div></div>
+
+  <h2>À valider</h2>
+  <div class="prose">
+    <p>1 · La palette (bleu roi + accent or, neutres froids) et la double densité clair/sombre.</p>
+    <p>2 · La navigation sidebar par domaines (vs onglets horizontaux façon ribbon).</p>
+    <p>3 · Le pattern « liste unifiée + éditeur de pièce + panneau totaux » pour ventes et achats.</p>
+    <p>4 · La densité des grilles (32 px) et la police mono pour les montants.</p>
+    <p style="margin-top:12px">Après validation → Phase 1 (routage serveur : CRUD articles, lots, tarifs) et Phase 2 (squelette Electron + bibliothèque de composants), cf. <span class="mono" style="font-size:12px">docs/04-TODO.md</span>.</p>
+  </div>
+  <footer>Gestion Commerciale Desktop · Phase 0 — proposition de charte graphique & maquettes · SOFTLY · 25/08/2026</footer>
+</div>

@@ -1,0 +1,28 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Montants : mono tabulaire partout */
+.money {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Impression : gérée par src/print/ (iframe isolée + Paged.js) — aucune règle
+   print globale ici pour ne pas interférer avec le document imprimé. */

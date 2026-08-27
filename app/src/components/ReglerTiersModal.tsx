@@ -1,0 +1,188 @@
+import { useState } from 'react';
+import { gql, useMutation, useQuery } from '@apollo/client';
+import { fmtMoney, isoToday } from '../lib/format';
+import { StatusPill } from './ui/atoms';
+
+const REGLER_CLIENT = gql`
+  mutation ReglerClient($input: JSON!) { reglerClient(input: $input) }
+`;
+const REGLER_FOURNISSEUR = gql`
+  mutation ReglerFournisseur($input: JSON!) { reglerFournisseur(input: $input) }
+`;
+const MODES = gql`
+  query ModesEtComptes { modesPayement banques }
+`;
+
+type ApercuLigne = {
+  numero: string; type_facture: string; montant_regle: number;
+  reste_avant: number; reste_apres: number; solde: boolean;
+};
+type Apercu = {
+  montant: number; distribue: number; reliquat: number; avance_creee: boolean;
+  nb_factures: number; total_du_avant: number; lignes: ApercuLigne[];
+  executed?: boolean; uuid?: string;
+};
+
+/**
+ * Règlement d'un tiers avec lettrage FIFO (distribution automatique sur les
+ * pièces les plus anciennes) et aperçu `dry_run` avant validation.
+ * kind='client' → mutation reglerClient (encaissement) ;
+ * kind='fournisseur' → reglerFournisseur (décaissement).
+ */
+export default function ReglerTiersModal({ kind, codeTiers, nom, onClose, onDone }: {
+  kind: 'client' | 'fournisseur';
+  codeTiers: string; nom: string; onClose: () => void; onDone: () => void;
+}) {
+  const [montant, setMontant] = useState('');
+  const [date, setDate] = useState(isoToday());
+  const [mode, setMode] = useState('Espece');
+  const [compte, setCompte] = useState('');
+  const [observation, setObservation] = useState('');
+  const [apercu, setApercu] = useState<Apercu | null>(null);
+  const [done, setDone] = useState<Apercu | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: refs } = useQuery(MODES);
+  const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
+  const banques: any[] = Array.isArray(refs?.banques) ? refs.banques : [];
+
+  const [regler, { loading }] = useMutation(kind === 'client' ? REGLER_CLIENT : REGLER_FOURNISSEUR);
+
+  function buildInput(dryRun: boolean) {
+    const b = banques.find((x) => String(x.nom ?? x.name) === compte);
+    return {
+      ...(kind === 'client' ? { code_cli: codeTiers } : { code_four: codeTiers }),
+      montant: parseFloat(montant),
+      date,
+      mode_payement: mode || undefined,
+      compte: compte || undefined,
+      compte_id: b?.id ?? undefined,
+      observation: observation || undefined,
+      dry_run: dryRun,
+    };
+  }
+
+  async function run(dryRun: boolean) {
+    setError(null);
+    const m = parseFloat(montant);
+    if (!m || m <= 0) { setError('Saisissez un montant positif.'); return; }
+    try {
+      const { data } = await regler({ variables: { input: buildInput(dryRun) } });
+      const res: Apercu = kind === 'client' ? data?.reglerClient : data?.reglerFournisseur;
+      if (dryRun) setApercu(res);
+      else { setDone(res); onDone(); }
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur.');
+    }
+  }
+
+  const verb = kind === 'client' ? 'Encaisser' : 'Payer';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
+      <div className="w-[560px] max-h-[85vh] overflow-auto bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="font-extrabold text-[15px]">{verb} — {nom}</div>
+            <div className="text-[11px] text-ink-muted">Distribution automatique sur les pièces les plus anciennes (reliquat → avance)</div>
+          </div>
+          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
+        </div>
+
+        {error && (
+          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
+               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{error}</div>
+        )}
+
+        {done ? (
+          <div className="flex flex-col gap-3">
+            <div className="text-[13px] font-bold" style={{ color: 'var(--success)' }}>✓ Règlement enregistré</div>
+            <Recap a={done} />
+            <button onClick={onClose} className="rounded-md py-2.5 font-bold text-white bg-brand-700">Fermer</button>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <label className="text-[11px] font-bold text-ink-label">Montant (DA)
+                <input type="number" min="0" step="0.01" autoFocus value={montant}
+                       onChange={(e) => { setMontant(e.target.value); setApercu(null); }}
+                       className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-[14px]" />
+              </label>
+              <label className="text-[11px] font-bold text-ink-label">Date
+                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                       className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink" />
+              </label>
+              <label className="text-[11px] font-bold text-ink-label">Mode de paiement
+                <select value={mode} onChange={(e) => setMode(e.target.value)}
+                        className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink">
+                  <option value="Espece">Espèces</option>
+                  {modes.map((m: any, i) => {
+                    const v = String(m.nom ?? m.name ?? m.mode ?? m);
+                    return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
+                  })}
+                </select>
+              </label>
+              <label className="text-[11px] font-bold text-ink-label">Compte / caisse
+                <select value={compte} onChange={(e) => setCompte(e.target.value)}
+                        className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink">
+                  <option value="">— défaut —</option>
+                  {banques.map((b: any, i) => {
+                    const v = String(b.nom ?? b.name ?? b);
+                    return <option key={i} value={v}>{v}</option>;
+                  })}
+                </select>
+              </label>
+              <label className="text-[11px] font-bold text-ink-label col-span-2">Observation
+                <input value={observation} onChange={(e) => setObservation(e.target.value)}
+                       className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink" />
+              </label>
+            </div>
+
+            {apercu && (
+              <div className="mb-3 border border-line-soft rounded-md overflow-hidden">
+                <div className="px-3 py-2 bg-bg text-[11px] font-bold text-ink-label">Aperçu de la distribution</div>
+                <table className="w-full text-[11.5px]">
+                  <tbody>
+                    {apercu.lignes.map((l, i) => (
+                      <tr key={i} className="border-t border-line-soft">
+                        <td className="px-3 py-1.5"><span className="money">{l.numero}</span></td>
+                        <td className="px-3 py-1.5 text-right money">{fmtMoney(l.montant_regle)}</td>
+                        <td className="px-3 py-1.5 text-right text-ink-muted money">reste {fmtMoney(l.reste_apres)}</td>
+                        <td className="px-3 py-1.5 text-right">{l.solde ? <StatusPill tone="ok">Soldée</StatusPill> : <StatusPill tone="warn">Partiel</StatusPill>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="px-3 py-2 border-t border-line-soft"><Recap a={apercu} /></div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <button onClick={() => run(true)} disabled={loading}
+                      className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">
+                {loading && !apercu ? '…' : 'Aperçu'}
+              </button>
+              <button onClick={() => run(false)} disabled={loading || !apercu}
+                      title={!apercu ? "Faites d'abord un aperçu" : undefined}
+                      className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
+                Confirmer le règlement
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Recap({ a }: { a: Apercu }) {
+  return (
+    <div className="text-[11.5px] text-ink-label flex gap-4 flex-wrap">
+      <span>Distribué : <b className="money">{fmtMoney(a.distribue)}</b> sur {a.nb_factures} pièce(s)</span>
+      <span>Dû avant : <span className="money">{fmtMoney(a.total_du_avant)}</span></span>
+      {a.reliquat > 0 && <span style={{ color: a.avance_creee ? 'var(--info)' : 'var(--warning)' }}>
+        Reliquat : <b className="money">{fmtMoney(a.reliquat)}</b>{a.avance_creee ? ' → avance' : ''}
+      </span>}
+    </div>
+  );
+}

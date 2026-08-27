@@ -1,0 +1,495 @@
+import { ReactNode, useState } from 'react';
+import { useQuery } from '@apollo/client';
+import {
+  STAT_VENTES, STAT_VENTES_PAR_FAMILLE, STAT_VENTES_PAR_ARTICLE, STAT_VENTES_PAR_CLIENT,
+  BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
+} from '../api/queries';
+import {
+  StatVentesResult, StatVenteLigne, StatParFamille, StatArticleVente, StatClient,
+  BeneficesResult, BeneficeLigne, StatAchatsResult, StatAchatLigne, StatFournisseur,
+  StatArticleAchat, StatStockResult, StatStockLigne,
+} from '../api/types';
+import { fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
+import { exporterCsv, ExportColumn } from '../lib/export';
+import { useDebouncedValue } from '../lib/useDebounce';
+import DataGrid, { Column } from '../components/ui/DataGrid';
+import { Money, Tabs, PeriodPicker, PageHeader, SearchInput, Pagination } from '../components/ui/atoms';
+
+const SECTIONS = [
+  { code: 'ventes', label: 'Ventes' },
+  { code: 'achats', label: 'Achats' },
+  { code: 'benefices', label: 'Bénéfices' },
+  { code: 'stock', label: 'Valorisation du stock' },
+] as const;
+type Section = (typeof SECTIONS)[number]['code'];
+
+const GROUPEMENTS = [
+  { code: 'jour', label: 'Par jour' },
+  { code: 'mois', label: 'Par mois' },
+] as const;
+type Groupement = (typeof GROUPEMENTS)[number]['code'];
+
+const LIMIT_STOCK = 50;
+
+export default function Statistiques() {
+  const [section, setSection] = useState<Section>('ventes');
+  const [debut, setDebut] = useState(isoFirstOfMonth());
+  const [fin, setFin] = useState(isoToday());
+
+  return (
+    <div className="flex flex-col gap-3.5">
+      <PageHeader title="Statistiques">
+        {section !== 'stock' && (
+          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        )}
+      </PageHeader>
+      <Tabs value={section} onChange={setSection} options={SECTIONS} />
+      {section === 'ventes' && <SectionVentes debut={debut} fin={fin} />}
+      {section === 'achats' && <SectionAchats debut={debut} fin={fin} />}
+      {section === 'benefices' && <SectionBenefices debut={debut} fin={fin} />}
+      {section === 'stock' && <SectionStock />}
+    </div>
+  );
+}
+
+/* ─── Ventes ────────────────────────────────────────────────────────────────── */
+
+const VUES_VENTES = [
+  { code: 'periode', label: 'Par période' },
+  { code: 'article', label: 'Par article' },
+  { code: 'client', label: 'Par client' },
+  { code: 'famille', label: 'Par famille' },
+] as const;
+
+function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
+  const [vue, setVue] = useState<(typeof VUES_VENTES)[number]['code']>('periode');
+  const [groupement, setGroupement] = useState<Groupement>('jour');
+  const periode = { date_debut: debut, date_fin: fin };
+
+  const { data, loading, error } = useQuery(STAT_VENTES, { variables: { ...periode, groupement } });
+  const res: StatVentesResult | undefined = data?.statVentes;
+
+  const art = useQuery(STAT_VENTES_PAR_ARTICLE, { variables: periode, skip: vue !== 'article' });
+  const cli = useQuery(STAT_VENTES_PAR_CLIENT, { variables: periode, skip: vue !== 'client' });
+  const fam = useQuery(STAT_VENTES_PAR_FAMILLE, { variables: periode, skip: vue !== 'famille' });
+
+  const articles: StatArticleVente[] = Array.isArray(art.data?.statVentesParArticle) ? art.data.statVentesParArticle : [];
+  const clients: StatClient[] = Array.isArray(cli.data?.statVentesParClient) ? cli.data.statVentesParClient : [];
+  const familles: StatParFamille[] = Array.isArray(fam.data?.statVentesParFamille) ? fam.data.statVentesParFamille : [];
+
+  const colPeriode: Column<StatVenteLigne>[] = [
+    { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b> },
+    { key: 'ht', header: 'Total HT', align: 'right', render: (l) => <Money value={l.total_ht} /> },
+    { key: 'ttc', header: 'Total TTC', align: 'right', render: (l) => <Money value={l.total_ttc} /> },
+    { key: 'remise', header: 'Remises', align: 'right', render: (l) => <Money value={l.remise} /> },
+    { key: 'marge', header: 'Marge', align: 'right', render: (l) => <MargeCell value={l.total_marge} /> },
+  ];
+
+  const colArticle: Column<StatArticleVente>[] = [
+    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
+    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b> },
+    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span> },
+    { key: 'ht', header: 'CA HT', align: 'right', width: '120px', render: (a) => <Money value={a.total_ht} /> },
+    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (a) => <MargeCell value={a.total_marge} /> },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (a) => <Pct value={a.pct_marge} /> },
+  ];
+
+  const colClient: Column<StatClient>[] = [
+    { key: 'code', header: 'Code', width: '80px', render: (c) => <span className="money">{c.code_cli}</span> },
+    { key: 'raison', header: 'Client', render: (c) => <b>{(c.raison ?? '').trim() || '—'}</b> },
+    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (c) => <span className="money">{c.nb_factures}</span> },
+    { key: 'ht', header: 'CA HT', align: 'right', width: '130px', render: (c) => <Money value={c.total_ht} /> },
+    { key: 'ttc', header: 'CA TTC', align: 'right', width: '130px', render: (c) => <Money value={c.total_ttc} /> },
+    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (c) => <MargeCell value={c.total_marge} /> },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (c) => <Pct value={c.pct_marge} /> },
+  ];
+
+  const colFamille: Column<StatParFamille>[] = [
+    { key: 'fam', header: 'Famille', render: (f) => <b>{f.famille || '(sans famille)'}</b> },
+    { key: 'ht', header: 'CA HT', align: 'right', render: (f) => <Money value={f.total_ht} /> },
+    { key: 'ttc', header: 'CA TTC', align: 'right', render: (f) => <Money value={f.total_ttc} /> },
+    { key: 'marge', header: 'Marge', align: 'right', render: (f) => <MargeCell value={f.total_marge} /> },
+  ];
+
+  return (
+    <>
+      {res && (
+        <div className="grid grid-cols-4 gap-3">
+          <Kpi label="CA TTC" value={`${fmtMoney(res.total_ttc)} DA`} />
+          <Kpi label="Marge brute" value={`${fmtMoney(res.total_marge)} DA`} />
+          <Kpi label="Charges période" value={`${fmtMoney(res.total_charges)} DA`} />
+          <Kpi label="Marge nette" value={`${fmtMoney(res.marge_nette_total)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} %`} />
+        </div>
+      )}
+      <Tabs value={vue} onChange={setVue} options={VUES_VENTES} />
+
+      {vue === 'periode' && (
+        <DataGrid titre={`Ventes ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
+                    actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
+                    exportCsv={{ nom: 'ventes-par-periode', columns: csvPeriode }}
+                    columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
+                    loading={loading} error={error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, ttc: <Money value={res?.total_ttc} />, marge: <Money value={res?.total_marge} /> }} />
+        
+      )}
+
+      {vue === 'article' && (
+        <DataGrid titre={`Ventes par article — ${articles.length} article(s)`} exportCsv={{ nom: 'ventes-par-article', columns: csvArticleVente }} columns={colArticle} rows={articles} rowKey={(a) => a.code_article}
+                    loading={art.loading} error={art.error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={somme(articles, 'total_ht')} />, marge: <Money value={somme(articles, 'total_marge')} /> }} />
+        
+      )}
+
+      {vue === 'client' && (
+        <DataGrid titre={`Ventes par client — ${clients.length} client(s)`} exportCsv={{ nom: 'ventes-par-client', columns: csvClient }} columns={colClient} rows={clients} rowKey={(c) => c.code_cli}
+                    loading={cli.loading} error={cli.error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={somme(clients, 'total_ht')} />, ttc: <Money value={somme(clients, 'total_ttc')} />, marge: <Money value={somme(clients, 'total_marge')} /> }} />
+        
+      )}
+
+      {vue === 'famille' && (
+        <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 items-start">
+          <DataGrid titre="Ventes par famille" exportCsv={{ nom: 'ventes-par-famille', columns: csvFamille }} columns={colFamille} rows={familles} rowKey={(f) => f.famille ?? '—'}
+                      loading={fam.loading} error={fam.error?.message}
+                      footer={{ _label: 'Totaux', ht: <Money value={somme(familles, 'total_ht')} />, ttc: <Money value={somme(familles, 'total_ttc')} /> }} />
+          
+          <Barres titre="Répartition du CA TTC"
+                  lignes={familles.map((f) => ({ label: f.famille || '(sans famille)', valeur: Number(f.total_ttc ?? 0) }))} />
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ─── Achats ────────────────────────────────────────────────────────────────── */
+
+const VUES_ACHATS = [
+  { code: 'periode', label: 'Par période' },
+  { code: 'fournisseur', label: 'Par fournisseur' },
+  { code: 'article', label: 'Par article' },
+] as const;
+
+function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
+  const [vue, setVue] = useState<(typeof VUES_ACHATS)[number]['code']>('periode');
+  const [groupement, setGroupement] = useState<Groupement>('mois');
+  const periode = { date_debut: debut, date_fin: fin };
+
+  const { data, loading, error } = useQuery(STAT_ACHATS, { variables: { ...periode, groupement } });
+  const res: StatAchatsResult | undefined = data?.statAchats;
+
+  const four = useQuery(STAT_ACHATS_PAR_FOURNISSEUR, { variables: periode, skip: vue !== 'fournisseur' });
+  const art = useQuery(STAT_ACHATS_PAR_ARTICLE, { variables: periode, skip: vue !== 'article' });
+  const fournisseurs: StatFournisseur[] = Array.isArray(four.data?.statAchatsParFournisseur) ? four.data.statAchatsParFournisseur : [];
+  const articles: StatArticleAchat[] = Array.isArray(art.data?.statAchatsParArticle) ? art.data.statAchatsParArticle : [];
+
+  const colPeriode: Column<StatAchatLigne>[] = [
+    { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b> },
+    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (l) => <span className="money">{l.nb_factures}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '90px', render: (l) => <span className="money">{fmtMoney(l.qte, 2)}</span> },
+    { key: 'ht', header: 'Achats HT', align: 'right', render: (l) => <Money value={l.total_ht} /> },
+    { key: 'ttc', header: 'Achats TTC', align: 'right', render: (l) => <Money value={l.total_ttc} /> },
+    { key: 'ret', header: 'Retours HT', align: 'right', render: (l) => (
+      <span className="money" style={{ color: Number(l.r_total_ht) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(l.r_total_ht)}</span>
+    ) },
+  ];
+
+  const colFournisseur: Column<StatFournisseur>[] = [
+    { key: 'code', header: 'Code', width: '80px', render: (f) => <span className="money">{f.code_four}</span> },
+    { key: 'nom', header: 'Fournisseur', render: (f) => <b>{(f.fournisseur ?? '').trim() || '—'}</b> },
+    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (f) => <span className="money">{f.nb_factures}</span> },
+    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (f) => <Money value={f.total_ht} /> },
+    { key: 'ttc', header: 'Achats TTC', align: 'right', width: '130px', render: (f) => <Money value={f.total_ttc} /> },
+    { key: 'reste', header: 'Reste à payer', align: 'right', width: '130px', render: (f) => (
+      <span className="money font-medium" style={{ color: Number(f.reste_a_payer) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(f.reste_a_payer)}</span>
+    ) },
+  ];
+
+  const colArticle: Column<StatArticleAchat>[] = [
+    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
+    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b> },
+    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span> },
+    { key: 'pmp', header: 'PMP moyen', align: 'right', width: '120px', render: (a) => <Money value={a.pmp_moyen} /> },
+    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (a) => <Money value={a.total_ht} /> },
+  ];
+
+  return (
+    <>
+      {res && (
+        <div className="grid grid-cols-3 gap-3">
+          <Kpi label="Achats HT" value={`${fmtMoney(res.total_ht)} DA`} />
+          <Kpi label="Achats TTC" value={`${fmtMoney(res.total_ttc)} DA`} />
+          <Kpi label="Pièces d'achat" value={String(res.nb_factures ?? 0)} />
+        </div>
+      )}
+      <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} />
+
+      {vue === 'periode' && (
+        <DataGrid titre={`Achats ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
+                    actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
+                    exportCsv={{ nom: 'achats-par-periode', columns: csvAchatPeriode }}
+                    columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
+                    loading={loading} error={error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, ttc: <Money value={res?.total_ttc} /> }} />
+        
+      )}
+
+      {vue === 'fournisseur' && (
+        <DataGrid titre={`Achats par fournisseur — ${fournisseurs.length} fournisseur(s)`} exportCsv={{ nom: 'achats-par-fournisseur', columns: csvFournisseur }} columns={colFournisseur} rows={fournisseurs} rowKey={(f) => f.code_four}
+                    loading={four.loading} error={four.error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={somme(fournisseurs, 'total_ht')} />, ttc: <Money value={somme(fournisseurs, 'total_ttc')} />,
+                              reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(somme(fournisseurs, 'reste_a_payer'))}</span> }} />
+        
+      )}
+
+      {vue === 'article' && (
+        <DataGrid titre={`Achats par article — ${articles.length} article(s)`} exportCsv={{ nom: 'achats-par-article', columns: csvArticleAchat }} columns={colArticle} rows={articles} rowKey={(a) => a.code_article}
+                    loading={art.loading} error={art.error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={somme(articles, 'total_ht')} /> }} />
+        
+      )}
+    </>
+  );
+}
+
+/* ─── Bénéfices ─────────────────────────────────────────────────────────────── */
+
+function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
+  const [groupement, setGroupement] = useState<Groupement>('mois');
+  const { data, loading, error } = useQuery(BENEFICES, {
+    variables: { date_debut: debut, date_fin: fin, groupement },
+  });
+  const res: BeneficesResult | undefined = data?.benefices;
+  const lignes = res?.lignes ?? [];
+  const taux = Number(res?.total_ht) > 0 ? (Number(res?.total_benefice) / Number(res?.total_ht)) * 100 : 0;
+
+  const columns: Column<BeneficeLigne>[] = [
+    { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b> },
+    { key: 'ht', header: 'CA HT', align: 'right', render: (l) => <Money value={l.total_ht} /> },
+    { key: 'revien', header: 'Coût de revient', align: 'right', render: (l) => <Money value={l.total_revien} /> },
+    { key: 'brut', header: 'Bénéfice brut', align: 'right', render: (l) => <MargeCell value={l.benefice_brut} /> },
+    { key: 'remise', header: 'Remises', align: 'right', render: (l) => <Money value={l.remise} /> },
+    { key: 'net', header: 'Après remises', align: 'right', render: (l) => <MargeCell value={l.benefice_avec_remise} /> },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (l) => (
+      <Pct value={Number(l.total_ht) > 0 ? (Number(l.benefice_brut) / Number(l.total_ht)) * 100 : 0} />
+    ) },
+  ];
+
+  return (
+    <>
+      {res && (
+        <div className="grid grid-cols-4 gap-3">
+          <Kpi label="CA HT" value={`${fmtMoney(res.total_ht)} DA`} />
+          <Kpi label="Coût de revient" value={`${fmtMoney(res.total_revien)} DA`} />
+          <Kpi label="Bénéfice brut" value={`${fmtMoney(res.total_benefice)} DA`} />
+          <Kpi label="Taux de marge" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice / CA HT" />
+        </div>
+      )}
+      <DataGrid titre="Bénéfices par période"
+                  actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
+                  exportCsv={{ nom: 'benefices', columns: csvBenefice }}
+                  columns={columns} rows={lignes} rowKey={(l) => l.periode} loading={loading} error={error?.message}
+                  footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, revien: <Money value={res?.total_revien} />, brut: <Money value={res?.total_benefice} /> }} />
+      
+    </>
+  );
+}
+
+/* ─── Valorisation du stock ─────────────────────────────────────────────────── */
+
+function SectionStock() {
+  const [search, setSearch] = useState('');
+  const [offset, setOffset] = useState(0);
+  // La frappe met à jour `search` (affichage immédiat) mais la requête n'utilise
+  // que la valeur différée : sinon chaque caractère déclenche un scan agrégé
+  // cloud→agent→SQL.
+  const recherche = useDebouncedValue(search, 250);
+  const { data, loading, error } = useQuery(STAT_STOCK, {
+    variables: { search: recherche || undefined, limit: LIMIT_STOCK, offset },
+  });
+  const res: StatStockResult | undefined = data?.statStock;
+  const rows = res?.articles ?? [];
+
+  const columns: Column<StatStockLigne>[] = [
+    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
+    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').replace(/\s+/g, ' ').trim() || '—'}</b> },
+    { key: 'fam', header: 'Famille', width: '120px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (a) => (
+      <span className="money font-medium" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.qte_reale, 2)}</span>
+    ) },
+    { key: 'pmp', header: 'PMP', align: 'right', width: '110px', render: (a) => <Money value={a.pmp} /> },
+    { key: 'val', header: 'Valeur stock', align: 'right', width: '130px', render: (a) => <Money value={a.stock_value} /> },
+    { key: 'vente', header: 'Valeur vente', align: 'right', width: '130px', render: (a) => <Money value={a.sales_value} /> },
+    { key: 'marge', header: 'Marge pot.', align: 'right', width: '120px', render: (a) => <MargeCell value={a.marge_potentielle} /> },
+  ];
+
+  return (
+    <>
+      {res && (
+        <div className="grid grid-cols-4 gap-3">
+          <Kpi label="Articles en catalogue" value={String(res.nb_articles ?? 0)} />
+          <Kpi label="Valeur du stock (PMP)" value={`${fmtMoney(res.total_stock_value)} DA`} />
+          <Kpi label="Valeur de vente TTC" value={`${fmtMoney(res.total_sales_value)} DA`} />
+          <Kpi label="Marge potentielle" value={`${fmtMoney(res.marge_potentielle_totale)} DA`}
+               sub={`stock initial : ${fmtMoney(res.total_initial_value)} DA`} />
+        </div>
+      )}
+      <DataGrid titre="Valorisation article par article"
+                  actions={<div className="w-64"><SearchInput value={search} placeholder="Code, désignation…"
+                                onChange={(v) => { setSearch(v); setOffset(0); }} /></div>}
+                  exportCsv={{ nom: 'valorisation-stock', columns: csvStock }}
+                  columns={columns} rows={rows} rowKey={(a) => a.id} loading={loading} error={error?.message}
+                  footer={{ _label: `${res?.nb_articles ?? 0} article(s)`,
+                            val: <Money value={res?.total_stock_value} />,
+                            vente: <Money value={res?.total_sales_value} />,
+                            marge: <Money value={res?.marge_potentielle_totale} /> }} />
+      
+      {res && res.nb_articles > LIMIT_STOCK && (
+        <Pagination offset={offset} limit={LIMIT_STOCK} total={res.nb_articles} onOffset={setOffset} />
+      )}
+    </>
+  );
+}
+
+/* ─── Colonnes CSV ──────────────────────────────────────────────────────────── */
+
+const csvPeriode: ExportColumn<StatVenteLigne>[] = [
+  { header: 'Période', value: (l) => l.periode },
+  { header: 'Total HT', value: (l) => l.total_ht, numeric: true },
+  { header: 'Total TTC', value: (l) => l.total_ttc, numeric: true },
+  { header: 'Remises', value: (l) => l.remise, numeric: true },
+  { header: 'Marge', value: (l) => l.total_marge, numeric: true },
+];
+
+const csvArticleVente: ExportColumn<StatArticleVente>[] = [
+  { header: 'Code', value: (a) => a.code_article },
+  { header: 'Désignation', value: (a) => (a.designation ?? '').replace(/\s+/g, ' ').trim() },
+  { header: 'Famille', value: (a) => a.famille ?? '' },
+  { header: 'Quantité', value: (a) => a.qte, numeric: true },
+  { header: 'CA HT', value: (a) => a.total_ht, numeric: true },
+  { header: 'CA TTC', value: (a) => a.total_ttc, numeric: true },
+  { header: 'Marge', value: (a) => a.total_marge, numeric: true },
+  { header: '% marge', value: (a) => a.pct_marge, numeric: true },
+];
+
+const csvClient: ExportColumn<StatClient>[] = [
+  { header: 'Code', value: (c) => c.code_cli },
+  { header: 'Client', value: (c) => c.raison },
+  { header: 'Pièces', value: (c) => c.nb_factures, numeric: true },
+  { header: 'CA HT', value: (c) => c.total_ht, numeric: true },
+  { header: 'CA TTC', value: (c) => c.total_ttc, numeric: true },
+  { header: 'Marge', value: (c) => c.total_marge, numeric: true },
+  { header: '% marge', value: (c) => c.pct_marge, numeric: true },
+];
+
+const csvFamille: ExportColumn<StatParFamille>[] = [
+  { header: 'Famille', value: (f) => f.famille ?? '' },
+  { header: 'CA HT', value: (f) => f.total_ht, numeric: true },
+  { header: 'CA TTC', value: (f) => f.total_ttc, numeric: true },
+  { header: 'Marge', value: (f) => f.total_marge, numeric: true },
+];
+
+const csvAchatPeriode: ExportColumn<StatAchatLigne>[] = [
+  { header: 'Période', value: (l) => l.periode },
+  { header: 'Pièces', value: (l) => l.nb_factures, numeric: true },
+  { header: 'Quantité', value: (l) => l.qte, numeric: true },
+  { header: 'Achats HT', value: (l) => l.total_ht, numeric: true },
+  { header: 'Achats TTC', value: (l) => l.total_ttc, numeric: true },
+  { header: 'Retours HT', value: (l) => l.r_total_ht, numeric: true },
+];
+
+const csvFournisseur: ExportColumn<StatFournisseur>[] = [
+  { header: 'Code', value: (f) => f.code_four },
+  { header: 'Fournisseur', value: (f) => f.fournisseur },
+  { header: 'Pièces', value: (f) => f.nb_factures, numeric: true },
+  { header: 'Achats HT', value: (f) => f.total_ht, numeric: true },
+  { header: 'Achats TTC', value: (f) => f.total_ttc, numeric: true },
+  { header: 'Reste à payer', value: (f) => f.reste_a_payer, numeric: true },
+];
+
+const csvArticleAchat: ExportColumn<StatArticleAchat>[] = [
+  { header: 'Code', value: (a) => a.code_article },
+  { header: 'Désignation', value: (a) => (a.designation ?? '').replace(/\s+/g, ' ').trim() },
+  { header: 'Famille', value: (a) => a.famille ?? '' },
+  { header: 'Quantité', value: (a) => a.qte, numeric: true },
+  { header: 'PMP moyen', value: (a) => a.pmp_moyen, numeric: true },
+  { header: 'Achats HT', value: (a) => a.total_ht, numeric: true },
+];
+
+const csvBenefice: ExportColumn<BeneficeLigne>[] = [
+  { header: 'Période', value: (l) => l.periode },
+  { header: 'CA HT', value: (l) => l.total_ht, numeric: true },
+  { header: 'Coût de revient', value: (l) => l.total_revien, numeric: true },
+  { header: 'Bénéfice brut', value: (l) => l.benefice_brut, numeric: true },
+  { header: 'Remises', value: (l) => l.remise, numeric: true },
+  { header: 'Bénéfice après remises', value: (l) => l.benefice_avec_remise, numeric: true },
+];
+
+const csvStock: ExportColumn<StatStockLigne>[] = [
+  { header: 'Code', value: (a) => a.code_article },
+  { header: 'Désignation', value: (a) => (a.designation ?? '').replace(/\s+/g, ' ').trim() },
+  { header: 'Famille', value: (a) => a.famille ?? '' },
+  { header: 'Quantité', value: (a) => a.qte_reale, numeric: true },
+  { header: 'PMP', value: (a) => a.pmp, numeric: true },
+  { header: 'Valeur stock', value: (a) => a.stock_value, numeric: true },
+  { header: 'Valeur vente', value: (a) => a.sales_value, numeric: true },
+  { header: 'Marge potentielle', value: (a) => a.marge_potentielle, numeric: true },
+];
+
+/* ─── Petits composants ─────────────────────────────────────────────────────── */
+
+function somme<T>(rows: T[], key: keyof T): number {
+  return rows.reduce((t, r) => t + Number(r[key] ?? 0), 0);
+}
+
+function MargeCell({ value }: { value: unknown }) {
+  return (
+    <span className="money" style={{ color: Number(value) < 0 ? 'var(--danger)' : 'var(--success)' }}>
+      {fmtMoney(value)}
+    </span>
+  );
+}
+
+function Pct({ value }: { value: unknown }) {
+  const n = Number(value ?? 0);
+  return <span className="money" style={{ color: n < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(n, 1)} %</span>;
+}
+
+
+function Barres({ titre, lignes }: { titre: string; lignes: { label: string; valeur: number }[] }) {
+  // Les données arrivent triées par nom (ORDER BY famille) : on classe par valeur
+  // décroissante avant de ne garder que les 14 premières, et on met l'échelle à
+  // l'échelle du plus grand VISIBLE — sinon on couperait les plus gros postes.
+  const visibles = [...lignes].sort((a, b) => b.valeur - a.valeur).slice(0, 14);
+  const max = Math.max(1, ...visibles.map((l) => l.valeur));
+  return (
+    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+      <div className="font-bold text-[13px] mb-3">{titre}</div>
+      <div className="flex flex-col gap-2.5">
+        {visibles.length === 0 && <div className="text-ink-muted text-[12px]">Aucune donnée.</div>}
+        {visibles.map((l) => (
+          <div key={l.label}>
+            <div className="flex justify-between text-[11.5px] mb-0.5">
+              <span className="font-semibold">{l.label}</span>
+              <span className="money text-ink-muted">{fmtMoney(l.valeur)}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-line-soft overflow-hidden">
+              <div className="h-full rounded-full" style={{ width: `${(l.valeur / max) * 100}%`, background: 'var(--brand-500)' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-3.5">
+      <div className="text-[11px] font-semibold text-ink-muted mb-1">{label}</div>
+      <div className="money text-[17px] font-extrabold">{value}</div>
+      {sub && <div className="text-[10.5px] text-ink-muted mt-0.5">{sub}</div>}
+    </div>
+  );
+}

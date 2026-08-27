@@ -1,0 +1,109 @@
+# TODO — Gestion Commerciale Desktop
+
+> Plan de travail par phases. La **Phase 0 (validation de la charte graphique + maquettes) est le point de départ** :
+> rien n'est implémenté tant qu'elle n'est pas validée. Chaque item décrit le livrable attendu.
+> Légende statut : ☐ à faire · ◐ en cours · ☑ fait
+
+## Phase 0 — Charte graphique & maquettes (VALIDATION REQUISE)
+- ☑ **Charte graphique** — palette (bleu roi + or logo, neutres froids), typo, densités, composants ([01-CHARTE-GRAPHIQUE.md](01-CHARTE-GRAPHIQUE.md))
+- ☑ **Design tokens** — variables CSS clair/sombre prêtes à l'emploi ([../design/tokens.css](../design/tokens.css))
+- ☑ **Maquettes HTML** — dashboard, liste documents, éditeur de facture, fiche client, trésorerie, login (artifact partagé)
+- ☑ **→ VALIDATION UTILISATEUR de la charte + maquettes** (validée le 25/08/2026)
+
+## Phase 1 — Serveurs : combler les manques P1 (détail : [03-API-GRAPHQL-ET-MANQUES-SERVEURS.md](03-API-GRAPHQL-ET-MANQUES-SERVEURS.md)) — ☑ FAIT 25/08/2026 (non commité)
+Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sauf mention.
+- ☑ **CRUD articles** : `createArticle`/`updateArticle`/`deleteArticle` routés bout-en-bout
+- ☑ **Lots** : `lots`, `lotPrix`, `addLot`, `deleteLot`
+- ☑ **Tarifs** : `tarifsArticle`, `prixPourQte`, `promotions`, `nomenclature`, `calculerPrix` ; **codes-barres** : `barcodesArticle`
+- ☑ **Alertes** : `alertesStock`, `articlesMargeNegative` ; `recalculerStock`
+- ☑ **Champs cloud manquants** (bridge OK) : `tresorie`, `categoriesCharges`, `charge(id)`, `createInventaire`, `commercial(id)`, `centreCout(id)`
+- ☑ **Bug** : `type_doc` transmis dans `facturesNonReglees` (résolveur + bridge)
+- ☑ `RecalculerStock` → `commandTimeout.slow`, `GetCategoriesCharges` → `fast` ; `AGENT-GRPC.md` mis à jour
+- ☐ Déployer (cloud VPS + agents) — les changements sont locaux, builds OK, non commités
+
+## Phase 2 — Squelette app desktop (◐ démarré 25/08/2026 — `app/`)
+- ☑ **Scaffold** Vite + React + TS + Tailwind(tokens) + Apollo + Zustand + Electron (pattern agent_tray : tsc electron + vite build + electron-builder ; `npm run typecheck`/`build` OK, login vérifié au navigateur)
+- ☑ **AppShell** : sidebar groupes + topbar (statut agent par polling `myAgents`, bandeau erreurs abonnement) — thème sombre/densité à venir
+- ◐ **Bibliothèque UI** : DataGrid (dense, totaux, pagination, **barre de titre + actions + export CSV**), DocBadge, StatusPill, Money, Tabs, PeriodPicker, SearchInput, FormModal, ConfirmDialog, EntitySearch (article/client/fournisseur), **CommandPalette ⌘K** ✅, **export CSV** ✅ — ☐ tri/filtres/virtualisation dans DataGrid, SidePanel, Toast, Skeleton
+- ☑ **CommandPalette ⌘K** (26/08/2026) : ouverte au ⌘K/Ctrl+K ou par la barre de recherche (qui était décorative), navigation vers les 10 écrans, 6 créations rapides, **recherche live clients / fournisseurs / articles** avec solde ou stock affiché, navigation ↑↓/Entrée/Échap — validé E2E
+- ☑ **Scan de code-barres** (26/08/2026) : dans la recherche d'article des éditeurs, une saisie de douchette (code numérique + Entrée) déclenche une correspondance **exacte** via `articleParCodeBarre` et ajoute l'article directement ; message explicite si le code est inconnu — validé E2E
+- ☑ **Couche API** : Apollo (authLink dynamique, errorLink codes `ACCOUNT_BLOCKED`/`SUBSCRIPTION_*`, header `X-Druxamed-Dossier`) — ☐ types TS dérivés des `.gql` agent + hooks par domaine
+- ☑ **Flux session** : login 2 étapes (`loginIdentify`→`loginWithAgent` avec conflit/offline/quota) + choix dossier + `loginDossierUser` + persistance electron-store — ☐ appairage QR (`loginWithApiKey`), migration `safeStorage`
+- ☑ **Robustesse de session** (27/08/2026) — validé E2E :
+  - `useSessionKeepAlive` : `refreshToken` automatique toutes les 6 h (JWT valable 7 j, donc jamais d'expiration en cours de journée) + sonde `sessionStatus` toutes les 2 min, qui fait remonter un blocage de compte ou une expiration d'abonnement dans le bandeau de l'errorLink sans attendre la prochaine action de l'utilisateur
+  - `DossierSwitcher` : changement de dossier **ou** d'utilisateur sans se déconnecter — le dossier est positionné *avant* `loginDossierUser`, le cache Apollo est vidé (`clearStore`) au succès pour qu'aucune donnée de l'ancienne base ne subsiste, et **le dossier précédent est restauré** si la ré-identification échoue (vérifié : passage vers une base inexistante → message serveur affiché, session intacte, données rechargées depuis la bonne base)
+  - Piège corrigé : le nom de dossier mémorisé en session peut différer de la liste par la casse (« bon 2026 » vs « BON 2026 ») ; sans réalignement le `<select>` retombait silencieusement sur la première entrée et on aurait changé de dossier par erreur
+- ☐ **Dashboard v1** branché (statVentes mois, soldesCaisse, debiteurs, alertesStock) — vérifier les formes JSON réelles contre un agent en ligne
+
+## Phase 3 — Lecture (tout existe déjà côté serveurs) — ◐ démarré 25/08/2026
+- ◐ **Dashboard** : KPI branchés (statVentes mois + marge, soldesCaisse, debiteurs+buckets, alertesStock) + barres CA/jour — ☐ péremption, donut familles
+- ☑ **Documents de vente** : liste unifiée 7 types + **détail pièce** + **journal ligne à ligne** (onglet Documents/Journal, filtre code article, marge par ligne et totaux) — validé E2E (100 lignes mars 2026, 3,99 M TTC / 375 170 de marge)
+- ☑ **Documents d'achat** : liste 6 types + **détail pièce** + **journal ligne à ligne**
+- ◐ **Articles & stock** : grille paginée (recherche, vues alerte/marge négative, état stock) + **fiche article** (lots avec badge péremption J-n, tarifs par qté, codes-barres) — ☐ stocks par dépôt, mouvements
+- ☑ **Clients / Fournisseurs** : listes CRUD + vue Débiteurs (buckets) + fiches 360° client & fournisseur + **états financiers globaux** (onglets « États clients » / « États fournisseurs » : solde de départ, mouvements, réglé, solde final, option « masquer les tiers soldés ») — ☐ paiements détaillés, avances
+- ☑ **Trésorerie** : cartes soldes par compte + mouvements (période, solde initial/final) + saisie encaissement/décaissement/transfert. Les **types de charges** sont un référentiel (onglet dédié) ; les dépenses réelles sont des décaissements de catégorie « Charge ».
+- ☑ **Statistiques complètes** (27/08/2026) — 4 sections, 8 vues, validé E2E contre l'agent réel :
+  - **Ventes** : par période (jour/mois), **par article** (200), **par client** (121), **par famille** (barres) — KPI CA TTC 126 814 418,55 / marge nette / charges (= parité Delphi)
+  - **Achats** : par période, **par fournisseur** (44, reste à payer), **par article** (PMP moyen)
+  - **Bénéfices** : CA HT − coût de revient par période, remises, taux de marge (bénéfice brut 12 919 018,44)
+  - **Valorisation du stock** : par article, recherche + pagination — total 18 832 942,74 DA (= parité Delphi), marge potentielle
+  - 7 requêtes serveur jusque-là jamais appelées désormais branchées (`statVentesParArticle/Client`, `benefices`, `statAchats*`, `statStock`) ; type `StatParFamille` complété (le serveur renvoie aussi HT/marge/retours)
+- ☑ **Référentiels** (lecture) : familles, dépôts, banques, modes paiement, TVA, unités
+- ☑ **Mode sombre** (toggle Paramètres, persisté) + sélecteur de serveur cloud
+- ☑ **Correctif CORS cloud** : `X-Druxamed-*` ajoutés aux `allowedHeaders` (`main.ts`) — requis pour Electron/web, à déployer
+- ☑ **Vérif contre agent réel (E2E local, 25/08/2026)** : stack complète montée en local (MariaDB + agent + cloud + app) — login 2 étapes réel, dossier « BON 2026 », utilisateur dossier Admin, dashboard/listes/fiches avec vraies données (892 BL, 115 débiteurs/51,6 M, relevé client, lots), aperçu lettrage sur vraies factures, **création + suppression d'un BL de bout en bout** (numéro format Delphi `1010/2026`), base restaurée à l'identique
+
+## Phase 4 — Écriture (mutations existantes)
+- ◐ **Éditeur de pièce de vente** (`/ventes/nouvelle`) : recherche article clavier (↑↓/Entrée, debounce, stock+prix affichés), recherche client (solde affiché, vide=comptoir), lignes éditables (qté/prix/remise, cumul si même article), remise globale, totaux temps réel (mêmes formules que l'agent), `createVente` 7 types avec `user_id`/`user_name`, navigation vers la pièce créée — ☐ règlement immédiat (F10), raccourci F2/F3 global, sélection de lot par ligne, suppression de pièce, timbre
+- ☑ **Bug agent corrigé (inventaire)** : `articleinventaire.nlot` est NOT NULL avec la sentinelle `'-1'` (= « pas de lot », lue par `UpdateSingleArticleStock`) mais le service forçait `null` → toute création d'inventaire échouait
+- ☑ **Bugs agent corrigés (caisse)** : `addEncaissement`/`addDecaissement` n'écrivaient ni `Compte`/`CompteID` (mouvement rattaché à aucun compte) ni de catégorie par défaut — or la vue trésorerie ne retient que les catégories exactes (`Encaissement`/`Décaissement`/`Charge`…) : un mouvement saisi aurait été **invisible** et hors de tout solde. Côté app : la colonne libellé ignorait le champ `objet`.
+- ☑ **Bugs agent corrigés au passage** : `article.actif` n'existe pas en base (create/update échouaient) ; `updateArticle` ne recalculait pas `margep` (marge % figée → filtre « marge négative » faussé) ni les prix TTC — recalcul complet dès qu'un des trois leviers change (achat / vente / TVA)
+- ☑ **Correctif login dossier** : `loginDossierUser` renvoie `{ok,message,user_id,username}` — l'écran lisait les mauvais champs
+- ◐ **Éditeur d'achat** (`/achats/nouvelle`) : recherche fournisseur + article, colonne lot/péremption, coût HT (défaut PMP), `createAchat` 6 types, **mouvement de stock validé E2E via UI** (BR +7 → suppression −7), MAJ PMP côté serveur — ☐ règlement immédiat, sélection lot existant
+- ☑ **Suppression de pièces** (fiches vente & achat) : `ConfirmDialog` réutilisable + `deleteVente`/`deleteAchat`, stock reversé — validé E2E via UI (25/08/2026)
+- ☑ **CRUD tiers & articles (UI)** : `FormModal` générique piloté par schéma (`forms/schemas.ts`) + hook `useCrud` (create/update/delete, colonne d'actions ✎/✕, confirmation) — branché sur **clients**, **fournisseurs** et **articles** (listes déroulantes familles/dépôts/unités/TVA alimentées par `REFERENTIELS`). Validé E2E : création → modification → suppression pour article et client, base restaurée. ☐ crédit initial (mutation `setCreditInitialClient`)
+- ◐ **Règlements** : modal **générique** `ReglerTiersModal` (client ET fournisseur — aperçu `dry_run` → distribution FIFO → confirmation, reliquat→avance) branché sur les deux fiches ; **règlement immédiat dans l'éditeur de vente** (champ « Montant reçu » + bouton/raccourci **« Encaisser tout · F10 »** → `addReglementClient` sur la pièce créée, plafonné au net, statut « Payée » immédiat — validé E2E avec nettoyage complet) — ☐ suppression règlements depuis l'UI, avances
+- ◐ **Caisse** : **encaissement / décaissement / transfert entre comptes** depuis l'écran Trésorerie (`MouvementCaisseModal`, compte obligatoire, catégories Charge/Charge Production pour les décaissements) — validé E2E (mouvement écrit avec compte + catégorie, visible dans la grille, base nettoyée). ☐ arrêté de caisse
+- ☑ **Inventaire complet** (`/stock/inventaires`) : liste (valeurs théorique/comptée, écart, statut) + **création** (motif, date, dépôt → toutes les lignes générées avec le stock théorique) + **feuille de comptage** (saisie par ligne enregistrée à la sortie de case/Entrée, filtre texte, bascule « écarts seulement », écart et valorisation recalculés en direct) + **clôture** avec confirmation (applique les quantités comptées au stock) + suppression. Validé E2E : inventaire de 2036 articles / 18 M DA, comptage avec écart +10 (valorisation +580 125 DA), suppression, stock inchangé.
+- ☐ **Stock** : bons d'entrée/sortie
+- ☑ **Référentiels : CRUD complet** (26/08/2026) — écran à 10 onglets (familles, sous-familles, dépôts, rayons, unités, TVA, comptes & banques, modes de paiement, commerciaux, centres de coût), piloté par une table de description (`REFS`) + `FormModal`/`useCrud`. Les référentiels sans mutation `update` côté serveur (sous-familles, rayons, unités, TVA, modes de paiement) masquent le bouton Modifier et affichent la raison. Validé E2E : famille créée → modifiée → supprimée.
+- ☑ **Paramètres en écriture** (26/08/2026) : **coordonnées de la société** modifiables (identité, contacts, RC/NIF/NIS/Art. — ces valeurs alimentent tous les documents imprimés) et **compteurs de numérotation** éditables par type de document, avec avertissement sur le risque de doublons. Correctif : `numerotationDocs` renvoie un tableau `{type, format, compteur}` (le parsing initial le traitait comme un objet).
+
+## Phase 5 — Impression & exports (◐ moteur pro en place 25/08/2026 — cf. [05-IMPRESSION.md](05-IMPRESSION.md))
+- ☑ **Moteur d'impression** : `PrintPreview` générique = **iframe isolée** (zéro conflit CSS app) + **Paged.js** dans l'iframe (pagination `@page` A4, « Page n/N », réf. doc en marge via string-set, thead répétés, avoid-break) + `window.print()` natif (PDF intégré). Polyfill vendorisé `public/vendor/` (script `sync:pagedjs`). Documenté : `app/src/print/README.md`.
+- ☑ **Modèles** : pièce de **vente** (fiche vente), pièce d'**achat** (fiche achat), **état/relevé client** (fiche client) — blocs partagés (DocHeader/TiersBlock/TotalsBlock/SignFooter) + BASE_CSS. Validé E2E données réelles : BL 1008/2026 (1 page), relevé client 131 (**2 pages**, pieds de page corrects).
+- ☑ **Export CSV (Excel FR)** (27/08/2026) : helper `lib/export.ts` (séparateur `;`, virgule décimale, **BOM UTF-8** pour les accents) intégré au **DataGrid** via `exportCsv={{ nom, columns }}` — les accesseurs sont explicites (nombres bruts, pas le texte affiché à espaces insécables). Bouton « ⬇ Exporter CSV » câblé sur **Ventes**, **Achats**, **Stock** et les **8 vues de Statistiques**. Exporte les lignes affichées (page courante pour les grilles paginées). Validé E2E : fichier `articles-stock-….csv`, BOM `EF BB BF`, 51 lignes.
+- ☑ **Bibliothèque complète des documents (25/08/2026)** : 9 modèles — pièce de vente A4 (facture/BL/devis…), **ticket 80 mm** (comptoir), pièce d'achat A4, relevé client, **relevé fournisseur** (+ nouvelle fiche fournisseur `/tiers/fournisseur/:code`), situation des impayés client, **état des créances** (liste complète re-requêtée, validé 4 pages), **état de trésorerie** (période/compte), **état du stock** (valeur PMP). Tous branchés dans l'UI (cf. tableau dans `app/src/print/README.md`), validés E2E données réelles.
+- ☐ Modèles restants : bordereau de factures, inventaire, journaux ventes/achats ; impression silencieuse ticket (imprimante dédiée)
+- ☐ **Exports** : Excel/CSV depuis toutes les grilles (export côté renderer)
+- ☐ Sélection d'imprimante + impression directe (silencieuse) pour tickets
+
+## Phase 6 — Serveurs P2 (nouvelles capacités, agent+bridge+cloud)
+- ☑ **Mouvements de stock** (create/delete vente & achat) via `recalcArticlesStock` → proc native `UpdateSingleArticleStock` + synchro `Qte_reale`=`SUM(lots.Qte)` — validé E2E (25/08/2026)
+- ☐ **`updateVente` / `updateAchat`** (modification de pièces + lignes) — sans ça, correction = supprimer/recréer
+- ☐ **Transformation de documents** : BC→BL→FA, FP→FA, regroupement BL→facture (`grouped`), BRT/FAV depuis pièce d'origine
+- ☐ **Trésorerie** : `annulerMouvement` (réel), `mouvementTresorie(cle)`
+- ☐ **Transfert de stock inter-dépôts** atomique
+- ☐ **Recouvrement** : retards > N jours, buckets d'ancienneté, échéances (SQL « Recouvrement » du doc agent) ; **Stat 104**
+- ☐ **Utilisateurs dossier & droits** : CRUD users + modèle de droits (IDs `DroitsConstants.pas`) exposé via agent, application dans l'UI (masquage menus/actions)
+- ☐ (option) **Production** : module agent + écrans
+
+## Phase 7 — Packaging & distribution (◐ 25/08/2026)
+- ☑ **Icônes** générées depuis `logo gestion commerciale.png` (`resources/icon.icns` + `icon.png` 1024²)
+- ☑ **Build macOS** : `npx electron-builder --dir` → `release/mac-arm64/Gestion Commerciale.app` (276 Mo) puis **DMG** `release/Gestion Commerciale-0.1.0-arm64.dmg` (105 Mo). Bundle vérifié : nom, identifiant `com.softly.gestion-commerciale`, version, icône, et `app.asar` contenant `dist-electron/main.js`, `preload.js`, `dist/index.html` **et `dist/vendor/paged.polyfill.js`** (moteur d'impression).
+- ☑ **Bundle de production validé** (servi comme Electron le charge) : chemins d'assets relatifs OK, React monté, écran de login rendu, hook de dev `window.__session` bien absent, polyfill Paged.js résolu correctement depuis `document.baseURI`.
+- ⚠️ **Non signé** : aucune identité « Developer ID Application » sur cette machine → l'app s'ouvre avec l'avertissement Gatekeeper (clic droit → Ouvrir). Signature + notarisation à faire pour la distribution (cf. `agent_tray/SIGNING.md`).
+- ⚠️ **Lancement de la fenêtre non vérifiable ici** : la session d'automatisation n'a pas de session graphique macOS (Electron démarre mais `whenReady` n'aboutit pas). À lancer manuellement : `open "release/mac-arm64/Gestion Commerciale.app"`.
+- ☐ Builds Windows (NSIS) et Linux (AppImage/deb) — à produire sur/pour ces plateformes (`npm run dist:all` depuis une machine ou un CI adapté)
+- ☐ Auto-update (electron-updater) + canal de release
+- ☐ Télémétrie d'erreurs (optionnel) + page diagnostic connexion
+
+## Phase 8 — Qualité
+- ◐ **Tests de parité chiffrée vs Delphi** (26/08/2026 — rapport : [06-PARITE-DELPHI.md](06-PARITE-DELPHI.md)) : ✅ soldes clients (5), CA TTC annuel, créances, solde fournisseur, valeur du stock, solde de trésorerie — **tous au centime**. 2 bugs graves corrigés au passage (signes de règlements inversés en trésorerie ; noms des tiers lus dans `nom` vide au lieu de `raison`). ☐ relevés ligne à ligne, stats par article/client/famille, bénéfices, Stat 104
+- ☐ Tests E2E des flux critiques (vente comptoir → règlement → caisse)
+- ☐ Revue sécurité (stockage tokens, IPC, CSP renderer)
+
+---
+
+### Ordre recommandé
+Phase 0 (validation) → 1 et 2 en parallèle → 3 → 4 → 5 → 6 → 7 → 8 (les tests de parité dès Phase 3).

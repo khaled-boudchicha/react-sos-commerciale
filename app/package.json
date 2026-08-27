@@ -1,0 +1,83 @@
+{
+  "name": "gestion-commerciale-desktop",
+  "version": "0.1.0",
+  "description": "SOFTLY Gestion Commerciale — application desktop (Windows/macOS/Linux)",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite --port 5174\" \"cross-env NODE_ENV=development VITE_PORT=5174 electron .\"",
+    "dev:vite": "vite",
+    "build": "npm run sync:pagedjs && tsc -p tsconfig.electron.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:all": "npm run build && electron-builder -mwl",
+    "start": "electron .",
+    "sync:pagedjs": "cp node_modules/pagedjs/dist/paged.polyfill.js public/vendor/paged.polyfill.js"
+  },
+  "author": "SOFTLY",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.0",
+    "cross-env": "^10.1.0",
+    "electron": "^31.7.7",
+    "electron-builder": "^24.0.0",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@apollo/client": "^3.11.8",
+    "electron-store": "^8.1.0",
+    "graphql": "^16.9.0",
+    "pagedjs": "^0.4.3",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.26.0",
+    "zustand": "^4.5.0"
+  },
+  "build": {
+    "appId": "com.softly.gestion-commerciale",
+    "productName": "Gestion Commerciale",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "resources/**/*"
+    ],
+    "win": {
+      "icon": "resources/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "icon": "resources/icon.icns",
+      "target": "dmg"
+    },
+    "linux": {
+      "icon": "resources/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

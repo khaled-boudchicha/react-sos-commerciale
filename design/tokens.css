@@ -1,0 +1,76 @@
+/* Gestion Commerciale Desktop — Design Tokens (source: docs/01-CHARTE-GRAPHIQUE.md)
+   Générés pour usage direct (Tailwind theme.extend ou CSS vars). Zéro hex ailleurs. */
+
+:root {
+  /* Marque */
+  --brand-50:  #EEF3FE;
+  --brand-100: #DCE6FD;
+  --brand-300: #7C9BF2;
+  --brand-500: #3B66F5;
+  --brand-700: #2450E0;
+  --brand-900: #1E3FB5;
+  --gradient-hero: linear-gradient(135deg, #3B66F5 0%, #2450E0 55%, #1E3FB5 100%);
+
+  /* Accent or (logo) */
+  --gold-400: #F6B93B;
+  --gold-600: #E89B0C;
+
+  /* Neutres froids — mode clair */
+  --bg:            #F6F8FC;
+  --surface:       #FFFFFF;
+  --surface-raised:#FFFFFF;
+  --line-soft:     #EDF1F8;
+  --line:          #C9D3E4;
+  --text-muted:    #7C8AA5;
+  --text-label:    #42536F;
+  --text:          #0F1A2E;
+
+  /* Sémantiques */
+  --success: #16A34A;
+  --warning: #D97706;
+  --danger:  #DC2626;
+  --info:    #0891B2;
+  --teal:    #14B8A6;
+  --violet:  #8B5CF6;
+  --orange:  #F97316;
+
+  /* Documents */
+  --doc-fa:  var(--brand-700);
+  --doc-bl:  var(--teal);
+  --doc-bc:  var(--violet);
+  --doc-fp:  var(--text-muted);
+  --doc-avoir: var(--danger);
+  --doc-achat: var(--orange);
+  --doc-reglement: var(--success);
+
+  /* Ombres */
+  --shadow-soft:   0 1px 3px rgb(15 26 46 / .06);
+  --shadow-card:   0 4px 12px rgb(15 26 46 / .08);
+  --shadow-lifted: 0 12px 32px rgb(15 26 46 / .16);
+
+  /* Rayons */
+  --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+
+  /* Typo */
+  --font-ui: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Densité tables */
+  --row-compact: 32px;
+  --row-comfortable: 40px;
+
+  /* Focus */
+  --focus-ring: 0 0 0 2px var(--brand-300);
+}
+
+[data-theme="dark"] {
+  --bg:            #0B1220;
+  --surface:       #111A2E;
+  --surface-raised:#16213A;
+  --line-soft:     #1C2942;
+  --line:          #31415F;
+  --text-muted:    #8093B0;
+  --text-label:    #B7C3D9;
+  --text:          #E9EEF7;
+  --shadow-soft: none; --shadow-card: none; --shadow-lifted: 0 12px 32px rgb(0 0 0 / .5);
+}
