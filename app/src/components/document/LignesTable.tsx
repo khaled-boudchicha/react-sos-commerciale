@@ -63,6 +63,15 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
                 <td className="px-3 py-1">
                   <b>{l.designation}</b>
                   <span className="money text-[10.5px] text-ink-muted"> · {l.code_article}</span>
+                  {l.stock !== undefined && (() => {
+                    const rupture = sens === 'vente' && l.qte > l.stock!;
+                    return (
+                      <span className={`text-[10.5px] ml-1 ${rupture ? 'font-semibold' : 'text-ink-muted'}`}
+                            style={rupture ? { color: 'var(--danger)' } : undefined}>
+                        · stock {fmtQte(l.stock)}{rupture ? ' ⚠ dépasse le stock' : ''}
+                      </span>
+                    );
+                  })()}
                 </td>
 
                 {vis('tarif') && (

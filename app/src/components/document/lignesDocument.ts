@@ -26,6 +26,8 @@ export type LigneDoc = {
   tarif?: number;
   /** Prix HT des 4 tiers de l'article, figés à l'ajout (pour le sélecteur de tarif). */
   prixTiers?: number[];
+  /** Stock disponible de l'article au moment de l'ajout (alerte de survente en vente). */
+  stock?: number;
 };
 
 export type Sens = 'vente' | 'achat';
@@ -64,6 +66,7 @@ export function ligneDepuisArticle(a: Article, sens: Sens): LigneDoc {
     date_peremption: '',
     tarif: sens === 'vente' ? 1 : undefined,
     prixTiers: tiers,
+    stock: a.qte_reale != null ? Number(a.qte_reale) : undefined,
   };
 }
 
