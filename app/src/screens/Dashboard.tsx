@@ -1,7 +1,7 @@
 import { useQuery } from '@apollo/client';
 import { Link } from 'react-router-dom';
 import { DASHBOARD } from '../api/dashboard';
-import { StatVentesResult, DebiteursResult } from '../api/types';
+import { StatVentesResult, DebiteursResult, StatParFamille } from '../api/types';
 import { fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 
 type SoldeCaisse = { banque: string; solde: number; total_entrees: number; total_sorties: number };
@@ -19,6 +19,11 @@ export default function Dashboard() {
 
   const lignes = stat?.lignes ?? [];
   const maxJour = Math.max(1, ...lignes.map((l) => Number(l.total_ttc ?? 0)));
+
+  const famillesBrutes: StatParFamille[] = Array.isArray(data?.statVentesParFamille) ? data.statVentesParFamille : [];
+  // Classement par CA décroissant puis top 6 (le serveur trie par nom, pas par valeur)
+  const familles = [...famillesBrutes].sort((a, b) => Number(b.total_ttc ?? 0) - Number(a.total_ttc ?? 0)).slice(0, 6);
+  const maxFam = Math.max(1, ...familles.map((f) => Number(f.total_ttc ?? 0)));
 
   return (
     <div className="flex flex-col gap-4">
@@ -56,14 +61,34 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <div className="font-bold text-[13px] mb-3">CA par jour — mois en cours</div>
-        {lignes.length === 0 && <div className="text-ink-muted text-[12px]">Aucune vente sur la période.</div>}
-        <div className="flex items-end gap-1 h-[110px]">
-          {lignes.map((l) => (
-            <div key={l.periode} className="flex-1 rounded-t-sm min-w-[6px]" title={`${l.periode} : ${fmtMoney(l.total_ttc)} DA`}
-                 style={{ height: `${(Number(l.total_ttc) / maxJour) * 100}%`, background: 'var(--brand-500)', opacity: 0.85 }} />
-          ))}
+      <div className="grid grid-cols-[1.5fr_1fr] gap-4 items-start">
+        <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+          <div className="font-bold text-[13px] mb-3">CA par jour — mois en cours</div>
+          {lignes.length === 0 && <div className="text-ink-muted text-[12px]">Aucune vente sur la période.</div>}
+          <div className="flex items-end gap-1 h-[110px]">
+            {lignes.map((l) => (
+              <div key={l.periode} className="flex-1 rounded-t-sm min-w-[6px]" title={`${l.periode} : ${fmtMoney(l.total_ttc)} DA`}
+                   style={{ height: `${(Number(l.total_ttc) / maxJour) * 100}%`, background: 'var(--brand-500)', opacity: 0.85 }} />
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+          <div className="font-bold text-[13px] mb-3">Top familles — CA TTC du mois</div>
+          {familles.length === 0 && <div className="text-ink-muted text-[12px]">Aucune donnée.</div>}
+          <div className="flex flex-col gap-2.5">
+            {familles.map((f) => (
+              <div key={f.famille || '—'}>
+                <div className="flex justify-between text-[11.5px] mb-0.5">
+                  <span className="font-semibold truncate pr-2">{f.famille || '(sans famille)'}</span>
+                  <span className="money text-ink-muted whitespace-nowrap">{fmtMoney(f.total_ttc)}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-line-soft overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${(Number(f.total_ttc) / maxFam) * 100}%`, background: 'var(--brand-500)' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

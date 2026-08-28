@@ -4,6 +4,7 @@ import { gql } from '@apollo/client';
 export const DASHBOARD = gql`
   query Dashboard($debutMois: String, $aujourdhui: String) {
     statVentes(date_debut: $debutMois, date_fin: $aujourdhui, groupement: "jour")
+    statVentesParFamille(date_debut: $debutMois, date_fin: $aujourdhui)
     soldesCaisse
     debiteurs(limit: 1, offset: 0)
     alertesStock

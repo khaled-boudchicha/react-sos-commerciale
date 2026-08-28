@@ -37,7 +37,7 @@ Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sau
 - ☐ **Dashboard v1** branché (statVentes mois, soldesCaisse, debiteurs, alertesStock) — vérifier les formes JSON réelles contre un agent en ligne
 
 ## Phase 3 — Lecture (tout existe déjà côté serveurs) — ◐ démarré 25/08/2026
-- ◐ **Dashboard** : KPI branchés (statVentes mois + marge, soldesCaisse, debiteurs+buckets, alertesStock) + barres CA/jour — ☐ péremption, donut familles
+- ◐ **Dashboard** : KPI branchés (statVentes mois + marge, soldesCaisse, debiteurs+buckets, alertesStock) + barres CA/jour + **répartition « Top familles » du mois** (28/08/2026, `statVentesParFamille` ajouté à la requête Dashboard, tri CA desc top 6, barres) — ☐ péremption (nécessite une requête serveur lots-expirant)
 - ☑ **Documents de vente** : liste unifiée 7 types + **détail pièce** + **journal ligne à ligne** (onglet Documents/Journal, filtre code article, marge par ligne et totaux) — validé E2E (100 lignes mars 2026, 3,99 M TTC / 375 170 de marge)
 - ☑ **Documents d'achat** : liste 6 types + **détail pièce** + **journal ligne à ligne**
 - ◐ **Articles & stock** : grille paginée (recherche, vues alerte/marge négative, état stock) + **fiche article** (lots avec badge péremption J-n, tarifs par qté, codes-barres) — ☐ stocks par dépôt, mouvements
