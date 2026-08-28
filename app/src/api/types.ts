@@ -37,7 +37,12 @@ export type Article = {
   type?: string | null; unite_mesure?: string | null; depot?: string | null;
   pmp?: number | null; prix_achat_ht?: number | null;
   prix_vente_ht?: number | null; prix_vente_ttc?: number | null;
+  // Tiers de prix 2 à 4 (le tier 1 = prix_vente_ht). Renvoyés par l'agent.
+  prix_vente_ht1?: number | null; prix_vente_ht2?: number | null; prix_vente_ht3?: number | null;
+  prix_vente_ttc1?: number | null; prix_vente_ttc2?: number | null; prix_vente_ttc3?: number | null;
   marge?: number | null; margep?: number | null; tva?: number | null;
+  marge1?: number | null; marge2?: number | null; marge3?: number | null;
+  margep1?: number | null; margep2?: number | null; margep3?: number | null;
   qte_reale?: number | null; qte_theorique?: number | null;
   stock_min?: number | null; code_bare?: string | null; actif?: boolean | null;
 };

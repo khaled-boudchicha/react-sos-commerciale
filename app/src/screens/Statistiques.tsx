@@ -86,30 +86,30 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   ];
 
   const colArticle: Column<StatArticleVente>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
-    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b> },
-    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
-    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span> },
-    { key: 'ht', header: 'CA HT', align: 'right', width: '120px', render: (a) => <Money value={a.total_ht} /> },
-    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (a) => <MargeCell value={a.total_marge} /> },
-    { key: 'pct', header: '%', align: 'right', width: '70px', render: (a) => <Pct value={a.pct_marge} /> },
+    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span>, sortAccessor: (a) => a.code_article },
+    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b>, sortAccessor: (a) => (a.designation ?? '').trim() },
+    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span>, sortAccessor: (a) => a.famille ?? '' },
+    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span>, sortAccessor: (a) => Number(a.qte) },
+    { key: 'ht', header: 'CA HT', align: 'right', width: '120px', render: (a) => <Money value={a.total_ht} />, sortAccessor: (a) => Number(a.total_ht) },
+    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (a) => <MargeCell value={a.total_marge} />, sortAccessor: (a) => Number(a.total_marge) },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (a) => <Pct value={a.pct_marge} />, sortAccessor: (a) => Number(a.pct_marge) },
   ];
 
   const colClient: Column<StatClient>[] = [
-    { key: 'code', header: 'Code', width: '80px', render: (c) => <span className="money">{c.code_cli}</span> },
-    { key: 'raison', header: 'Client', render: (c) => <b>{(c.raison ?? '').trim() || '—'}</b> },
-    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (c) => <span className="money">{c.nb_factures}</span> },
-    { key: 'ht', header: 'CA HT', align: 'right', width: '130px', render: (c) => <Money value={c.total_ht} /> },
-    { key: 'ttc', header: 'CA TTC', align: 'right', width: '130px', render: (c) => <Money value={c.total_ttc} /> },
-    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (c) => <MargeCell value={c.total_marge} /> },
-    { key: 'pct', header: '%', align: 'right', width: '70px', render: (c) => <Pct value={c.pct_marge} /> },
+    { key: 'code', header: 'Code', width: '80px', render: (c) => <span className="money">{c.code_cli}</span>, sortAccessor: (c) => c.code_cli },
+    { key: 'raison', header: 'Client', render: (c) => <b>{(c.raison ?? '').trim() || '—'}</b>, sortAccessor: (c) => (c.raison ?? '').trim() },
+    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (c) => <span className="money">{c.nb_factures}</span>, sortAccessor: (c) => Number(c.nb_factures) },
+    { key: 'ht', header: 'CA HT', align: 'right', width: '130px', render: (c) => <Money value={c.total_ht} />, sortAccessor: (c) => Number(c.total_ht) },
+    { key: 'ttc', header: 'CA TTC', align: 'right', width: '130px', render: (c) => <Money value={c.total_ttc} />, sortAccessor: (c) => Number(c.total_ttc) },
+    { key: 'marge', header: 'Marge', align: 'right', width: '120px', render: (c) => <MargeCell value={c.total_marge} />, sortAccessor: (c) => Number(c.total_marge) },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (c) => <Pct value={c.pct_marge} />, sortAccessor: (c) => Number(c.pct_marge) },
   ];
 
   const colFamille: Column<StatParFamille>[] = [
-    { key: 'fam', header: 'Famille', render: (f) => <b>{f.famille || '(sans famille)'}</b> },
-    { key: 'ht', header: 'CA HT', align: 'right', render: (f) => <Money value={f.total_ht} /> },
-    { key: 'ttc', header: 'CA TTC', align: 'right', render: (f) => <Money value={f.total_ttc} /> },
-    { key: 'marge', header: 'Marge', align: 'right', render: (f) => <MargeCell value={f.total_marge} /> },
+    { key: 'fam', header: 'Famille', render: (f) => <b>{f.famille || '(sans famille)'}</b>, sortAccessor: (f) => f.famille ?? '' },
+    { key: 'ht', header: 'CA HT', align: 'right', render: (f) => <Money value={f.total_ht} />, sortAccessor: (f) => Number(f.total_ht) },
+    { key: 'ttc', header: 'CA TTC', align: 'right', render: (f) => <Money value={f.total_ttc} />, sortAccessor: (f) => Number(f.total_ttc) },
+    { key: 'marge', header: 'Marge', align: 'right', render: (f) => <MargeCell value={f.total_marge} />, sortAccessor: (f) => Number(f.total_marge) },
   ];
 
   return (
@@ -195,23 +195,23 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
   ];
 
   const colFournisseur: Column<StatFournisseur>[] = [
-    { key: 'code', header: 'Code', width: '80px', render: (f) => <span className="money">{f.code_four}</span> },
-    { key: 'nom', header: 'Fournisseur', render: (f) => <b>{(f.fournisseur ?? '').trim() || '—'}</b> },
-    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (f) => <span className="money">{f.nb_factures}</span> },
-    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (f) => <Money value={f.total_ht} /> },
-    { key: 'ttc', header: 'Achats TTC', align: 'right', width: '130px', render: (f) => <Money value={f.total_ttc} /> },
+    { key: 'code', header: 'Code', width: '80px', render: (f) => <span className="money">{f.code_four}</span>, sortAccessor: (f) => f.code_four },
+    { key: 'nom', header: 'Fournisseur', render: (f) => <b>{(f.fournisseur ?? '').trim() || '—'}</b>, sortAccessor: (f) => (f.fournisseur ?? '').trim() },
+    { key: 'nb', header: 'Pièces', align: 'right', width: '80px', render: (f) => <span className="money">{f.nb_factures}</span>, sortAccessor: (f) => Number(f.nb_factures) },
+    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (f) => <Money value={f.total_ht} />, sortAccessor: (f) => Number(f.total_ht) },
+    { key: 'ttc', header: 'Achats TTC', align: 'right', width: '130px', render: (f) => <Money value={f.total_ttc} />, sortAccessor: (f) => Number(f.total_ttc) },
     { key: 'reste', header: 'Reste à payer', align: 'right', width: '130px', render: (f) => (
       <span className="money font-medium" style={{ color: Number(f.reste_a_payer) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(f.reste_a_payer)}</span>
-    ) },
+    ), sortAccessor: (f) => Number(f.reste_a_payer) },
   ];
 
   const colArticle: Column<StatArticleAchat>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
-    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b> },
-    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
-    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span> },
-    { key: 'pmp', header: 'PMP moyen', align: 'right', width: '120px', render: (a) => <Money value={a.pmp_moyen} /> },
-    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (a) => <Money value={a.total_ht} /> },
+    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span>, sortAccessor: (a) => a.code_article },
+    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').trim() || '—'}</b>, sortAccessor: (a) => (a.designation ?? '').trim() },
+    { key: 'fam', header: 'Famille', width: '130px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span>, sortAccessor: (a) => a.famille ?? '' },
+    { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (a) => <span className="money">{fmtMoney(a.qte, 2)}</span>, sortAccessor: (a) => Number(a.qte) },
+    { key: 'pmp', header: 'PMP moyen', align: 'right', width: '120px', render: (a) => <Money value={a.pmp_moyen} />, sortAccessor: (a) => Number(a.pmp_moyen) },
+    { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (a) => <Money value={a.total_ht} />, sortAccessor: (a) => Number(a.total_ht) },
   ];
 
   return (
@@ -265,15 +265,15 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
   const taux = Number(res?.total_ht) > 0 ? (Number(res?.total_benefice) / Number(res?.total_ht)) * 100 : 0;
 
   const columns: Column<BeneficeLigne>[] = [
-    { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b> },
-    { key: 'ht', header: 'CA HT', align: 'right', render: (l) => <Money value={l.total_ht} /> },
-    { key: 'revien', header: 'Coût de revient', align: 'right', render: (l) => <Money value={l.total_revien} /> },
-    { key: 'brut', header: 'Bénéfice brut', align: 'right', render: (l) => <MargeCell value={l.benefice_brut} /> },
-    { key: 'remise', header: 'Remises', align: 'right', render: (l) => <Money value={l.remise} /> },
-    { key: 'net', header: 'Après remises', align: 'right', render: (l) => <MargeCell value={l.benefice_avec_remise} /> },
+    { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b>, sortAccessor: (l) => l.periode },
+    { key: 'ht', header: 'CA HT', align: 'right', render: (l) => <Money value={l.total_ht} />, sortAccessor: (l) => Number(l.total_ht) },
+    { key: 'revien', header: 'Coût de revient', align: 'right', render: (l) => <Money value={l.total_revien} />, sortAccessor: (l) => Number(l.total_revien) },
+    { key: 'brut', header: 'Bénéfice brut', align: 'right', render: (l) => <MargeCell value={l.benefice_brut} />, sortAccessor: (l) => Number(l.benefice_brut) },
+    { key: 'remise', header: 'Remises', align: 'right', render: (l) => <Money value={l.remise} />, sortAccessor: (l) => Number(l.remise) },
+    { key: 'net', header: 'Après remises', align: 'right', render: (l) => <MargeCell value={l.benefice_avec_remise} />, sortAccessor: (l) => Number(l.benefice_avec_remise) },
     { key: 'pct', header: '%', align: 'right', width: '70px', render: (l) => (
       <Pct value={Number(l.total_ht) > 0 ? (Number(l.benefice_brut) / Number(l.total_ht)) * 100 : 0} />
-    ) },
+    ), sortAccessor: (l) => (Number(l.total_ht) > 0 ? (Number(l.benefice_brut) / Number(l.total_ht)) * 100 : 0) },
   ];
 
   return (

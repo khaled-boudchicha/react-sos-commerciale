@@ -7,10 +7,22 @@ import { buildTresoreriePrint } from '../print/templates';
 import MouvementCaisseModal, { MouvementKind } from '../components/MouvementCaisseModal';
 import { TresorieCompleteResult, MouvementTresorie, SoldeCompte } from '../api/types';
 import { fmtDate, fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
+import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
 
 const LIMIT = 50;
+
+const csvMouvements: ExportColumn<MouvementTresorie>[] = [
+  { header: 'Date', value: (m) => (m.date ? fmtDate(m.date) : '') },
+  { header: 'Catégorie', value: (m) => m.categorie ?? '' },
+  { header: 'Tiers / libellé', value: (m) => m.tier || m.objet || m.code_tier || m.observation || '' },
+  { header: 'Compte', value: (m) => m.compte ?? '' },
+  { header: 'Mode', value: (m) => m.mode_payement ?? '' },
+  { header: 'Utilisateur', value: (m) => m.user ?? '' },
+  { header: 'Montant', value: (m) => m.montant, numeric: true },
+  { header: 'Solde cumulé', value: (m) => m.solde_cumul, numeric: true },
+];
 
 export default function Tresorerie() {
   const [compteId, setCompteId] = useState<number | null>(null);
@@ -31,6 +43,15 @@ export default function Tresorerie() {
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [fetchAll, { loading: printing }] = useLazyQuery(TRESORIE_COMPLETE, { fetchPolicy: 'network-only' });
+  const [fetchExport, { loading: exporting }] = useLazyQuery(TRESORIE_COMPLETE, { fetchPolicy: 'network-only' });
+
+  async function exporter() {
+    // Tous les mouvements de la période/compte, dans l'ordre chronologique cumulé.
+    const { data: all } = await fetchExport({
+      variables: { compte_id: compteId ?? undefined, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 },
+    });
+    exporterCsv('tresorerie', csvMouvements, all?.tresorieComplete?.data ?? []);
+  }
 
   async function printEtat() {
     // Tous les mouvements de la période (pas seulement la page affichée)
@@ -70,6 +91,11 @@ export default function Tresorerie() {
         <button onClick={() => void printEtat()} disabled={printing}
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {printing ? 'Préparation…' : "Imprimer l'état"}
+        </button>
+        <button onClick={() => void exporter()} disabled={exporting}
+                title="Exporter tous les mouvements en CSV (Excel)"
+                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+          {exporting ? 'Export…' : '⬇ CSV'}
         </button>
         <button onClick={() => setMouvement('transfert')}
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">

@@ -40,7 +40,7 @@ export default function Achats() {
 
   const csvDocs: ExportColumn<Achat>[] = [
     { header: 'N° pièce', value: (r) => r.numero },
-    { header: 'Date', value: (r) => r.date },
+    { header: 'Date', value: (r) => (r.date ? fmtDate(r.date) : '') },
     { header: 'Fournisseur', value: (r) => r.raison ?? r.code_four ?? r.code_cli ?? '' },
     { header: 'Mode', value: (r) => r.mode_payement ?? '' },
     { header: 'Net à payer', value: (r) => r.net_a_payer ?? r.total_ttc, numeric: true },

@@ -7,6 +7,8 @@ import { fmtMoney, fmtQte, isoToday } from '../lib/format';
 import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
 import ArticleSearch from '../components/ArticleSearch';
 import ClientSearch from '../components/ClientSearch';
+import LignesTable from '../components/document/LignesTable';
+import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
 
 const CREATE_VENTE = gql`
   mutation CreateVente($input: JSON!) { createVente(input: $input) }
@@ -17,19 +19,6 @@ const ADD_REGLEMENT_CLIENT = gql`
 const MODES = gql`
   query ModesPayementEditor { modesPayement }
 `;
-
-type Ligne = {
-  key: number;
-  id_article?: number;
-  code_article: string;
-  designation: string;
-  qte: number;
-  prix_ht: number;
-  tva: number;
-  remise: number;
-};
-
-let lineKey = 1;
 
 export default function VenteEditor() {
   const navigate = useNavigate();
@@ -43,7 +32,7 @@ export default function VenteEditor() {
   const [mode, setMode] = useState('Espece');
   const [remiseGlobale, setRemiseGlobale] = useState(0);
   const [observation, setObservation] = useState('');
-  const [lignes, setLignes] = useState<Ligne[]>([]);
+  const [lignes, setLignes] = useState<LigneDoc[]>([]);
   const [montantRecu, setMontantRecu] = useState('');
   const [error, setError] = useState<string | null>(null);
   const montantRecuRef = useRef<HTMLInputElement>(null);
@@ -62,20 +51,11 @@ export default function VenteEditor() {
         next[idx] = { ...next[idx], qte: next[idx].qte + 1 };
         return next;
       }
-      return [...ls, {
-        key: lineKey++,
-        id_article: a.id,
-        code_article: a.code,
-        designation: a.designation,
-        qte: 1,
-        prix_ht: Number(a.prix_vente_ht ?? 0),
-        tva: Number(a.tva ?? 0),
-        remise: 0,
-      }];
+      return [...ls, ligneDepuisArticle(a, 'vente')];
     });
   }
 
-  function patchLigne(key: number, patch: Partial<Ligne>) {
+  function patchLigne(key: number, patch: Partial<LigneDoc>) {
     setLignes((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   }
 
@@ -84,18 +64,7 @@ export default function VenteEditor() {
   }
 
   // Mêmes formules que l'agent (createVente) : ht = qte×prix×(1−rem/100) ; ttc = ht×(1+tva/100) ; remise globale sur le net
-  const totaux = useMemo(() => {
-    let ht = 0, ttc = 0, remLignes = 0;
-    for (const l of lignes) {
-      const brut = l.qte * l.prix_ht;
-      const net = brut * (1 - (l.remise || 0) / 100);
-      remLignes += brut - net;
-      ht += net;
-      ttc += net * (1 + l.tva / 100);
-    }
-    const remGlob = ttc * ((remiseGlobale || 0) / 100);
-    return { ht, remLignes, tva: ttc - ht, remGlob, net: ttc - remGlob };
-  }, [lignes, remiseGlobale]);
+  const totaux = useMemo(() => totauxDocument(lignes, remiseGlobale), [lignes, remiseGlobale]);
 
   async function save(recuOverride?: number) {
     setError(null);
@@ -121,6 +90,9 @@ export default function VenteEditor() {
               prix_ht: l.prix_ht,
               tva: l.tva,
               remise: l.remise || 0,
+              n_lot: l.n_lot || undefined,
+              date_peremption: l.date_peremption || undefined,
+              colis: l.colis || undefined,
             })),
           },
         },
@@ -163,8 +135,6 @@ export default function VenteEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lignes, saving, totaux.net, client, date, mode, remiseGlobale, observation, dossierUser]);
 
-  const cellCls = 'w-full bg-transparent text-right money text-[12px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
-
   return (
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Nouvelle pièce de vente">
@@ -206,47 +176,7 @@ export default function VenteEditor() {
       <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">
         <div className="flex flex-col gap-2.5">
           <ArticleSearch onSelect={addArticle} autoFocus />
-          <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-x-auto">
-            <table className="w-full text-[12px] border-collapse">
-              <thead>
-                <tr>
-                  {['Article', 'Qté', 'P.U. HT', 'Rem. %', 'TVA %', 'Total TTC', ''].map((h, i) => (
-                    <th key={i} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-2 ${i > 0 && i < 6 ? 'text-right' : 'text-left'}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-ink-muted">
-                    Recherchez un article ci-dessus, ou scannez un code-barres. Entrée pour l'ajouter.
-                  </td></tr>
-                )}
-                {lignes.map((l) => {
-                  const net = l.qte * l.prix_ht * (1 - (l.remise || 0) / 100);
-                  const ttc = net * (1 + l.tva / 100);
-                  return (
-                    <tr key={l.key} className="border-b border-line-soft last:border-b-0">
-                      <td className="px-3 py-1">
-                        <b>{l.designation}</b>
-                        <span className="money text-[10.5px] text-ink-muted"> · {l.code_article}</span>
-                      </td>
-                      <td className="w-[80px]"><input type="number" min="0" step="any" value={l.qte}
-                        onChange={(e) => patchLigne(l.key, { qte: parseFloat(e.target.value) || 0 })} className={cellCls} /></td>
-                      <td className="w-[100px]"><input type="number" min="0" step="0.01" value={l.prix_ht}
-                        onChange={(e) => patchLigne(l.key, { prix_ht: parseFloat(e.target.value) || 0 })} className={cellCls} /></td>
-                      <td className="w-[75px]"><input type="number" min="0" max="100" step="0.5" value={l.remise}
-                        onChange={(e) => patchLigne(l.key, { remise: parseFloat(e.target.value) || 0 })} className={cellCls} /></td>
-                      <td className="w-[65px] text-right money px-3">{fmtQte(l.tva)}</td>
-                      <td className="w-[110px] text-right money font-semibold px-3">{fmtMoney(ttc)}</td>
-                      <td className="w-[36px] text-center">
-                        <button onClick={() => removeLigne(l.key)} className="text-ink-muted hover:text-[color:var(--danger)] font-bold">✕</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <LignesTable sens="vente" lignes={lignes} patch={patchLigne} remove={removeLigne} />
           <label className="text-[11px] font-bold text-ink-label">Note
             <input value={observation} onChange={(e) => setObservation(e.target.value)}
                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
