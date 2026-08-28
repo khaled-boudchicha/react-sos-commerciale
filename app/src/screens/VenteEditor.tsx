@@ -119,9 +119,15 @@ export default function VenteEditor() {
     }
   }
 
-  // F10 = encaisser tout et enregistrer (héritage Delphi)
+  // Raccourcis Delphi : F2 = recherche article, F3 = recherche client, F10 = encaisser tout
   useEffect(() => {
+    function focusPlaceholder(prefixe: string) {
+      const el = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').startsWith(prefixe));
+      if (el) { el.focus(); (el as HTMLInputElement).select?.(); }
+    }
     function onKey(e: KeyboardEvent) {
+      if (e.key === 'F2') { e.preventDefault(); focusPlaceholder('Article'); return; }
+      if (e.key === 'F3') { e.preventDefault(); focusPlaceholder('Client'); return; }
       if (e.key === 'F10') {
         e.preventDefault();
         if (lignes.length > 0 && !saving) {
@@ -205,6 +211,22 @@ export default function VenteEditor() {
                 </button>
               </div>
             </label>
+            {(() => {
+              const recu = parseFloat(montantRecu) || 0;
+              const rendu = recu - totaux.net;
+              if (recu <= 0) return null;
+              return rendu >= 0 ? (
+                <div className="flex justify-between items-center px-1 text-[12px] font-bold" style={{ color: 'var(--success)' }}>
+                  <span>À rendre</span>
+                  <span className="money text-[14px]">{fmtMoney(rendu)} DA</span>
+                </div>
+              ) : (
+                <div className="flex justify-between items-center px-1 text-[12px] font-bold" style={{ color: 'var(--warning)' }}>
+                  <span>Reste dû</span>
+                  <span className="money text-[14px]">{fmtMoney(-rendu)} DA</span>
+                </div>
+              );
+            })()}
             <button onClick={() => void save()} disabled={saving || lignes.length === 0}
                     className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
               {saving ? 'Enregistrement…' : 'Enregistrer la pièce'}

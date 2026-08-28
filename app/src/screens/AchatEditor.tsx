@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Article, Fournisseur, TYPES_ACHAT } from '../api/types';
@@ -56,6 +56,20 @@ export default function AchatEditor() {
   }
 
   const totaux = useMemo(() => totauxDocument(lignes, remiseGlobale), [lignes, remiseGlobale]);
+
+  // Raccourcis : F2 = recherche article, F3 = recherche fournisseur
+  useEffect(() => {
+    function focusPlaceholder(prefixe: string) {
+      const el = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').startsWith(prefixe));
+      if (el) { el.focus(); (el as HTMLInputElement).select?.(); }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'F2') { e.preventDefault(); focusPlaceholder('Article'); }
+      if (e.key === 'F3') { e.preventDefault(); focusPlaceholder('Fournisseur'); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   async function save() {
     setError(null);
