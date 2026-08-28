@@ -56,6 +56,7 @@ export default function Stock() {
     createDoc: CREATE_ARTICLE, updateDoc: UPDATE_ARTICLE, deleteDoc: DELETE_ARTICLE,
     onDone: () => { void refetch(); },
     labelOf: (a) => `${a.designation} (${a.code})`,
+    formExtra: (v) => <MatricePrix values={v} />,
   });
 
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
@@ -139,5 +140,60 @@ export default function Stock() {
                 footer={{ _label: `${res?.total ?? 0} article(s)` }} />
       {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
     </div>
+  );
+}
+
+/**
+ * Aperçu calculé des 4 prix de vente : pour chaque tier, TTC (via TVA), marge et
+ * marge % (relative au prix d'achat, comme l'agent). Purement réactif aux
+ * valeurs du formulaire — n'envoie rien au serveur, qui recalcule de son côté.
+ */
+function MatricePrix({ values }: { values: Record<string, unknown> }) {
+  const n = (k: string) => Number(values[k] ?? 0) || 0;
+  const achat = n('prix_achat_ht');
+  const tva = n('tva');
+  const tiers = [
+    { label: 'Prix 1 (principal)', ht: n('prix_vente_ht') },
+    { label: 'Prix 2',             ht: n('prix_vente_ht1') },
+    { label: 'Prix 3',             ht: n('prix_vente_ht2') },
+    { label: 'Prix 4',             ht: n('prix_vente_ht3') },
+  ];
+  return (
+    <section>
+      <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-2">
+        Aperçu des marges (calcul automatique)
+      </h3>
+      <div className="border border-line-soft rounded-md overflow-hidden">
+        <table className="w-full text-[12px] border-collapse">
+          <thead>
+            <tr>
+              {['Tarif', 'P.V. HT', 'P.V. TTC', 'Marge', 'Marge %'].map((h, i) => (
+                <th key={h} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-1.5 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map((t) => {
+              const ttc = t.ht * (1 + tva / 100);
+              const marge = t.ht - achat;
+              const margep = achat > 0 ? (marge / achat) * 100 : 0;
+              const neg = marge < 0;
+              return (
+                <tr key={t.label} className="border-b border-line-soft last:border-b-0">
+                  <td className="px-3 py-1.5 font-semibold">{t.label}</td>
+                  <td className="px-3 py-1.5 text-right money">{fmtMoney(t.ht)}</td>
+                  <td className="px-3 py-1.5 text-right money">{fmtMoney(ttc)}</td>
+                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger)' : 'var(--success)' }}>{fmtMoney(marge)}</td>
+                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger)' : undefined }}>{fmtQte(margep)} %</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="text-[10.5px] text-ink-muted mt-1">
+        La marge % est calculée par rapport au prix d'achat HT. Le serveur enregistre les 4 prix et recalcule TTC/marges.
+      </div>
+    </section>
   );
 }

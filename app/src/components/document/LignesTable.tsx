@@ -5,9 +5,9 @@ import {
   netHtLigne, totalTtcLigne, prixTtcUnitaire, remiseMontantLigne,
   depuisPrixTtc, depuisRemiseMontant,
 } from './lignesDocument';
+import LotCell from './LotCell';
 
 const cellNum = 'w-full bg-transparent text-right money text-[12px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
-const cellTxt = 'w-full bg-transparent money text-[11px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
 
 /** Nombre édité sans imposer un 0 collant : champ vide toléré pendant la saisie. */
 function num(v: string): number { return parseFloat(v) || 0; }
@@ -106,8 +106,7 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
                 <td className="w-[62px] text-right money px-3">{fmtQte(l.tva)}</td>
 
                 {vis('lot') && (
-                  <td className="w-[90px]"><input value={l.n_lot ?? ''} placeholder="—"
-                    onChange={(e) => patch(l.key, { n_lot: e.target.value })} className={cellTxt} /></td>
+                  <td className="w-[150px]"><LotCell sens={sens} line={l} patch={patch} /></td>
                 )}
 
                 {vis('peremption') && (

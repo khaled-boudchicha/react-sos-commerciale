@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 import { DocumentNode, useMutation } from '@apollo/client';
 import FormModal, { Section } from '../components/ui/FormModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -16,7 +16,7 @@ type Entity = { id: number } & Record<string, unknown>;
  *   {crud.modals}
  */
 export function useCrud<T extends Entity>({
-  label, createTitle, editTitle, deleteTitle, sections, createDoc, updateDoc, deleteDoc, onDone, labelOf, width,
+  label, createTitle, editTitle, deleteTitle, sections, createDoc, updateDoc, deleteDoc, onDone, labelOf, width, formExtra,
 }: {
   label: string;
   /** Titres si l'élision française diffère (ex. « Nouvel article », « Modifier l'article »). */
@@ -32,6 +32,8 @@ export function useCrud<T extends Entity>({
   /** Texte identifiant la ligne dans la confirmation de suppression. */
   labelOf: (row: T) => string;
   width?: number;
+  /** Aperçu réactif rendu sous le formulaire (ex. matrice de prix calculée). */
+  formExtra?: (values: Record<string, unknown>) => ReactNode;
 }) {
   const [editing, setEditing] = useState<T | null | 'new'>(null);
   const [deleting, setDeleting] = useState<T | null>(null);
@@ -87,6 +89,7 @@ export function useCrud<T extends Entity>({
           loading={creating || updating}
           error={error}
           width={width}
+          renderExtra={formExtra}
           onSubmit={submit}
           onCancel={() => { setEditing(null); setError(null); }}
         />

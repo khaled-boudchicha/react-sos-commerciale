@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ReactNode, useState } from 'react';
 
 export type Field = {
   /** Clé envoyée au serveur (doit correspondre à l'input GraphQL). */
@@ -23,7 +23,7 @@ export type Section = { title: string; fields: Field[] };
  * create → input à plat ; update → { id, input }).
  */
 export default function FormModal({
-  title, sections, initial, submitLabel, loading, error, onSubmit, onCancel, width = 720,
+  title, sections, initial, submitLabel, loading, error, onSubmit, onCancel, width = 720, renderExtra,
 }: {
   title: string;
   sections: Section[];
@@ -34,6 +34,8 @@ export default function FormModal({
   onSubmit: (values: Record<string, unknown>) => void;
   onCancel: () => void;
   width?: number;
+  /** Contenu additionnel réactif aux valeurs (ex. aperçu calculé). Rendu sous les sections. */
+  renderExtra?: (values: Record<string, unknown>) => ReactNode;
 }) {
   const isEdit = !!initial;
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -132,6 +134,7 @@ export default function FormModal({
               </div>
             </section>
           ))}
+          {renderExtra?.(values)}
         </div>
 
         <div className="flex gap-2 justify-end px-5 py-3.5 border-t border-line-soft flex-none">
