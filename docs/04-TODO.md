@@ -118,3 +118,5 @@ Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sau
 Phase 0 (validation) → 1 et 2 en parallèle → 3 → 4 → 5 → 6 → 7 → 8 (les tests de parité dès Phase 3).
 
 - ☑ **Impression directe / silencieuse (tickets)** (29/08/2026) : IPC Electron `printers:list` + `print:silent` (fenêtre cachée → `webContents.print({silent})`), exposé via preload `window.gc.printers/printSilent`, util `print/engine/silentPrint.ts`, bouton « Impression directe » dans `PrintPreview` (masqué hors Electron) + réglage « Imprimante ticket » dans Paramètres. Dégradation gracieuse en navigateur. ⚠️ impression physique à valider sur poste (Electron + imprimante réelle).
+
+- ☑ **Page de diagnostic de connexion** (29/08/2026) : `/diagnostic` (lien depuis Paramètres) teste cloud (ping+latence), agent (myAgents), session (sessionStatus), et le chemin **cloud→agent→base** (modesPayement) ; pastilles vert/orange/rouge + latences + actions « Retester » et « Renouveler le jeton ». Validé E2E.

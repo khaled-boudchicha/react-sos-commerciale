@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery } from '@apollo/client';
 import { COORDONNEES_SOCIETE, UPDATE_COORDONNEES, NUMEROTATION_DOCS, SET_NUMEROTATION } from '../api/queries';
 import FormModal from '../components/ui/FormModal';
@@ -69,7 +70,10 @@ export default function Parametres() {
       </section>
 
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <h2 className="font-bold text-[13px] mb-3">Connexion</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-[13px]">Connexion</h2>
+          <Link to="/diagnostic" className="text-[11.5px] font-bold text-brand-700">Diagnostic de connexion →</Link>
+        </div>
         <div className="text-[12px] text-ink-label flex flex-col gap-1.5">
           <div>Agent : <b>{agent?.label ?? agent?.agentId}</b></div>
           <div>Dossier : <b>{dossier}</b></div>

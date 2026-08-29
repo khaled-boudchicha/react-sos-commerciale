@@ -20,6 +20,7 @@ import Tresorerie from './screens/Tresorerie';
 import Statistiques from './screens/Statistiques';
 import Referentiels from './screens/Referentiels';
 import Parametres from './screens/Parametres';
+import Diagnostic from './screens/Diagnostic';
 
 export default function App() {
   const { hydrated, token, dossier, dossierUser } = useSession();
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="statistiques" element={<Statistiques />} />
           <Route path="referentiels" element={<Referentiels />} />
           <Route path="parametres" element={<Parametres />} />
+          <Route path="diagnostic" element={<Diagnostic />} />
         </Route>
       </Routes>
     </HashRouter>
