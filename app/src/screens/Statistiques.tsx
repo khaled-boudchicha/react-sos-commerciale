@@ -221,13 +221,16 @@ const VUES_ACHATS = [
 function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
   const [vue, setVue] = useState<(typeof VUES_ACHATS)[number]['code']>('periode');
   const [groupement, setGroupement] = useState<Groupement>('mois');
+  // Filtre fournisseur appliqué CÔTÉ SERVEUR (param de statAchatsParArticle).
+  const [codeFour, setCodeFour] = useState('');
   const periode = { date_debut: debut, date_fin: fin };
 
   const { data, loading, error } = useQuery(STAT_ACHATS, { variables: { ...periode, groupement } });
   const res: StatAchatsResult | undefined = data?.statAchats;
 
-  const four = useQuery(STAT_ACHATS_PAR_FOURNISSEUR, { variables: periode, skip: vue !== 'fournisseur' });
-  const art = useQuery(STAT_ACHATS_PAR_ARTICLE, { variables: periode, skip: vue !== 'article' });
+  // Toujours chargée : alimente les graphiques fournisseur ET les options du filtre.
+  const four = useQuery(STAT_ACHATS_PAR_FOURNISSEUR, { variables: periode });
+  const art = useQuery(STAT_ACHATS_PAR_ARTICLE, { variables: { ...periode, code_four: codeFour || undefined }, skip: vue !== 'article' });
   const fournisseurs: StatFournisseur[] = Array.isArray(four.data?.statAchatsParFournisseur) ? four.data.statAchatsParFournisseur : [];
   const articles: StatArticleAchat[] = Array.isArray(art.data?.statAchatsParArticle) ? art.data.statAchatsParArticle : [];
 
@@ -271,7 +274,19 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
           <Kpi label="Pièces d'achat" value={String(res.nb_factures ?? 0)} />
         </div>
       )}
-      <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} />
+        {vue === 'article' && (
+          <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
+            Filtrer par fournisseur
+            <select value={codeFour} onChange={(e) => setCodeFour(e.target.value)}
+                    className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal max-w-[220px]">
+              <option value="">Tous les fournisseurs</option>
+              {fournisseurs.map((f) => <option key={f.code_four} value={f.code_four}>{(f.fournisseur ?? '').trim() || f.code_four}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
 
       {vue === 'periode' && (
         <>
@@ -289,11 +304,22 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
       )}
 
       {vue === 'fournisseur' && (
-        <DataGrid titre={`Achats par fournisseur — ${fournisseurs.length} fournisseur(s)`} exportCsv={{ nom: 'achats-par-fournisseur', columns: csvFournisseur }} columns={colFournisseur} rows={fournisseurs} rowKey={(f) => f.code_four}
+        <div className="flex flex-col gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 items-start">
+            <Carte titre="Top fournisseurs — Achats HT">
+              <BarChart data={fournisseurs.map((f) => ({ label: (f.fournisseur ?? '').trim() || f.code_four, value: Number(f.total_ht ?? 0) }))}
+                        format={(v) => fmtMoney(v, 0)} />
+            </Carte>
+            <Carte titre="Répartition des achats HT">
+              <DonutChart data={fournisseurs.map((f) => ({ label: (f.fournisseur ?? '').trim() || f.code_four, value: Number(f.total_ht ?? 0) }))}
+                          format={(v) => fmtMoney(v, 0)} titreCentre="Achats HT" />
+            </Carte>
+          </div>
+          <DataGrid titre={`Achats par fournisseur — ${fournisseurs.length} fournisseur(s)`} exportCsv={{ nom: 'achats-par-fournisseur', columns: csvFournisseur }} columns={colFournisseur} rows={fournisseurs} rowKey={(f) => f.code_four}
                     loading={four.loading} error={four.error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={somme(fournisseurs, 'total_ht')} />, ttc: <Money value={somme(fournisseurs, 'total_ttc')} />,
                               reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(somme(fournisseurs, 'reste_a_payer'))}</span> }} />
-        
+        </div>
       )}
 
       {vue === 'article' && (
