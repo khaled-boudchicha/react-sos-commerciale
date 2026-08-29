@@ -121,6 +121,10 @@ export const TYPES_VENTE = [
   { code: 'FAV', label: 'Avoirs' },
 ] as const;
 
+/** Type numérique (colonne `Type`) → code d'onglet, pour dupliquer une pièce. */
+export const VENTE_TYPE_CODE: Record<number, string> = { 1: 'FA', 2: 'BL', 4: 'BCT', 0: 'BC', 3: 'FP', 6: 'BRT', 7: 'FAV' };
+export const ACHAT_TYPE_CODE: Record<number, string> = { 1: 'FA', 2: 'BR', 0: 'BC', 3: 'DO', 4: 'BRT', 5: 'FAV' };
+
 export const TYPES_ACHAT = [
   { code: 'FA', label: "Factures d'achat" },
   { code: 'BR', label: 'Bons de réception' },

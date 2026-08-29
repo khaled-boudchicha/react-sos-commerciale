@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { VENTE } from '../api/queries';
 import { Article, Client, TYPES_VENTE } from '../api/types';
+import { nouvelleCle } from '../components/document/lignesDocument';
 import { useSession } from '../store/session';
 import { fmtMoney, fmtQte, isoToday } from '../lib/format';
 import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
@@ -9,6 +11,7 @@ import ArticleSearch from '../components/ArticleSearch';
 import ClientSearch from '../components/ClientSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { useToast } from '../components/ui/Toast';
 
 const CREATE_VENTE = gql`
   mutation CreateVente($input: JSON!) { createVente(input: $input) }
@@ -22,6 +25,7 @@ const MODES = gql`
 
 export default function VenteEditor() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [params] = useSearchParams();
   const { dossierUser } = useSession();
 
@@ -41,6 +45,36 @@ export default function VenteEditor() {
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
   const [create, { loading: saving }] = useMutation(CREATE_VENTE);
   const [addReglement] = useMutation(ADD_REGLEMENT_CLIENT);
+
+  // Duplication : ?from=<id> → on recharge la pièce source et on reprend ses
+  // lignes (le serveur renumérote ; la date reste celle du jour).
+  const dupliquerId = params.get('from');
+  const { data: sourceData } = useQuery(VENTE, { variables: { id: Number(dupliquerId) }, skip: !dupliquerId });
+  const prefaitRef = useRef(false);
+  useEffect(() => {
+    if (prefaitRef.current || !dupliquerId) return;
+    const src: any = sourceData?.vente;
+    if (!src) return;
+    prefaitRef.current = true;
+    const src_lignes: any[] = Array.isArray(src.lignes) ? src.lignes : [];
+    setLignes(src_lignes.map((l) => ({
+      key: nouvelleCle(),
+      id_article: l.id_article ?? undefined,
+      code_article: l.code_article,
+      designation: l.designation,
+      qte: Number(l.qte) || 0,
+      prix_ht: Number(l.prix_ht) || 0,
+      tva: Number(l.tva) || 0,
+      remise: Number(l.remise) || 0,
+      n_lot: l.n_lot || '',
+      date_peremption: l.date_peremption ? String(l.date_peremption).slice(0, 10) : '',
+    })));
+    if (src.code_cli) setClient({ code: src.code_cli, nom: src.raison ?? src.code_cli, raison: src.raison } as unknown as Client);
+    if (src.mode_payement) setMode(String(src.mode_payement));
+    if (src.remise != null) setRemiseGlobale(Number(src.remise) || 0);
+    if (src.observation) setObservation(String(src.observation));
+    toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
+  }, [sourceData, dupliquerId, toast]);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -110,12 +144,16 @@ export default function VenteEditor() {
         } catch (e: any) {
           // La pièce existe : on informe sans bloquer la navigation
           setError(`Pièce ${created.numero} créée, mais règlement échoué : ${e.message ?? e}`);
+          toast.error(`Pièce ${created.numero} créée, mais règlement échoué.`);
+          navigate(`/ventes/${created.id}`);
           return;
         }
       }
+      toast.success(`Pièce ${created.numero} enregistrée${recu > 0 ? ` · encaissé ${fmtMoney(recu)}` : ''}.`);
       navigate(`/ventes/${created.id}`);
     } catch (e: any) {
       setError(e.message ?? 'Erreur à l’enregistrement.');
+      toast.error(`Enregistrement échoué : ${e.message ?? 'erreur'}`);
     }
   }
 

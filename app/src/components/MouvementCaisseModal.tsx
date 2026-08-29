@@ -3,6 +3,7 @@ import { gql, useMutation, useQuery } from '@apollo/client';
 import { SOLDES_COMPTES, REFERENTIELS } from '../api/queries';
 import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
+import { useToast } from './ui/Toast';
 
 const ADD_ENCAISSEMENT = gql`mutation AddEncaissement($input: JSON!) { addEncaissement(input: $input) }`;
 const ADD_DECAISSEMENT = gql`mutation AddDecaissement($input: JSON!) { addDecaissement(input: $input) }`;
@@ -32,6 +33,7 @@ export default function MouvementCaisseModal({ kind, onClose, onDone }: {
   const [compteId, setCompteId] = useState('');
   const [compteDestId, setCompteDestId] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const { data: soldesData } = useQuery(SOLDES_COMPTES);
   // Seuls les comptes identifiés sont sélectionnables : les lignes sans compte_id
@@ -81,8 +83,10 @@ export default function MouvementCaisseModal({ kind, onClose, onDone }: {
       }
       onDone();
       onClose();
+      toast.success(`${TITRES[kind]} enregistré · ${fmtMoney(m)} DA`);
     } catch (e: any) {
       setError(e.message ?? 'Erreur.');
+      toast.error(`Échec : ${e.message ?? 'erreur'}`);
     }
   }
 

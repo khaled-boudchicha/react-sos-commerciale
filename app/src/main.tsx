@@ -4,6 +4,7 @@ import { ApolloProvider } from '@apollo/client';
 import { apollo } from './api/client';
 import { useSession } from './store/session';
 import App from './App';
+import { ToastProvider } from './components/ui/Toast';
 import { loadTheme } from './screens/Parametres';
 import './styles/index.css';
 
@@ -16,7 +17,9 @@ if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sessio
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ApolloProvider client={apollo}>
-      <App />
+      <ToastProvider>
+        <App />
+      </ToastProvider>
     </ApolloProvider>
   </React.StrictMode>,
 );

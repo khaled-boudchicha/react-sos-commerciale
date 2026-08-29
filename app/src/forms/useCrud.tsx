@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { DocumentNode, useMutation } from '@apollo/client';
 import FormModal, { Section } from '../components/ui/FormModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useToast } from '../components/ui/Toast';
 
 type Entity = { id: number } & Record<string, unknown>;
 
@@ -38,6 +39,8 @@ export function useCrud<T extends Entity>({
   const [editing, setEditing] = useState<T | null | 'new'>(null);
   const [deleting, setDeleting] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const nom = label.charAt(0).toUpperCase() + label.slice(1);
 
   const [create, { loading: creating }] = useMutation(createDoc);
   const [update, { loading: updating }] = useMutation(updateDoc ?? createDoc);
@@ -45,8 +48,9 @@ export function useCrud<T extends Entity>({
 
   async function submit(values: Record<string, unknown>) {
     setError(null);
+    const creation = editing === 'new';
     try {
-      if (editing === 'new') {
+      if (creation) {
         await create({ variables: { input: values } });
       } else if (editing && updateDoc) {
         // Le code n'est pas modifiable : on ne l'envoie pas en update
@@ -55,8 +59,10 @@ export function useCrud<T extends Entity>({
       }
       setEditing(null);
       onDone();
+      toast.success(creation ? `${nom} créé(e).` : `${nom} modifié(e).`);
     } catch (e: any) {
       setError(e.message ?? 'Erreur.');
+      toast.error(`Échec : ${e.message ?? 'erreur'}`);
     }
   }
 
@@ -67,9 +73,11 @@ export function useCrud<T extends Entity>({
       await remove({ variables: { id: deleting.id } });
       setDeleting(null);
       onDone();
+      toast.success(`${nom} supprimé(e).`);
     } catch (e: any) {
       setDeleting(null);
       setError(e.message ?? 'Suppression impossible.');
+      toast.error(`Suppression impossible : ${e.message ?? 'erreur'}`);
     }
   }
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { VENTE, DELETE_VENTE, COORDONNEES_SOCIETE } from '../api/queries';
-import { Vente, LigneVente } from '../api/types';
+import { Vente, LigneVente, VENTE_TYPE_CODE } from '../api/types';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { DocBadge, PayStatus, Money, PageHeader } from '../components/ui/atoms';
@@ -56,6 +56,13 @@ export default function VenteDetail() {
           <button onClick={() => setPrintDoc(buildVentePrint(v, societe))}
                   className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
             Imprimer A4
+          </button>
+        )}
+        {v && (
+          <button onClick={() => navigate(`/ventes/nouvelle?type=${VENTE_TYPE_CODE[Number(v.type)] ?? 'FA'}&from=${v.id}`)}
+                  title="Créer une nouvelle pièce reprenant ces lignes"
+                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+            Dupliquer
           </button>
         )}
         {v && v.type === 4 && (

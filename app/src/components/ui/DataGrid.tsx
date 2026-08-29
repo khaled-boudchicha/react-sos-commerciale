@@ -116,7 +116,16 @@ export default function DataGrid<T>({
         </thead>
         <tbody>
           {loading && rows.length === 0 && (
-            <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center text-ink-muted">Chargement…</td></tr>
+            Array.from({ length: 6 }).map((_, i) => (
+              <tr key={`sk-${i}`} className="border-b border-line-soft last:border-b-0">
+                {columns.map((c) => (
+                  <td key={c.key} className="px-3.5 h-8 align-middle">
+                    <div className={`h-3 rounded bg-line-soft animate-pulse ${c.align === 'right' ? 'ml-auto' : ''}`}
+                         style={{ width: c.align === 'right' ? '60%' : '80%', opacity: 1 - i * 0.12 }} />
+                  </td>
+                ))}
+              </tr>
+            ))
           )}
           {error && (
             <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center" style={{ color: 'var(--danger)' }}>{error}</td></tr>

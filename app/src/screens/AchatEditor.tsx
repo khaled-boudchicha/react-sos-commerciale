@@ -8,6 +8,7 @@ import ArticleSearch from '../components/ArticleSearch';
 import FournisseurSearch from '../components/FournisseurSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { useToast } from '../components/ui/Toast';
 
 const CREATE_ACHAT = gql`
   mutation CreateAchat($input: JSON!) { createAchat(input: $input) }
@@ -18,6 +19,7 @@ const MODES = gql`
 
 export default function AchatEditor() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [params] = useSearchParams();
   const initialType = (params.get('type') as (typeof TYPES_ACHAT)[number]['code']) || 'BR';
 
@@ -100,10 +102,12 @@ export default function AchatEditor() {
         },
       });
       const created = data?.createAchat;
+      toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}.`.replace('  ', ' '));
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
     } catch (e: any) {
       setError(e.message ?? 'Erreur à l’enregistrement.');
+      toast.error(`Enregistrement échoué : ${e.message ?? 'erreur'}`);
     }
   }
 
