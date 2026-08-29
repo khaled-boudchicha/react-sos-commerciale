@@ -14,6 +14,22 @@ import { exporterCsv, ExportColumn } from '../lib/export';
 import { useDebouncedValue } from '../lib/useDebounce';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, Tabs, PeriodPicker, PageHeader, SearchInput, Pagination } from '../components/ui/atoms';
+import LineChart from '../components/charts/LineChart';
+import BarChart from '../components/charts/BarChart';
+import DonutChart from '../components/charts/DonutChart';
+
+/** Cartouche graphique réutilisable (titre + corps). */
+function Carte({ titre, actions, children }: { titre: string; actions?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="font-bold text-[13px]">{titre}</div>
+        {actions}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const SECTIONS = [
   { code: 'ventes', label: 'Ventes' },
@@ -64,18 +80,26 @@ const VUES_VENTES = [
 function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const [vue, setVue] = useState<(typeof VUES_VENTES)[number]['code']>('periode');
   const [groupement, setGroupement] = useState<Groupement>('jour');
+  // Filtre famille appliqué CÔTÉ SERVEUR (paramètre des requêtes stat).
+  const [famille, setFamille] = useState('');
   const periode = { date_debut: debut, date_fin: fin };
+  const filtreFam = famille || undefined;
 
+  // statVentes agrège au niveau document (parité Delphi) : le filtre famille (ligne)
+  // ne s'y applique pas ; il vaut pour les vues article/client (serveur).
   const { data, loading, error } = useQuery(STAT_VENTES, { variables: { ...periode, groupement } });
   const res: StatVentesResult | undefined = data?.statVentes;
 
-  const art = useQuery(STAT_VENTES_PAR_ARTICLE, { variables: periode, skip: vue !== 'article' });
-  const cli = useQuery(STAT_VENTES_PAR_CLIENT, { variables: periode, skip: vue !== 'client' });
-  const fam = useQuery(STAT_VENTES_PAR_FAMILLE, { variables: periode, skip: vue !== 'famille' });
+  const art = useQuery(STAT_VENTES_PAR_ARTICLE, { variables: { ...periode, famille: filtreFam }, skip: vue !== 'article' });
+  const cli = useQuery(STAT_VENTES_PAR_CLIENT, { variables: { ...periode, famille: filtreFam }, skip: vue !== 'client' });
+  // Toujours chargée : alimente à la fois les options du filtre et les graphiques familles.
+  const fam = useQuery(STAT_VENTES_PAR_FAMILLE, { variables: periode });
 
   const articles: StatArticleVente[] = Array.isArray(art.data?.statVentesParArticle) ? art.data.statVentesParArticle : [];
   const clients: StatClient[] = Array.isArray(cli.data?.statVentesParClient) ? cli.data.statVentesParClient : [];
-  const familles: StatParFamille[] = Array.isArray(fam.data?.statVentesParFamille) ? fam.data.statVentesParFamille : [];
+  const famillesTout: StatParFamille[] = Array.isArray(fam.data?.statVentesParFamille) ? fam.data.statVentesParFamille : [];
+  const familles = filtreFam ? famillesTout.filter((f) => f.famille === famille) : famillesTout;
+  const optionsFamille = famillesTout.map((f) => f.famille).filter(Boolean).sort();
 
   const colPeriode: Column<StatVenteLigne>[] = [
     { key: 'periode', header: 'Période', render: (l) => <b className="money">{l.periode}</b> },
@@ -122,16 +146,33 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
           <Kpi label="Marge nette" value={`${fmtMoney(res.marge_nette_total)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} %`} />
         </div>
       )}
-      <Tabs value={vue} onChange={setVue} options={VUES_VENTES} />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Tabs value={vue} onChange={setVue} options={VUES_VENTES} />
+        {(vue === 'article' || vue === 'client') && (
+          <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
+            Filtrer par famille
+            <select value={famille} onChange={(e) => setFamille(e.target.value)}
+                    className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal">
+              <option value="">Toutes les familles</option>
+              {optionsFamille.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
 
       {vue === 'periode' && (
-        <DataGrid titre={`Ventes ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
-                    actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
+        <>
+          <Carte titre={`Évolution du CA TTC ${groupement === 'jour' ? '— par jour' : '— par mois'}`}
+                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+            <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ttc ?? 0) }))}
+                       format={(v) => fmtMoney(v, 0)} />
+          </Carte>
+          <DataGrid titre={`Ventes ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
                     exportCsv={{ nom: 'ventes-par-periode', columns: csvPeriode }}
                     columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
                     loading={loading} error={error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, ttc: <Money value={res?.total_ttc} />, marge: <Money value={res?.total_marge} /> }} />
-        
+        </>
       )}
 
       {vue === 'article' && (
@@ -149,13 +190,20 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
       )}
 
       {vue === 'famille' && (
-        <div className="grid grid-cols-[1.4fr_1fr] gap-3.5 items-start">
+        <div className="flex flex-col gap-3.5">
+          <div className="grid grid-cols-2 gap-3.5 items-start">
+            <Carte titre="Top familles — CA TTC">
+              <BarChart data={famillesTout.map((f) => ({ label: f.famille || '(sans famille)', value: Number(f.total_ttc ?? 0) }))}
+                        format={(v) => fmtMoney(v, 0)} />
+            </Carte>
+            <Carte titre="Répartition du CA TTC">
+              <DonutChart data={famillesTout.map((f) => ({ label: f.famille || '(sans famille)', value: Number(f.total_ttc ?? 0) }))}
+                          format={(v) => fmtMoney(v, 0)} titreCentre="CA TTC" />
+            </Carte>
+          </div>
           <DataGrid titre="Ventes par famille" exportCsv={{ nom: 'ventes-par-famille', columns: csvFamille }} columns={colFamille} rows={familles} rowKey={(f) => f.famille ?? '—'}
-                      loading={fam.loading} error={fam.error?.message}
-                      footer={{ _label: 'Totaux', ht: <Money value={somme(familles, 'total_ht')} />, ttc: <Money value={somme(familles, 'total_ttc')} /> }} />
-          
-          <Barres titre="Répartition du CA TTC"
-                  lignes={familles.map((f) => ({ label: f.famille || '(sans famille)', valeur: Number(f.total_ttc ?? 0) }))} />
+                    loading={fam.loading} error={fam.error?.message}
+                    footer={{ _label: 'Totaux', ht: <Money value={somme(familles, 'total_ht')} />, ttc: <Money value={somme(familles, 'total_ttc')} /> }} />
         </div>
       )}
     </>
@@ -226,13 +274,18 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
       <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} />
 
       {vue === 'periode' && (
-        <DataGrid titre={`Achats ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
-                    actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
+        <>
+          <Carte titre={`Évolution des achats HT ${groupement === 'jour' ? '— par jour' : '— par mois'}`}
+                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+            <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ht ?? 0) }))}
+                       format={(v) => fmtMoney(v, 0)} couleur="#B45309" />
+          </Carte>
+          <DataGrid titre={`Achats ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
                     exportCsv={{ nom: 'achats-par-periode', columns: csvAchatPeriode }}
                     columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
                     loading={loading} error={error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, ttc: <Money value={res?.total_ttc} /> }} />
-        
+        </>
       )}
 
       {vue === 'fournisseur' && (
@@ -286,12 +339,15 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
           <Kpi label="Taux de marge" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice / CA HT" />
         </div>
       )}
+      <Carte titre="Évolution du bénéfice brut"
+             actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+        <LineChart data={lignes.map((l) => ({ label: l.periode, value: Number(l.benefice_brut ?? 0) }))}
+                   format={(v) => fmtMoney(v, 0)} couleur="#0D9488" />
+      </Carte>
       <DataGrid titre="Bénéfices par période"
-                  actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}
                   exportCsv={{ nom: 'benefices', columns: csvBenefice }}
                   columns={columns} rows={lignes} rowKey={(l) => l.periode} loading={loading} error={error?.message}
                   footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, revien: <Money value={res?.total_revien} />, brut: <Money value={res?.total_benefice} /> }} />
-      
     </>
   );
 }
@@ -457,32 +513,6 @@ function Pct({ value }: { value: unknown }) {
 }
 
 
-function Barres({ titre, lignes }: { titre: string; lignes: { label: string; valeur: number }[] }) {
-  // Les données arrivent triées par nom (ORDER BY famille) : on classe par valeur
-  // décroissante avant de ne garder que les 14 premières, et on met l'échelle à
-  // l'échelle du plus grand VISIBLE — sinon on couperait les plus gros postes.
-  const visibles = [...lignes].sort((a, b) => b.valeur - a.valeur).slice(0, 14);
-  const max = Math.max(1, ...visibles.map((l) => l.valeur));
-  return (
-    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-      <div className="font-bold text-[13px] mb-3">{titre}</div>
-      <div className="flex flex-col gap-2.5">
-        {visibles.length === 0 && <div className="text-ink-muted text-[12px]">Aucune donnée.</div>}
-        {visibles.map((l) => (
-          <div key={l.label}>
-            <div className="flex justify-between text-[11.5px] mb-0.5">
-              <span className="font-semibold">{l.label}</span>
-              <span className="money text-ink-muted">{fmtMoney(l.valeur)}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-line-soft overflow-hidden">
-              <div className="h-full rounded-full" style={{ width: `${(l.valeur / max) * 100}%`, background: 'var(--brand-500)' }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
