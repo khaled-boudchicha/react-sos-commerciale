@@ -116,3 +116,5 @@ Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sau
 
 ### Ordre recommandé
 Phase 0 (validation) → 1 et 2 en parallèle → 3 → 4 → 5 → 6 → 7 → 8 (les tests de parité dès Phase 3).
+
+- ☑ **Impression directe / silencieuse (tickets)** (29/08/2026) : IPC Electron `printers:list` + `print:silent` (fenêtre cachée → `webContents.print({silent})`), exposé via preload `window.gc.printers/printSilent`, util `print/engine/silentPrint.ts`, bouton « Impression directe » dans `PrintPreview` (masqué hors Electron) + réglage « Imprimante ticket » dans Paramètres. Dégradation gracieuse en navigateur. ⚠️ impression physique à valider sur poste (Electron + imprimante réelle).

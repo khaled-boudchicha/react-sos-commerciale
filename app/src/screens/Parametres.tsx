@@ -4,6 +4,9 @@ import { COORDONNEES_SOCIETE, UPDATE_COORDONNEES, NUMEROTATION_DOCS, SET_NUMEROT
 import FormModal from '../components/ui/FormModal';
 import { useSession } from '../store/session';
 import { PageHeader } from '../components/ui/atoms';
+import {
+  supporteImpressionDirecte, listerImprimantes, getImprimanteTicket, setImprimanteTicket, PrinterInfo,
+} from '../print/engine/silentPrint';
 
 export function applyTheme(theme: 'light' | 'dark') {
   document.documentElement.dataset.theme = theme;
@@ -40,6 +43,15 @@ export default function Parametres() {
 
   useEffect(() => { void loadTheme().then(setTheme); }, []);
 
+  const [imprimantes, setImprimantes] = useState<PrinterInfo[]>([]);
+  const [imprimanteTicket, setImprimanteTicketState] = useState('');
+  const impressionDispo = supporteImpressionDirecte();
+  useEffect(() => {
+    if (!impressionDispo) return;
+    void listerImprimantes().then(setImprimantes);
+    void getImprimanteTicket().then((n) => setImprimanteTicketState(n ?? ''));
+  }, [impressionDispo]);
+
   return (
     <div className="flex flex-col gap-3.5 max-w-[720px]">
       <PageHeader title="Paramètres" />
@@ -70,6 +82,30 @@ export default function Parametres() {
             </div>
           </label>
         </div>
+      </section>
+
+      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+        <h2 className="font-bold text-[13px] mb-3">Impression</h2>
+        {impressionDispo ? (
+          <label className="text-[11px] font-bold text-ink-label block max-w-md">
+            Imprimante ticket (impression directe, sans dialogue)
+            <select value={imprimanteTicket}
+                    onChange={(e) => { setImprimanteTicketState(e.target.value); void setImprimanteTicket(e.target.value); }}
+                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
+              <option value="">— imprimante par défaut du système —</option>
+              {imprimantes.map((p) => (
+                <option key={p.name} value={p.name}>{p.displayName || p.name}{p.isDefault ? ' (défaut)' : ''}</option>
+              ))}
+            </select>
+            <div className="text-[10.5px] text-ink-muted font-normal mt-1">
+              Utilisée par le bouton « Impression directe » de l'aperçu (tickets comptoir).
+            </div>
+          </label>
+        ) : (
+          <div className="text-[12px] text-ink-muted">
+            L'impression directe (silencieuse) est disponible uniquement dans l'application installée.
+          </div>
+        )}
       </section>
 
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">

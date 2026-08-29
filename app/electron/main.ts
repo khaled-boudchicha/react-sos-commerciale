@@ -37,6 +37,33 @@ ipcMain.handle('store:get', (_e, key: string) => store.get(key));
 ipcMain.handle('store:set', (_e, key: string, value: unknown) => { store.set(key, value); });
 ipcMain.handle('store:delete', (_e, key: string) => { store.delete(key); });
 
+// Liste des imprimantes système (pour le réglage « imprimante ticket »).
+ipcMain.handle('printers:list', async () => {
+  if (!win) return [];
+  const list = await win.webContents.getPrintersAsync();
+  return list.map((p) => ({ name: p.name, displayName: p.displayName, isDefault: p.isDefault }));
+});
+
+// Impression silencieuse d'un HTML complet vers une imprimante donnée (tickets).
+// Une fenêtre cachée charge le HTML puis imprime sans dialogue ni aperçu.
+ipcMain.handle('print:silent', async (_e, html: string, opts: { deviceName?: string; silent?: boolean }) => {
+  const w = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, nodeIntegration: false } });
+  try {
+    await w.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    const result = await new Promise<{ success: boolean; reason?: string }>((resolve) => {
+      w.webContents.print(
+        { silent: opts?.silent !== false, printBackground: true, deviceName: opts?.deviceName || undefined, margins: { marginType: 'none' } },
+        (success, reason) => resolve({ success, reason }),
+      );
+    });
+    return result;
+  } catch (e) {
+    return { success: false, reason: (e as Error)?.message ?? 'print error' };
+  } finally {
+    if (!w.isDestroyed()) w.close();
+  }
+});
+
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

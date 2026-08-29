@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld('gc', {
     delete: (key: string) => ipcRenderer.invoke('store:delete', key),
   },
   platform: process.platform,
+  printers: () => ipcRenderer.invoke('printers:list'),
+  printSilent: (html: string, opts?: { deviceName?: string; silent?: boolean }) =>
+    ipcRenderer.invoke('print:silent', html, opts ?? {}),
 });

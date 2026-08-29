@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PrintDocument } from './types';
+import { supporteImpressionDirecte, imprimerSilencieux } from './silentPrint';
+import { useToast } from '../../components/ui/Toast';
 
 // Polyfill Paged.js embarqué dans public/vendor/ (copié depuis node_modules par
 // le script npm `sync:pagedjs` — l'export map du package ne permet pas l'import
@@ -97,8 +99,23 @@ export default function PrintPreview({ doc, onClose }: { doc: PrintDocument; onC
     };
   }, [onClose]);
 
+  const toast = useToast();
+  const [impressionDirecte, setImpressionDirecte] = useState(false);
+  const directeDispo = supporteImpressionDirecte();
+
   function print() {
     iframeRef.current?.contentWindow?.print();
+  }
+
+  async function imprimerDirect() {
+    setImpressionDirecte(true);
+    try {
+      const r = await imprimerSilencieux(doc);
+      if (r.success) toast.success('Envoyé à l’imprimante.');
+      else toast.error(r.reason ?? 'Impression directe échouée.');
+    } finally {
+      setImpressionDirecte(false);
+    }
   }
 
   return (
@@ -115,6 +132,13 @@ export default function PrintPreview({ doc, onClose }: { doc: PrintDocument; onC
                   className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px]">
             Fermer <span className="font-mono text-[10px] opacity-60">Échap</span>
           </button>
+          {directeDispo && (
+            <button onClick={() => void imprimerDirect()} disabled={!ready || impressionDirecte}
+                    title="Imprimer sans dialogue sur l’imprimante ticket par défaut (Paramètres)"
+                    className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-50">
+              {impressionDirecte ? 'Impression…' : 'Impression directe'}
+            </button>
+          )}
           <button onClick={print} disabled={!ready}
                   className="px-4 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-50">
             Imprimer / PDF
