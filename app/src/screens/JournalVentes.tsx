@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { useQuery } from '@apollo/client';
-import { JOURNAL_VENTES, JOURNAL_ACHATS } from '../api/queries';
+import { useQuery, useLazyQuery } from '@apollo/client';
+import { JOURNAL_VENTES, JOURNAL_ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte, isoFirstOfMonth, isoToday } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
+import PrintPreview from '../print/engine/PrintPreview';
+import { PrintDocument } from '../print/engine/types';
+import { buildJournalPrint } from '../print/templates';
 import { PeriodPicker, Pagination, SearchInput } from '../components/ui/atoms';
 
 type LigneJournal = Record<string, any> & { id: string };
@@ -26,6 +29,19 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   const res = (vente ? data?.journalVentes : data?.journalAchats) as
     { lignes: LigneJournal[]; total: number; total_ttc: number; total_marge?: number } | undefined;
   const lignes = res?.lignes ?? [];
+
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
+  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [fetchAll, { loading: printing }] = useLazyQuery(vente ? JOURNAL_VENTES : JOURNAL_ACHATS, { fetchPolicy: 'network-only' });
+
+  async function imprimerJournal() {
+    const { data: all } = await fetchAll({ variables: { date_debut: debut, date_fin: fin, code_article: article || undefined, limit: 5000, offset: 0 } });
+    const full = (vente ? all?.journalVentes : all?.journalAchats) as { lignes: LigneJournal[] } | undefined;
+    setPrintDoc(buildJournalPrint(
+      { sens, lignes: full?.lignes ?? [], debut, fin },
+      (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+    ));
+  }
 
   const colonnes: Column<LigneJournal>[] = [
     { key: 'date', header: 'Date', width: '90px', render: (l) => fmtDate(l.date) },
@@ -54,7 +70,12 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
       <div className="flex items-center gap-3 flex-wrap">
         <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); setOffset(0); }} />
         <SearchInput value={article} onChange={(v) => { setArticle(v); setOffset(0); }} placeholder="Filtrer par code article…" />
+        <button onClick={() => void imprimerJournal()} disabled={printing}
+                className="ml-auto rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+          {printing ? 'Préparation…' : 'Imprimer le journal'}
+        </button>
       </div>
+      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={colonnes} rows={lignes} rowKey={(l, i) => l.id ?? i}
                 loading={loading} error={error?.message}
                 emptyMessage="Aucune ligne sur la période."

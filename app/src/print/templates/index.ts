@@ -10,4 +10,6 @@ export { buildTresoreriePrint } from './tresorerie';
 export { buildStockPrint } from './stock';
 export { buildBordereauPrint } from './bordereau';
 export type { BordereauLigne } from './bordereau';
+export { buildJournalPrint } from './journal';
+export type { JournalLigne } from './journal';
 export type { Societe } from './partials';
