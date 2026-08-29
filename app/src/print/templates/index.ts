@@ -12,4 +12,5 @@ export { buildBordereauPrint } from './bordereau';
 export type { BordereauLigne } from './bordereau';
 export { buildJournalPrint } from './journal';
 export type { JournalLigne } from './journal';
+export { buildInventairePrint } from './inventaire';
 export type { Societe } from './partials';

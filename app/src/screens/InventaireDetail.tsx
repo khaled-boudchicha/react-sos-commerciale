@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
-import { INVENTAIRE, UPDATE_LIGNE_INVENTAIRE, CLOTURER_INVENTAIRE } from '../api/queries';
+import { INVENTAIRE, UPDATE_LIGNE_INVENTAIRE, CLOTURER_INVENTAIRE, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import { PageHeader, StatusPill } from '../components/ui/atoms';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import PrintPreview from '../print/engine/PrintPreview';
+import { PrintDocument } from '../print/engine/types';
+import { buildInventairePrint } from '../print/templates';
 
 type LigneInv = {
   id: number; code_article: string; designation: string; unite?: string | null;
@@ -36,6 +39,16 @@ export default function InventaireDetail() {
 
   const [updateLigne] = useMutation(UPDATE_LIGNE_INVENTAIRE);
   const [cloturer, { loading: cloturing }] = useMutation(CLOTURER_INVENTAIRE);
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
+  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+
+  function imprimer(vierge: boolean) {
+    if (!inv) return;
+    setPrintDoc(buildInventairePrint(
+      { inv, lignes: inv.lignes ?? [], vierge },
+      (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+    ));
+  }
 
   useEffect(() => { setDrafts({}); }, [id]);
 
@@ -78,6 +91,18 @@ export default function InventaireDetail() {
     <div className="flex flex-col gap-3.5">
       <PageHeader title={inv?.designation || `Inventaire #${id}`}>
         <Link to="/stock/inventaires" className="text-[12px] font-bold text-brand-700">← Inventaires</Link>
+        {inv && (
+          <button onClick={() => imprimer(true)}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Feuille de comptage
+          </button>
+        )}
+        {inv && (
+          <button onClick={() => imprimer(false)}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Imprimer l'état
+          </button>
+        )}
         {inv && !closed && (
           <button onClick={() => setConfirmCloture(true)}
                   className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
@@ -85,6 +110,7 @@ export default function InventaireDetail() {
           </button>
         )}
       </PageHeader>
+      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
 
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error}</div>}
       {qError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{qError.message}</div>}
