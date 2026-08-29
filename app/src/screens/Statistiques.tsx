@@ -5,6 +5,7 @@ import {
   BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
 } from '../api/queries';
 import {
+  Client,
   StatVentesResult, StatVenteLigne, StatParFamille, StatArticleVente, StatClient,
   BeneficesResult, BeneficeLigne, StatAchatsResult, StatAchatLigne, StatFournisseur,
   StatArticleAchat, StatStockResult, StatStockLigne,
@@ -17,6 +18,7 @@ import { Money, Tabs, PeriodPicker, PageHeader, SearchInput, Pagination } from '
 import LineChart from '../components/charts/LineChart';
 import BarChart from '../components/charts/BarChart';
 import DonutChart from '../components/charts/DonutChart';
+import ClientSearch from '../components/ClientSearch';
 
 /** Cartouche graphique réutilisable (titre + corps). */
 function Carte({ titre, actions, children }: { titre: string; actions?: ReactNode; children: ReactNode }) {
@@ -80,8 +82,9 @@ const VUES_VENTES = [
 function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const [vue, setVue] = useState<(typeof VUES_VENTES)[number]['code']>('periode');
   const [groupement, setGroupement] = useState<Groupement>('jour');
-  // Filtre famille appliqué CÔTÉ SERVEUR (paramètre des requêtes stat).
+  // Filtres appliqués CÔTÉ SERVEUR (paramètres des requêtes stat).
   const [famille, setFamille] = useState('');
+  const [clientFiltre, setClientFiltre] = useState<Client | null>(null);
   const periode = { date_debut: debut, date_fin: fin };
   const filtreFam = famille || undefined;
 
@@ -90,7 +93,7 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const { data, loading, error } = useQuery(STAT_VENTES, { variables: { ...periode, groupement } });
   const res: StatVentesResult | undefined = data?.statVentes;
 
-  const art = useQuery(STAT_VENTES_PAR_ARTICLE, { variables: { ...periode, famille: filtreFam }, skip: vue !== 'article' });
+  const art = useQuery(STAT_VENTES_PAR_ARTICLE, { variables: { ...periode, famille: filtreFam, code_cli: clientFiltre?.code || undefined }, skip: vue !== 'article' });
   const cli = useQuery(STAT_VENTES_PAR_CLIENT, { variables: { ...periode, famille: filtreFam }, skip: vue !== 'client' });
   // Toujours chargée : alimente à la fois les options du filtre et les graphiques familles.
   const fam = useQuery(STAT_VENTES_PAR_FAMILLE, { variables: periode });
@@ -148,16 +151,21 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
       )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <Tabs value={vue} onChange={setVue} options={VUES_VENTES} />
-        {(vue === 'article' || vue === 'client') && (
-          <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
-            Filtrer par famille
-            <select value={famille} onChange={(e) => setFamille(e.target.value)}
-                    className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal">
-              <option value="">Toutes les familles</option>
-              {optionsFamille.map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
-          </label>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {vue === 'article' && (
+            <div className="w-64"><ClientSearch value={clientFiltre} onSelect={setClientFiltre} /></div>
+          )}
+          {(vue === 'article' || vue === 'client') && (
+            <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
+              Famille
+              <select value={famille} onChange={(e) => setFamille(e.target.value)}
+                      className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal">
+                <option value="">Toutes</option>
+                {optionsFamille.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
       </div>
 
       {vue === 'periode' && (
