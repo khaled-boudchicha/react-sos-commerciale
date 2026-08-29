@@ -12,6 +12,7 @@ import ClientSearch from '../components/ClientSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
 import { useToast } from '../components/ui/Toast';
+import RemiseGlobale from '../components/document/RemiseGlobale';
 
 const CREATE_VENTE = gql`
   mutation CreateVente($input: JSON!) { createVente(input: $input) }
@@ -210,11 +211,7 @@ export default function VenteEditor() {
             })}
           </select>
         </label>
-        <label className="text-[11px] font-bold text-ink-label">Remise globale %
-          <input type="number" min="0" max="100" step="0.5" value={remiseGlobale}
-                 onChange={(e) => setRemiseGlobale(parseFloat(e.target.value) || 0)}
-                 className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-        </label>
+        <RemiseGlobale pct={remiseGlobale} onPct={setRemiseGlobale} baseTtc={totaux.net + totaux.remGlob} />
       </div>
 
       <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">

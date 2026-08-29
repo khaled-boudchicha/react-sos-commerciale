@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ACHAT } from '../api/queries';
 import { Article, Fournisseur, TYPES_ACHAT } from '../api/types';
 import { fmtMoney, fmtQte, isoToday } from '../lib/format';
 import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
 import ArticleSearch from '../components/ArticleSearch';
 import FournisseurSearch from '../components/FournisseurSearch';
 import LignesTable from '../components/document/LignesTable';
-import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { LigneDoc, ligneDepuisArticle, totauxDocument, nouvelleCle } from '../components/document/lignesDocument';
 import { useToast } from '../components/ui/Toast';
+import RemiseGlobale from '../components/document/RemiseGlobale';
 
 const CREATE_ACHAT = gql`
   mutation CreateAchat($input: JSON!) { createAchat(input: $input) }
@@ -37,6 +39,35 @@ export default function AchatEditor() {
   const [create, { loading: saving }] = useMutation(CREATE_ACHAT);
 
   const affecteStock = type === 'FA' || type === 'BR';
+
+  // Duplication : ?from=<id> → reprend les lignes de la pièce source.
+  const dupliquerId = params.get('from');
+  const { data: sourceData } = useQuery(ACHAT, { variables: { id: Number(dupliquerId) }, skip: !dupliquerId });
+  const prefaitRef = useRef(false);
+  useEffect(() => {
+    if (prefaitRef.current || !dupliquerId) return;
+    const src: any = sourceData?.achat;
+    if (!src) return;
+    prefaitRef.current = true;
+    const src_lignes: any[] = Array.isArray(src.lignes) ? src.lignes : [];
+    setLignes(src_lignes.map((l) => ({
+      key: nouvelleCle(),
+      id_article: l.id_article ?? undefined,
+      code_article: String(l.code_article ?? ''),
+      designation: String(l.designation ?? ''),
+      qte: Number(l.qte) || 0,
+      prix_ht: Number(l.prix_ht) || 0,
+      tva: Number(l.tva) || 0,
+      remise: Number(l.remise) || 0,
+      n_lot: l.n_lot || '',
+      date_peremption: l.date_peremption ? String(l.date_peremption).slice(0, 10) : '',
+    })));
+    if (src.code_four) setFournisseur({ code: src.code_four, nom: src.raison ?? src.code_four, raison: src.raison } as unknown as Fournisseur);
+    if (src.mode_payement) setMode(String(src.mode_payement));
+    if (src.remise != null) setRemiseGlobale(Number(src.remise) || 0);
+    if (src.observation) setObservation(String(src.observation));
+    toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
+  }, [sourceData, dupliquerId, toast]);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -145,11 +176,7 @@ export default function AchatEditor() {
             })}
           </select>
         </label>
-        <label className="text-[11px] font-bold text-ink-label">Remise globale %
-          <input type="number" min="0" max="100" step="0.5" value={remiseGlobale}
-                 onChange={(e) => setRemiseGlobale(parseFloat(e.target.value) || 0)}
-                 className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-        </label>
+        <RemiseGlobale pct={remiseGlobale} onPct={setRemiseGlobale} baseTtc={totaux.net + totaux.remGlob} />
       </div>
 
       <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">

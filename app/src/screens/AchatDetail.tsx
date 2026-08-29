@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { ACHAT, DELETE_ACHAT, COORDONNEES_SOCIETE } from '../api/queries';
+import { ACHAT_TYPE_CODE } from '../api/types';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { DocBadge, PayStatus, Money, PageHeader } from '../components/ui/atoms';
@@ -56,6 +57,13 @@ export default function AchatDetail() {
           <button onClick={() => setPrintDoc(buildAchatPrint(a, societe))}
                   className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
             Imprimer
+          </button>
+        )}
+        {a && (
+          <button onClick={() => navigate(`/achats/nouvelle?type=${ACHAT_TYPE_CODE[Number(a.type)] ?? 'BR'}&from=${a.id}`)}
+                  title="Créer une nouvelle pièce reprenant ces lignes"
+                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+            Dupliquer
           </button>
         )}
         {a && (
