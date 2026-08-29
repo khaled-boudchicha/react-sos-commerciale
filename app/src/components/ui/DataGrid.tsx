@@ -56,17 +56,35 @@ export default function DataGrid<T>({
   columns, rows, rowKey, loading, error, footer, onRowClick, emptyMessage, titre, actions, exportCsv,
 }: Props<T>) {
   const [sort, setSort] = useState<SortState | null>(null);
+  const [filtresOn, setFiltresOn] = useState(false);
+  const [filtres, setFiltres] = useState<Record<string, string>>({});
   const barre = titre || actions || exportCsv;
+  // Le filtrage réutilise `sortAccessor` comme source de valeur : à n'activer
+  // que sur des grilles chargées en entier (sinon on ne filtre que la page).
+  const filtrable = columns.some((c) => c.sortAccessor);
+  const nbFiltresActifs = Object.values(filtres).filter((v) => v.trim()).length;
 
   const rowsAffichees = useMemo(() => {
-    if (!sort) return rows;
-    const col = columns.find((c) => c.key === sort.key);
-    if (!col?.sortAccessor) return rows;
-    const accessor = col.sortAccessor;
-    const signe = sort.dir === 'asc' ? 1 : -1;
-    // copie : ne jamais muter le tableau du parent (qui alimente aussi le pied)
-    return [...rows].sort((a, b) => signe * comparer(accessor(a), accessor(b)));
-  }, [rows, sort, columns]);
+    let out = rows;
+    const actifs = Object.entries(filtres).filter(([, v]) => v.trim());
+    if (actifs.length) {
+      out = out.filter((r) => actifs.every(([k, v]) => {
+        const col = columns.find((c) => c.key === k);
+        const val = col?.sortAccessor ? col.sortAccessor(r) : '';
+        return String(val ?? '').toLowerCase().includes(v.trim().toLowerCase());
+      }));
+    }
+    if (sort) {
+      const col = columns.find((c) => c.key === sort.key);
+      if (col?.sortAccessor) {
+        const accessor = col.sortAccessor;
+        const signe = sort.dir === 'asc' ? 1 : -1;
+        // copie : ne jamais muter le tableau du parent (qui alimente aussi le pied)
+        out = [...out].sort((a, b) => signe * comparer(accessor(a), accessor(b)));
+      }
+    }
+    return out;
+  }, [rows, sort, columns, filtres]);
 
   // Clic sur un en-tête triable : croissant → décroissant → aucun tri.
   function basculerTri(key: string) {
@@ -81,12 +99,19 @@ export default function DataGrid<T>({
     <div className="flex flex-col gap-2.5">
       {barre && (
         <div className="flex items-center justify-between gap-3">
-          <div className="font-bold text-[13px]">{titre}</div>
+          <div className="font-bold text-[13px]">{titre}{nbFiltresActifs > 0 && <span className="ml-2 text-[11px] font-semibold text-ink-muted">· {rowsAffichees.length} / {rows.length}</span>}</div>
           <div className="flex items-center gap-2">
             {actions}
+            {filtrable && (
+              <button type="button" onClick={() => { setFiltresOn((v) => !v); if (filtresOn) setFiltres({}); }}
+                      title="Filtrer les colonnes"
+                      className={`rounded-md px-3 py-1.5 font-semibold text-[11.5px] border ${filtresOn ? 'border-brand-500 text-brand-700' : 'border-line-soft'} bg-surface hover:bg-surface-alt`}>
+▾ Filtres{nbFiltresActifs > 0 ? ` (${nbFiltresActifs})` : ''}
+              </button>
+            )}
             {exportCsv && (
               <button type="button" title="Exporter les lignes affichées en CSV (Excel)"
-                      disabled={rows.length === 0}
+                      disabled={rowsAffichees.length === 0}
                       onClick={() => exporterCsv(exportCsv.nom, exportCsv.columns, rowsAffichees)}
                       className="rounded-md px-3 py-1.5 font-semibold text-[11.5px] border border-line-soft bg-surface hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed">
                 ⬇ Exporter CSV
@@ -113,6 +138,20 @@ export default function DataGrid<T>({
               );
             })}
           </tr>
+          {filtresOn && (
+            <tr>
+              {columns.map((c) => (
+                <th key={c.key} className="bg-bg border-b border-line-soft px-2 py-1">
+                  {c.sortAccessor ? (
+                    <input value={filtres[c.key] ?? ''}
+                           onChange={(e) => setFiltres((f) => ({ ...f, [c.key]: e.target.value }))}
+                           placeholder="filtrer…"
+                           className={`w-full bg-surface border border-line-soft rounded-sm px-2 py-1 text-[11px] font-normal ${c.align === 'right' ? 'text-right' : ''}`} />
+                  ) : null}
+                </th>
+              ))}
+            </tr>
+          )}
         </thead>
         <tbody>
           {loading && rows.length === 0 && (
@@ -132,6 +171,9 @@ export default function DataGrid<T>({
           )}
           {!loading && !error && rows.length === 0 && (
             <tr><td colSpan={columns.length} className="px-3.5 py-8 text-center text-ink-muted">{emptyMessage ?? 'Aucun résultat.'}</td></tr>
+          )}
+          {!loading && !error && rows.length > 0 && rowsAffichees.length === 0 && (
+            <tr><td colSpan={columns.length} className="px-3.5 py-8 text-center text-ink-muted">Aucune ligne ne correspond au filtre.</td></tr>
           )}
           {rowsAffichees.map((r, i) => (
             <tr key={rowKey(r, i)} onClick={() => onRowClick?.(r)}
