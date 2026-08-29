@@ -281,3 +281,9 @@ export const STAT_STOCK = gql`
     statStock(search: $search, famille: $famille, limit: $limit, offset: $offset)
   }
 `;
+
+export const SET_CREDIT_INITIAL_CLIENT = gql`
+  mutation SetCreditInitialClient($code: String!, $montant: Float!, $date: String!) {
+    setCreditInitialClient(code: $code, montant: $montant, date: $date)
+  }
+`;

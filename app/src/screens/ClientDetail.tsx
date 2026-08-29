@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@apollo/client';
-import { ETAT_CLIENT, FACTURES_NON_REGLEES, COORDONNEES_SOCIETE } from '../api/queries';
+import { useQuery, useMutation } from '@apollo/client';
+import { ETAT_CLIENT, FACTURES_NON_REGLEES, COORDONNEES_SOCIETE, SET_CREDIT_INITIAL_CLIENT } from '../api/queries';
+import { useToast } from '../components/ui/Toast';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildEtatClientPrint, buildFacturesNonRegleesPrint } from '../print/templates';
-import { fmtDate, fmtMoney } from '../lib/format';
+import { fmtDate, fmtMoney, isoToday } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill, Tabs, PeriodPicker } from '../components/ui/atoms';
 import ReglerTiersModal from '../components/ReglerTiersModal';
@@ -35,7 +36,9 @@ export default function ClientDetail() {
   const [fin, setFin] = useState('');
 
   const [showRegler, setShowRegler] = useState(false);
+  const [showCredit, setShowCredit] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const toast = useToast();
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const societe = (socData?.coordonneesSociete ?? {}) as Record<string, unknown>;
 
@@ -99,11 +102,22 @@ export default function ClientDetail() {
                   className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
             Imprimer le relevé
           </button>
+          <button onClick={() => setShowCredit(true)}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Crédit initial
+          </button>
           <button onClick={() => setShowRegler(true)}
                   className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
             Régler
           </button>
         </div>
+      )}
+
+      {showCredit && client && (
+        <CreditInitialModal codeCli={client.code_cli} nom={client.nom_client || client.code_cli}
+                            actuel={Number(client.credit_initial ?? 0)}
+                            onClose={() => setShowCredit(false)}
+                            onDone={() => { setShowCredit(false); void refetch(); void refetchFnr(); toast.success('Crédit initial mis à jour.'); }} />
       )}
 
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
@@ -148,6 +162,66 @@ function Head({ label, children }: { label: string; children: React.ReactNode })
     <div>
       <div className="text-[10px] font-bold uppercase text-ink-muted">{label}</div>
       <div className="text-[13px] font-semibold">{children}</div>
+    </div>
+  );
+}
+
+/** Définit le crédit initial (solde de départ) d'un client à une date donnée. */
+function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
+  codeCli: string; nom: string; actuel: number; onClose: () => void; onDone: () => void;
+}) {
+  const [montant, setMontant] = useState(String(actuel || ''));
+  const [date, setDate] = useState(isoToday());
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [set, { loading }] = useMutation(SET_CREDIT_INITIAL_CLIENT);
+
+  async function valider() {
+    setErreur(null);
+    const m = parseFloat(montant);
+    if (!Number.isFinite(m)) { setErreur('Montant invalide.'); return; }
+    try {
+      await set({ variables: { code: codeCli, montant: m, date } });
+      onDone();
+    } catch (e: any) {
+      setErreur(e.message ?? 'Erreur.');
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
+      <div className="w-[420px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-extrabold text-[15px]">Crédit initial — {nom}</div>
+          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
+        </div>
+        <div className="text-[11.5px] text-ink-muted mb-4">
+          Solde de départ du client (créance d'ouverture). Remplace la valeur actuelle.
+        </div>
+        {erreur && (
+          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
+               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{erreur}</div>
+        )}
+        <div className="flex flex-col gap-3">
+          <label className="text-[11px] font-bold text-ink-label">Montant (DA)
+            <input type="number" step="0.01" value={montant} autoFocus
+                   onChange={(e) => setMontant(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }}
+                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
+          </label>
+          <label className="text-[11px] font-bold text-ink-label">Date
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
+          </label>
+        </div>
+        <div className="flex gap-2 mt-5">
+          <button onClick={onClose} disabled={loading}
+                  className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">Annuler</button>
+          <button onClick={() => void valider()} disabled={loading}
+                  className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
+            {loading ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
