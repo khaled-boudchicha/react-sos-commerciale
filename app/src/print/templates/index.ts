@@ -8,4 +8,6 @@ export { buildFacturesNonRegleesPrint } from './facturesNonReglees';
 export { buildDebiteursPrint } from './debiteurs';
 export { buildTresoreriePrint } from './tresorerie';
 export { buildStockPrint } from './stock';
+export { buildBordereauPrint } from './bordereau';
+export type { BordereauLigne } from './bordereau';
 export type { Societe } from './partials';

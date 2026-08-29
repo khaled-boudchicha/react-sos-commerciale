@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@apollo/client';
-import { ACHATS } from '../api/queries';
+import { useQuery, useLazyQuery } from '@apollo/client';
+import { ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { AchatsResult, Achat, TYPES_ACHAT } from '../api/types';
 import { fmtDate, isoFirstOfMonth, isoToday, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
 import Journal from './JournalVentes';
+import PrintPreview from '../print/engine/PrintPreview';
+import { PrintDocument } from '../print/engine/types';
+import { buildBordereauPrint } from '../print/templates';
 import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
 
 const LIMIT = 50;
@@ -24,6 +27,27 @@ export default function Achats() {
   });
   const res: AchatsResult | undefined = data?.achats;
   const rows = res?.data ?? [];
+
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
+  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [fetchAll, { loading: bordereauEnCours }] = useLazyQuery(ACHATS, { fetchPolicy: 'network-only' });
+  const typeLabel = TYPES_ACHAT.find((t) => t.code === type)?.label ?? type;
+
+  async function imprimerBordereau() {
+    const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 } });
+    const docs: Achat[] = all?.achats?.data ?? [];
+    setPrintDoc(buildBordereauPrint(
+      {
+        titre: `Bordereau des achats — ${typeLabel}`, tiersLabel: 'Fournisseur',
+        debut, fin,
+        lignes: docs.map((a) => ({
+          numero: a.numero, date: a.date, tiers: a.raison ?? a.code_four ?? a.code_cli, mode_payement: a.mode_payement,
+          net: a.net_a_payer ?? a.total_ttc, regler: a.regler, reste: a.reste_a_payer,
+        })),
+      },
+      (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+    ));
+  }
 
   const columns: Column<Achat>[] = [
     { key: 'numero', header: 'N° pièce', render: (a) => <span className="flex items-center gap-2"><DocBadge code={type === 'FA' ? 'BR' : type} /><span className="money">{a.numero}</span></span> },
@@ -55,12 +79,19 @@ export default function Achats() {
           <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); setOffset(0); }} />
         )}
         {vue === 'documents' && (
+        <button onClick={() => void imprimerBordereau()} disabled={bordereauEnCours}
+                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+          {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
+        </button>
+        )}
+        {vue === 'documents' && (
         <button onClick={() => navigate(`/achats/nouvelle?type=${type}`)}
                 className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
           ＋ Nouvelle pièce
         </button>
         )}
       </PageHeader>
+      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
       <Tabs value={vue} onChange={setVue}
             options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
       {vue === 'journal' && <Journal sens="achat" />}

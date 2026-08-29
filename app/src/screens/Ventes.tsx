@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@apollo/client';
-import { VENTES } from '../api/queries';
+import { useQuery, useLazyQuery } from '@apollo/client';
+import { VENTES, COORDONNEES_SOCIETE } from '../api/queries';
 import { VentesResult, Vente, TYPES_VENTE } from '../api/types';
 import { fmtDate, isoFirstOfMonth, isoToday, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
 import Journal from './JournalVentes';
+import PrintPreview from '../print/engine/PrintPreview';
+import { PrintDocument } from '../print/engine/types';
+import { buildBordereauPrint } from '../print/templates';
 import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
 
 const LIMIT = 50;
@@ -24,6 +27,27 @@ export default function Ventes() {
   });
   const res: VentesResult | undefined = data?.ventes;
   const rows = res?.data ?? [];
+
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
+  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [fetchAll, { loading: bordereauEnCours }] = useLazyQuery(VENTES, { fetchPolicy: 'network-only' });
+  const typeLabel = TYPES_VENTE.find((t) => t.code === type)?.label ?? type;
+
+  async function imprimerBordereau() {
+    const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 } });
+    const docs: Vente[] = all?.ventes?.data ?? [];
+    setPrintDoc(buildBordereauPrint(
+      {
+        titre: `Bordereau des ventes — ${typeLabel}`, tiersLabel: 'Client',
+        debut, fin,
+        lignes: docs.map((v) => ({
+          numero: v.numero, date: v.date, tiers: v.raison ?? v.code_cli, mode_payement: v.mode_payement,
+          net: v.net_a_payer ?? v.total_ttc, regler: v.regler, reste: v.reste_a_payer,
+        })),
+      },
+      (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+    ));
+  }
   const isAvoir = type === 'FAV' || type === 'BRT';
 
   const columns: Column<Vente>[] = [
@@ -56,12 +80,19 @@ export default function Ventes() {
           <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); setOffset(0); }} />
         )}
         {vue === 'documents' && (
+        <button onClick={() => void imprimerBordereau()} disabled={bordereauEnCours}
+                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+          {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
+        </button>
+        )}
+        {vue === 'documents' && (
         <button onClick={() => navigate(`/ventes/nouvelle?type=${type}`)}
                 className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
           ＋ Nouvelle pièce
         </button>
         )}
       </PageHeader>
+      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
       <Tabs value={vue} onChange={setVue}
             options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
       {vue === 'journal' && <Journal sens="vente" />}
