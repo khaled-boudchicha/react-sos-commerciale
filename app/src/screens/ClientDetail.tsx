@@ -11,6 +11,7 @@ import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill, Tabs, PeriodPicker } from '../components/ui/atoms';
 import ReglerTiersModal from '../components/ReglerTiersModal';
 import AvancesPanel from '../components/AvancesPanel';
+import { D, useDroits } from '../lib/droits';
 
 type CreditDetails = {
   code_cli: string; nom_client: string; credit_initial: number; total_ventes: number;
@@ -41,6 +42,7 @@ export default function ClientDetail() {
   const [showCredit, setShowCredit] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
   const toast = useToast();
+  const { peut } = useDroits();
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const societe = (socData?.coordonneesSociete ?? {}) as Record<string, unknown>;
 
@@ -104,10 +106,12 @@ export default function ClientDetail() {
                   className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
             Imprimer le relevé
           </button>
-          <button onClick={() => setShowCredit(true)}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Crédit initial
-          </button>
+          {peut('tiers', D.tiers.clients) && (
+            <button onClick={() => setShowCredit(true)}
+                    className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+              Crédit initial
+            </button>
+          )}
           <button onClick={() => setShowRegler(true)}
                   className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
             Régler
@@ -177,7 +181,6 @@ function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
   codeCli: string; nom: string; actuel: number; onClose: () => void; onDone: () => void;
 }) {
   const [montant, setMontant] = useState(String(actuel || ''));
-  const [date, setDate] = useState(isoToday());
   const [erreur, setErreur] = useState<string | null>(null);
   const [set, { loading }] = useMutation(SET_CREDIT_INITIAL_CLIENT);
 
@@ -186,7 +189,8 @@ function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
     const m = parseFloat(montant);
     if (!Number.isFinite(m)) { setErreur('Montant invalide.'); return; }
     try {
-      await set({ variables: { code: codeCli, montant: m, date } });
+      // Delphi ne date pas le crédit initial : la date transmise n'est pas conservée
+      await set({ variables: { code: codeCli, montant: m, date: isoToday() } });
       onDone();
     } catch (e: any) {
       setErreur(e.message ?? 'Erreur.');
@@ -201,7 +205,8 @@ function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
           <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
         </div>
         <div className="text-[11.5px] text-ink-muted mb-4">
-          Solde de départ du client (créance d'ouverture). Remplace la valeur actuelle.
+          Solde de départ du client (créance d'ouverture). Remplace la valeur actuelle ; les paiements
+          déjà faits sur ce crédit sont conservés, le montant ne peut donc pas descendre en dessous.
         </div>
         {erreur && (
           <div className="text-[12px] rounded-md px-3 py-2 mb-3"
@@ -213,10 +218,6 @@ function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
                    onChange={(e) => setMontant(e.target.value)}
                    onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }}
                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
           </label>
         </div>
         <div className="flex gap-2 mt-5">
