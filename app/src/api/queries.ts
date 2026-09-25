@@ -363,3 +363,13 @@ export const ETAT_104 = gql`
   }
 `;
 export const LOTS_EXPIRANT = gql`query LotsExpirant($jours: Int, $limit: Int) { lotsExpirant(jours: $jours, limit: $limit) }`;
+
+// ─── Fiche de stock d'un article (kardex) ───────────────────────────────────
+export const FICHE_STOCK = gql`
+  query FicheStock($article_id: Int, $date_debut: String, $date_fin: String) {
+    ficheStock(article_id: $article_id, date_debut: $date_debut, date_fin: $date_fin)
+  }
+`;
+export const RECALCULER_STOCK_ARTICLE = gql`
+  mutation RecalculerStockArticle($article_id: Int!) { recalculerStockArticle(article_id: $article_id) }
+`;

@@ -6,6 +6,7 @@ import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill } from '../components/ui/atoms';
 import { D, useDroits } from '../lib/droits';
+import FicheStockPanel from '../components/FicheStockPanel';
 
 type Lot = { id: number; n_lot: string; date_fabrication?: string | null; date_peremption?: string | null; qte: number; prix?: unknown[] };
 type Tarif = Record<string, unknown> & { qte_from?: number; qte_to?: number; prix_ht?: number };
@@ -18,7 +19,8 @@ export default function ArticleDetail() {
   const { id } = useParams();
   const articleId = Number(id);
   const { data, loading, error } = useQuery(ARTICLE, { variables: { id: articleId } });
-  const a: Article | undefined = data?.article ?? undefined;
+  // L'agent renvoie { article, lots, tarifs, … } (forme partagée avec l'app mobile)
+  const a: Article | undefined = data?.article?.article ?? data?.article ?? undefined;
 
   const { data: lotsData, loading: lotsLoading } = useQuery(LOTS, { variables: { article_id: articleId } });
   const { data: tarifsData } = useQuery(TARIFS_ARTICLE, { variables: { code_article: a?.code ?? '' }, skip: !a?.code });
@@ -97,6 +99,8 @@ export default function ArticleDetail() {
           </div>
         </div>
       </div>
+
+      {a && <FicheStockPanel articleId={articleId} />}
     </div>
   );
 }
