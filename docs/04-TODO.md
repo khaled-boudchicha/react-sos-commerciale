@@ -149,3 +149,17 @@ Revue de code (même jour) et correctifs :
 Puis : **droit de timbre** (barème LF 2025, art. 100 du Code du timbre : exonéré ≤ 300 DA, 1 / 1,5 / 2 DA par tranche de 100 DA, minimum 5 DA ; factures et comptoirs en espèces, calcul côté agent, aperçu désactivable dans l'éditeur, impressions) — correctif : la facture A4 imprimait la TVA deux fois (« Timbre / Taxes ») ; **mode strict** des droits (`exiger_jeton_utilisateur`) ; app mobile : mémorisation et envoi du jeton (non commité, mêlé au travail en cours du dépôt mobile) ; **guide de déploiement** ([07-DEPLOIEMENT.md](07-DEPLOIEMENT.md)). Tests d'intégration agent : 101 ; tests unitaires : 22.
 
 Reste à faire : déploiement (cf. guide), commit + publication du mobile, activation du mode strict une fois tous les clients à jour, hébergement public des mises à jour, contrôle visuel de l'impression paysage de l'État 104, PMP non rejoué à la modification d'un achat (volontaire), recouvrement/Stat 104, déploiement cloud + agents, signature/auto-update/builds Windows-Linux, tests E2E automatisés.
+
+## Lot du 25/09/2026 (soir) — grille de données, opérations serveur, audit du schéma
+- ☑ **Grille de données** (`app/src/components/grille`, type DataGrid DevExtreme) : tri multiple, filtres (ligne, en-tête, recherche), groupes par glisser-déposer avec totaux, colonnes figées / bandes / réorganisables / redimensionnables / masquables, sélection, maître-détail, édition ligne / cellule / lot / formulaire, export Excel / CSV / PDF, clavier, RTL, état mémorisé. Tous les tableaux de consultation passent par elle (`ui/DataGrid`).
+- ☑ **Opérations côté serveur** sur les 17 listes paginées : tri, filtres, recherche, pagination, regroupement et totaux en SQL (`sos-agent/src/common/grille-distante.ts`, argument `grille` des requêtes de liste). Les totaux et exports portent sur tout le résultat filtré, plus sur la page.
+- ☑ **Fiche de stock** (kardex) dans la fiche article, selon les règles de la procédure `UpdateSingleArticleStock` ; alerte + recalcul quand le stock enregistré ne correspond plus aux mouvements (7 articles sur 2036 dans la base de test).
+- ☑ Éditeur d'achat : **paiement immédiat** du fournisseur (« Payer tout · F10 »).
+- ☑ **Bugs corrigés** :
+  - crédit initial client : la mutation effaçait les paiements du crédit (encaissements réels) et ramenait le solde à zéro ;
+  - l'agent s'arrêtait à la reconnexion au cloud (erreur gRPC sans écouteur) ;
+  - en-tête de la fiche article vide pour tous les articles ;
+  - tables / colonnes inexistantes : tarifs par quantité (`tarifqte`), centres de coût (`centredescouts`), promotions, nomenclature, trésorerie historique, commerciaux.
+- ☑ Tests agent : intégration 109 (cycle des pièces) + **`lectures.itest.js`** (91 commandes Get*, 0 erreur SQL) + **`schema.itest.js`** (tables et colonnes écrites contre la base Delphi).
+- Reste (inchangé) : déploiement, commit du mobile, mode strict, push — en attente de votre accord.
+
