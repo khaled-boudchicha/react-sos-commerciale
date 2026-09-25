@@ -58,6 +58,7 @@ export function buildTicketPrint(vente: Vente, societe: Societe): PrintDocument 
       <table>
         <tbody>
           <tr><td>Total HT</td><td className="r">{fmtMoney(vente.total_ht)}</td></tr>
+          {Number(vente.timbre) > 0 && <tr><td>Droit de timbre</td><td className="r">{fmtMoney(vente.timbre)}</td></tr>}
           <tr className="b" style={{ fontSize: 12 }}>
             <td>NET À PAYER</td><td className="r">{fmtMoney(vente.net_a_payer)} DA</td>
           </tr>

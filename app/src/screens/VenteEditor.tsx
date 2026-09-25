@@ -13,6 +13,7 @@ import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
 import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
+import { calculerTimbre, estEspeces, TYPES_TIMBRE } from '../lib/timbre';
 import RemiseGlobale from '../components/document/RemiseGlobale';
 
 const CREATE_VENTE = gql`
@@ -51,6 +52,8 @@ export default function VenteEditor() {
   const [observation, setObservation] = useState('');
   // Délai de paiement en jours (vide = délai par défaut du dossier, fixé par le serveur)
   const [delai, setDelai] = useState('');
+  const [timbreChoix, setTimbreChoix] = useState<boolean | null>(null);
+  const [timbreInitial, setTimbreInitial] = useState(false);
   const [lignes, setLignes] = useState<LigneDoc[]>([]);
   const [montantRecu, setMontantRecu] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +89,7 @@ export default function VenteEditor() {
     setRemiseGlobale(Number(src.remise_p) || 0);
     if (src.observation) setObservation(String(src.observation));
     if (src.delai_reglement != null && Number(src.delai_reglement) > 0) setDelai(String(src.delai_reglement));
+    setTimbreInitial(Number(src.is_timbre) === 1);
     if (enEdition) {
       if (src.date) setDate(isoDate(src.date));
     } else {
@@ -115,7 +119,13 @@ export default function VenteEditor() {
   }
 
   // Mêmes formules que l'agent (createVente) : ht = qte×prix×(1−rem/100) ; ttc = ht×(1+tva/100) ; remise globale sur le net
-  const totaux = useMemo(() => totauxDocument(lignes, remiseGlobale), [lignes, remiseGlobale]);
+  const totauxBase = useMemo(() => totauxDocument(lignes, remiseGlobale), [lignes, remiseGlobale]);
+  // Droit de timbre (quittance en espèces) : ajouté au net à payer. `timbreChoix` = choix
+  // explicite de l'utilisateur ; null = règle automatique (création) / état conservé (modification).
+  const timbreApplicable = !!type && TYPES_TIMBRE.includes(type) && estEspeces(mode);
+  const timbreActif = timbreChoix ?? (enEdition ? timbreInitial && timbreApplicable : timbreApplicable);
+  const timbre = timbreActif ? calculerTimbre(totauxBase.net) : 0;
+  const totaux = useMemo(() => ({ ...totauxBase, net: totauxBase.net + timbre }), [totauxBase, timbre]);
 
   async function save(recuOverride?: number) {
     setError(null);
@@ -134,6 +144,7 @@ export default function VenteEditor() {
             remise: remiseGlobale || 0,
             observation: observation || undefined,
             delai_reglement: delai === '' ? undefined : Math.max(0, Number(delai) || 0),
+            timbre: timbreChoix ?? undefined,
             user_id: Number(dossierUser.id),
             user_name: String(dossierUser.username),
             lignes: lignesPourServeur(lignes),
@@ -183,6 +194,7 @@ export default function VenteEditor() {
             remise: remiseGlobale || 0,
             observation: observation || undefined,
             delai_reglement: delai === '' ? undefined : Math.max(0, Number(delai) || 0),
+            timbre: timbreChoix ?? undefined,
             lignes: lignesPourServeur(lignes),
           },
         },
@@ -299,6 +311,17 @@ export default function VenteEditor() {
           <TotRow label="Remises lignes" value={-totaux.remLignes} />
           <TotRow label="TVA" value={totaux.tva} />
           <TotRow label={`Remise globale (${fmtQte(remiseGlobale)} %)`} value={-totaux.remGlob} />
+          {!!type && TYPES_TIMBRE.includes(type) && (
+            <label className="flex justify-between items-center px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft"
+                   title="Droit de timbre sur les paiements en espèces (barème LF 2025)">
+              <span className="flex items-center gap-1.5">
+                <input type="checkbox" checked={timbreActif} disabled={!timbreApplicable && !timbreActif}
+                       onChange={(e) => setTimbreChoix(e.target.checked)} />
+                Droit de timbre{!timbreApplicable ? ' (espèces uniquement)' : ''}
+              </span>
+              <span className="money">{fmtMoney(timbre)}</span>
+            </label>
+          )}
           <div className="px-4 py-3.5 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
             <span>Net à payer</span>
             <span className="money text-[16px]">{fmtMoney(totaux.net)} DA</span>

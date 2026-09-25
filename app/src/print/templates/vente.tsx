@@ -45,7 +45,8 @@ export function buildVentePrint(vente: Vente, societe: Societe): PrintDocument {
         rows={[
           { label: 'Total HT', value: fmtMoney(vente.total_ht) },
           ...(vente.tva != null ? [{ label: 'TVA', value: fmtMoney(vente.tva) }] : []),
-          ...(Number(vente.total_taxe) > 0 ? [{ label: 'Timbre / Taxes', value: fmtMoney(vente.total_taxe) }] : []),
+          // (total_taxe = TVA des lignes : l'ancienne ligne « Timbre / Taxes » imprimait la TVA une 2e fois)
+          ...(Number(vente.timbre) > 0 ? [{ label: 'Droit de timbre', value: fmtMoney(vente.timbre) }] : []),
           ...(Number(vente.remise) > 0 ? [{ label: 'Remise', value: fmtMoney(vente.remise) }] : []),
         ]}
         final={{ label: 'Net à payer', value: `${fmtMoney(vente.net_a_payer)} DA` }}

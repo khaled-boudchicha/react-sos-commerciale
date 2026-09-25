@@ -4,6 +4,8 @@
 export type Vente = {
   /** Échéance de paiement (date_reglement) et délai en jours (nbr_jour_reglement) */
   date_echeance?: string | null; delai_reglement?: number | null;
+  /** Droit de timbre (paiement en espèces) inclus dans net_a_payer */
+  timbre?: number | null; is_timbre?: number | null;
   id: number; numero: string; type_doc: string; type: number; date: string;
   code_cli?: string | null; raison?: string | null; tel?: string | null;
   total_ht: number; total_ttc: number; net_a_payer: number;

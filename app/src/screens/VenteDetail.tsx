@@ -173,6 +173,7 @@ export default function VenteDetail() {
             <Row label="Total HT" value={v.total_ht} />
             <Row label={`Remise globale${Number(v.remise_p) ? ` (${fmtQte(v.remise_p)} %)` : ''}`} value={-(Number(v.remise ?? 0))} neg />
             <Row label="TVA" value={v.tva ?? 0} />
+            {Number(v.timbre) > 0 && <Row label="Droit de timbre" value={v.timbre} />}
             <div className="px-4 py-3 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
               <span>Net à payer</span><span className="money text-[15px]">{fmtMoney(v.net_a_payer)} DA</span>
             </div>
