@@ -35,6 +35,7 @@ const INTERFACE_CSS = `
 @media screen {
   html { background: #566072; }
   body { margin: 0; }
+  /* Pages plus larges que la fenêtre (paysage) : réduites à l'écran par vendor/paged-config.js */
   .pagedjs_pages { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 24px 0 48px; }
   .pagedjs_page { background: #fff; box-shadow: 0 10px 30px rgb(10 18 34 / .35); }
 }
