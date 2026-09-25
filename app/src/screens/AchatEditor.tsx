@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ACHAT, UPDATE_ACHAT } from '../api/queries';
+import { ACHAT, UPDATE_ACHAT, ADD_REGLEMENT_FOURNISSEUR } from '../api/queries';
 import { Achat, ACHAT_TYPE_CODE, Article, Fournisseur, TYPES_ACHAT } from '../api/types';
 import { useDroits } from '../lib/droits';
 import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
@@ -13,6 +13,8 @@ import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/docu
 import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import RemiseGlobale from '../components/document/RemiseGlobale';
+import { TYPES_AVEC_REGLEMENT } from '../components/document/ReglementsPiece';
+import { useSession } from '../store/session';
 
 const CREATE_ACHAT = gql`
   mutation CreateAchat($input: JSON!) { createAchat(input: $input) }
@@ -46,11 +48,14 @@ export default function AchatEditor() {
   const [observation, setObservation] = useState('');
   const [lignes, setLignes] = useState<LigneDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [montantPaye, setMontantPaye] = useState('');
+  const dossierUser = useSession((s) => s.dossierUser);
 
   const { data: refs } = useQuery(MODES);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
   const [create, { loading: creating }] = useMutation(CREATE_ACHAT);
   const [update, { loading: updating }] = useMutation(UPDATE_ACHAT);
+  const [addReglement] = useMutation(ADD_REGLEMENT_FOURNISSEUR);
   const saving = creating || updating;
 
   // Pièce source (duplication ou modification)
@@ -66,6 +71,8 @@ export default function AchatEditor() {
     ? typeEdition
     : (permis.some((t) => t.code === typeChoisi) ? typeChoisi : permis[0]?.code);
   const affecteStock = type === 'FA' || type === 'BR';
+  // Paiement immédiat du fournisseur : seules les factures et réceptions portent des règlements
+  const payable = !enEdition && !!type && TYPES_AVEC_REGLEMENT.includes(type);
 
   const prefaitRef = useRef(false);
   useEffect(() => {
@@ -115,12 +122,17 @@ export default function AchatEditor() {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'F2') { e.preventDefault(); focusPlaceholder('Article'); }
       if (e.key === 'F3') { e.preventDefault(); focusPlaceholder('Fournisseur'); }
+      if (e.key === 'F10' && payable) {
+        e.preventDefault();
+        if (lignes.length > 0 && !saving) { setMontantPaye(String(totaux.net)); void save(totaux.net); }
+      }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payable, lignes, saving, totaux.net, fournisseur, date, mode, remiseGlobale, observation, type]);
 
-  async function save() {
+  async function save(payeOverride?: number) {
     setError(null);
     if (lignes.length === 0) { setError('Ajoutez au moins une ligne.'); return; }
     if (!type) return;
@@ -141,7 +153,23 @@ export default function AchatEditor() {
       }
       const { data } = await create({ variables: { input: { type_doc: type, ...commun } } });
       const created = data?.createAchat;
-      toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}.`.replace('  ', ' '));
+      // Paiement immédiat (plafonné au net), dans la caisse par défaut de l'utilisateur
+      const paye = payable && created?.id
+        ? Math.min(payeOverride ?? (parseFloat(montantPaye) || 0), Number(created.net_a_payer ?? totaux.net)) : 0;
+      if (paye > 0) {
+        try {
+          await addReglement({
+            variables: { input: { achat_id: created.id, montant: paye, date, mode_payement: mode || undefined,
+              compte: dossierUser?.compte ?? undefined, compte_id: dossierUser?.compte_id ?? undefined } },
+          });
+        } catch (e: any) {
+          // La pièce existe : on informe sans bloquer
+          toast.error(`Pièce ${created.numero} créée, mais paiement échoué : ${e.message ?? e}`);
+          navigate(`/achats/${created.id}`);
+          return;
+        }
+      }
+      toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}${paye > 0 ? ` · payé ${fmtMoney(paye)}` : ''}.`.replace('  ', ' '));
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
     } catch (e: any) {
@@ -232,10 +260,37 @@ export default function AchatEditor() {
             <span className="money text-[16px]">{fmtMoney(totaux.net)} DA</span>
           </div>
           <div className="p-3 flex flex-col gap-2">
-            <button onClick={save} disabled={saving || lignes.length === 0}
+            {payable && (<>
+              <label className="text-[11px] font-bold text-ink-label">
+                Montant payé (paiement immédiat)
+                <div className="flex gap-1.5 mt-1">
+                  <input type="number" min="0" step="0.01" value={montantPaye}
+                         onChange={(e) => setMontantPaye(e.target.value)} placeholder="0,00"
+                         className="flex-1 min-w-0 border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
+                  <button onClick={() => setMontantPaye(String(totaux.net))}
+                          className="px-3 rounded-sm border border-line text-[11px] font-bold text-ink-label">Tout</button>
+                </div>
+              </label>
+              {(parseFloat(montantPaye) || 0) > 0 && (
+                <div className="flex justify-between items-center px-1 text-[12px] font-bold"
+                     style={{ color: totaux.net - (parseFloat(montantPaye) || 0) > 0.009 ? 'var(--warning)' : 'var(--success)' }}>
+                  <span>Reste à payer</span>
+                  <span className="money text-[14px]">{fmtMoney(Math.max(0, totaux.net - (parseFloat(montantPaye) || 0)))} DA</span>
+                </div>
+              )}
+            </>)}
+            <button onClick={() => void save()} disabled={saving || lignes.length === 0}
                     className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
               {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
             </button>
+            {payable && (
+              <button onClick={() => { setMontantPaye(String(totaux.net)); void save(totaux.net); }}
+                      disabled={saving || lignes.length === 0}
+                      className="rounded-md py-2.5 font-bold disabled:opacity-50"
+                      style={{ background: 'var(--gold-400)', color: '#3A2A05' }}>
+                Payer tout · F10
+              </button>
+            )}
             <div className="text-[10.5px] text-ink-muted text-center flex items-center justify-center gap-1.5">
               <DocBadge code={type === 'FA' ? 'BR' : type} /> {affecteStock ? 'entre en stock' : 'sans impact stock'}
             </div>
