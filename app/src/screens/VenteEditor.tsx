@@ -1,42 +1,56 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { VENTE } from '../api/queries';
-import { Article, Client, TYPES_VENTE } from '../api/types';
-import { nouvelleCle } from '../components/document/lignesDocument';
+import { VENTE, UPDATE_VENTE, ADD_REGLEMENT_CLIENT } from '../api/queries';
+import { Article, Client, TYPES_VENTE, Vente, VENTE_TYPE_CODE } from '../api/types';
 import { useSession } from '../store/session';
-import { fmtMoney, fmtQte, isoToday } from '../lib/format';
+import { useDroits } from '../lib/droits';
+import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
 import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
 import ArticleSearch from '../components/ArticleSearch';
 import ClientSearch from '../components/ClientSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import RemiseGlobale from '../components/document/RemiseGlobale';
 
 const CREATE_VENTE = gql`
   mutation CreateVente($input: JSON!) { createVente(input: $input) }
 `;
-const ADD_REGLEMENT_CLIENT = gql`
-  mutation AddReglementClient($input: JSON!) { addReglementClient(input: $input) }
-`;
 const MODES = gql`
   query ModesPayementEditor { modesPayement }
 `;
 
+type TypeVente = (typeof TYPES_VENTE)[number]['code'];
+
+/**
+ * Éditeur de pièce de vente, trois modes :
+ *  - création (`?type=FA`) ;
+ *  - duplication (`?from=<id>`) : nouvelle pièce reprenant les lignes ;
+ *  - modification (`?edit=<id>`) : updateVente, numéro/type/règlements conservés.
+ */
 export default function VenteEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const [params] = useSearchParams();
   const { dossierUser } = useSession();
+  const { peutDoc } = useDroits();
 
-  const initialType = (params.get('type') as (typeof TYPES_VENTE)[number]['code']) || 'FA';
-  const [type, setType] = useState<(typeof TYPES_VENTE)[number]['code']>(initialType);
+  const editId = params.get('edit');
+  const enEdition = !!editId;
+  const sourceId = editId ?? params.get('from');
+
+  // Types proposés à la création : seulement ceux que l'utilisateur peut créer
+  const permis = TYPES_VENTE.filter((t) => peutDoc('vente', t.code, 'creer'));
+  const [typeChoisi, setType] = useState<TypeVente>((params.get('type') as TypeVente) || 'FA');
   const [client, setClient] = useState<Client | null>(null);
   const [date, setDate] = useState(isoToday());
   const [mode, setMode] = useState('Espece');
   const [remiseGlobale, setRemiseGlobale] = useState(0);
   const [observation, setObservation] = useState('');
+  // Délai de paiement en jours (vide = délai par défaut du dossier, fixé par le serveur)
+  const [delai, setDelai] = useState('');
   const [lignes, setLignes] = useState<LigneDoc[]>([]);
   const [montantRecu, setMontantRecu] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -44,38 +58,40 @@ export default function VenteEditor() {
 
   const { data: refs } = useQuery(MODES);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
-  const [create, { loading: saving }] = useMutation(CREATE_VENTE);
+  const [create, { loading: creating }] = useMutation(CREATE_VENTE);
+  const [update, { loading: updating }] = useMutation(UPDATE_VENTE);
   const [addReglement] = useMutation(ADD_REGLEMENT_CLIENT);
+  const saving = creating || updating;
 
-  // Duplication : ?from=<id> → on recharge la pièce source et on reprend ses
-  // lignes (le serveur renumérote ; la date reste celle du jour).
-  const dupliquerId = params.get('from');
-  const { data: sourceData } = useQuery(VENTE, { variables: { id: Number(dupliquerId) }, skip: !dupliquerId });
+  // Pièce source (duplication ou modification) — toujours relue du serveur
+  const { data: sourceData, error: sourceError } = useQuery(VENTE, {
+    variables: { id: Number(sourceId) }, skip: !sourceId, fetchPolicy: 'network-only',
+  });
+  const src: Vente | undefined = sourceData?.vente ?? undefined;
+  const typeEdition = enEdition && src ? (VENTE_TYPE_CODE[Number(src.type)] as TypeVente | undefined) : undefined;
+
+  // Type effectif : verrouillé en modification ; sinon le choix s'il est permis, à défaut le premier permis
+  const type: TypeVente | undefined = enEdition
+    ? typeEdition
+    : (permis.some((t) => t.code === typeChoisi) ? typeChoisi : permis[0]?.code);
+
   const prefaitRef = useRef(false);
   useEffect(() => {
-    if (prefaitRef.current || !dupliquerId) return;
-    const src: any = sourceData?.vente;
-    if (!src) return;
+    if (prefaitRef.current || !src) return;
     prefaitRef.current = true;
-    const src_lignes: any[] = Array.isArray(src.lignes) ? src.lignes : [];
-    setLignes(src_lignes.map((l) => ({
-      key: nouvelleCle(),
-      id_article: l.id_article ?? undefined,
-      code_article: l.code_article,
-      designation: l.designation,
-      qte: Number(l.qte) || 0,
-      prix_ht: Number(l.prix_ht) || 0,
-      tva: Number(l.tva) || 0,
-      remise: Number(l.remise) || 0,
-      n_lot: l.n_lot || '',
-      date_peremption: l.date_peremption ? String(l.date_peremption).slice(0, 10) : '',
-    })));
+    setLignes(lignesDepuisPiece(src));
     if (src.code_cli) setClient({ code: src.code_cli, nom: src.raison ?? src.code_cli, raison: src.raison } as unknown as Client);
     if (src.mode_payement) setMode(String(src.mode_payement));
-    if (src.remise != null) setRemiseGlobale(Number(src.remise) || 0);
+    // `remise` est le montant HT de la remise globale ; le % est dans `remise_p`
+    setRemiseGlobale(Number(src.remise_p) || 0);
     if (src.observation) setObservation(String(src.observation));
-    toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
-  }, [sourceData, dupliquerId, toast]);
+    if (src.delai_reglement != null && Number(src.delai_reglement) > 0) setDelai(String(src.delai_reglement));
+    if (enEdition) {
+      if (src.date) setDate(isoDate(src.date));
+    } else {
+      toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
+    }
+  }, [src, enEdition, toast]);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -104,7 +120,9 @@ export default function VenteEditor() {
   async function save(recuOverride?: number) {
     setError(null);
     if (lignes.length === 0) { setError('Ajoutez au moins une ligne.'); return; }
+    if (enEdition) { await enregistrerModification(); return; }
     if (!dossierUser) { setError('Utilisateur dossier manquant — reconnectez-vous.'); return; }
+    if (!type) return;
     try {
       const { data } = await create({
         variables: {
@@ -115,20 +133,10 @@ export default function VenteEditor() {
             mode_payement: mode || undefined,
             remise: remiseGlobale || 0,
             observation: observation || undefined,
+            delai_reglement: delai === '' ? undefined : Math.max(0, Number(delai) || 0),
             user_id: Number(dossierUser.id),
             user_name: String(dossierUser.username),
-            lignes: lignes.map((l) => ({
-              id_article: l.id_article,
-              code_article: l.code_article,
-              designation: l.designation,
-              qte: l.qte,
-              prix_ht: l.prix_ht,
-              tva: l.tva,
-              remise: l.remise || 0,
-              n_lot: l.n_lot || undefined,
-              date_peremption: l.date_peremption || undefined,
-              colis: l.colis || undefined,
-            })),
+            lignes: lignesPourServeur(lignes),
           },
         },
       });
@@ -140,7 +148,9 @@ export default function VenteEditor() {
       if (recu > 0) {
         try {
           await addReglement({
-            variables: { input: { vente_id: created.id, montant: recu, date, mode_payement: mode || undefined } },
+            // Encaissé dans la caisse par défaut de l'utilisateur (comme le desktop)
+            variables: { input: { vente_id: created.id, montant: recu, date, mode_payement: mode || undefined,
+              compte: dossierUser.compte ?? undefined, compte_id: dossierUser.compte_id ?? undefined } },
           });
         } catch (e: any) {
           // La pièce existe : on informe sans bloquer la navigation
@@ -158,6 +168,33 @@ export default function VenteEditor() {
     }
   }
 
+  // Modification : le serveur garde numéro, type et règlements, et refuse si le
+  // nouveau net devient inférieur au déjà réglé (message affiché tel quel).
+  async function enregistrerModification() {
+    try {
+      const { data } = await update({
+        variables: {
+          id: Number(editId),
+          input: {
+            // null = pièce ramenée au comptoir (undefined signifierait « client inchangé »)
+            code_cli: client?.code ?? null,
+            date,
+            mode_payement: mode || undefined,
+            remise: remiseGlobale || 0,
+            observation: observation || undefined,
+            delai_reglement: delai === '' ? undefined : Math.max(0, Number(delai) || 0),
+            lignes: lignesPourServeur(lignes),
+          },
+        },
+      });
+      toast.success(`Pièce ${data?.updateVente?.numero ?? src?.numero ?? ''} modifiée.`);
+      navigate(`/ventes/${editId}`);
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur à l’enregistrement.');
+      toast.error(`Modification échouée : ${e.message ?? 'erreur'}`);
+    }
+  }
+
   // Raccourcis Delphi : F2 = recherche article, F3 = recherche client, F10 = encaisser tout
   useEffect(() => {
     function focusPlaceholder(prefixe: string) {
@@ -167,7 +204,7 @@ export default function VenteEditor() {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'F2') { e.preventDefault(); focusPlaceholder('Article'); return; }
       if (e.key === 'F3') { e.preventDefault(); focusPlaceholder('Client'); return; }
-      if (e.key === 'F10') {
+      if (e.key === 'F10' && !enEdition) {
         e.preventDefault();
         if (lignes.length > 0 && !saving) {
           setMontantRecu(String(totaux.net));
@@ -178,19 +215,45 @@ export default function VenteEditor() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lignes, saving, totaux.net, client, date, mode, remiseGlobale, observation, dossierUser]);
+  }, [lignes, saving, totaux.net, client, date, mode, remiseGlobale, observation, delai, dossierUser, enEdition, type]);
+
+  const retour = enEdition ? `/ventes/${editId}` : '/ventes';
+  const titre = enEdition ? `Modifier ${src ? `${src.type_doc} ${src.numero}` : 'la pièce'}` : 'Nouvelle pièce de vente';
+
+  // Garde-fous : droits et pièce non modifiable (BL facturé, facture groupée)
+  let blocage: string | null = null;
+  if (enEdition) {
+    if (sourceError) blocage = sourceError.message;
+    else if (src && typeEdition && !peutDoc('vente', typeEdition, 'modifier')) blocage = 'Accès refusé : vous n’avez pas le droit de modifier ce type de pièce.';
+    else if (src && src.modifiable === false) blocage = 'Cette pièce ne peut plus être modifiée (bon de livraison facturé ou facture issue d’un regroupement).';
+  } else if (permis.length === 0) {
+    blocage = 'Accès refusé : vous n’avez le droit de créer aucun type de pièce de vente.';
+  }
+  if (blocage || !type) {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <PageHeader title={titre}>
+          <Link to={retour} className="text-[12px] font-bold text-brand-700">← Retour</Link>
+        </PageHeader>
+        {blocage
+          ? <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{blocage}</div>
+          : <div className="text-[12px] text-ink-muted">Chargement…</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Nouvelle pièce de vente">
-        <Link to="/ventes" className="text-[12px] font-bold text-brand-700">← Annuler</Link>
+      <PageHeader title={titre}>
+        <Link to={retour} className="text-[12px] font-bold text-brand-700">← Annuler</Link>
       </PageHeader>
 
-      <Tabs value={type} onChange={setType} options={TYPES_VENTE} />
+      {/* En modification, le type est figé (seule la pièce courante est affichée) */}
+      <Tabs value={type} onChange={setType}
+            options={enEdition ? TYPES_VENTE.filter((t) => t.code === type) : permis} />
 
       {error && (
-        <div className="text-[12px] rounded-md px-3 py-2"
-             style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{error}</div>
+        <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>
       )}
 
       <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 grid grid-cols-[2fr_1fr_1fr_1fr] gap-3">
@@ -218,10 +281,17 @@ export default function VenteEditor() {
         <div className="flex flex-col gap-2.5">
           <ArticleSearch onSelect={addArticle} autoFocus />
           <LignesTable sens="vente" lignes={lignes} patch={patchLigne} remove={removeLigne} />
-          <label className="text-[11px] font-bold text-ink-label">Note
-            <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
+          <div className="grid grid-cols-[1fr_170px] gap-3">
+            <label className="text-[11px] font-bold text-ink-label">Note
+              <input value={observation} onChange={(e) => setObservation(e.target.value)}
+                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
+            </label>
+            <label className="text-[11px] font-bold text-ink-label" title="Échéance de paiement = date de la pièce + délai">
+              Délai de paiement (j)
+              <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)} placeholder="défaut"
+                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
+            </label>
+          </div>
         </div>
 
         <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden sticky top-4">
@@ -234,6 +304,7 @@ export default function VenteEditor() {
             <span className="money text-[16px]">{fmtMoney(totaux.net)} DA</span>
           </div>
           <div className="p-3 flex flex-col gap-2">
+            {!enEdition && (<>
             <label className="text-[11px] font-bold text-ink-label">
               Montant reçu (règlement immédiat)
               <div className="flex gap-1.5 mt-1">
@@ -262,18 +333,21 @@ export default function VenteEditor() {
                 </div>
               );
             })()}
+            </>)}
             <button onClick={() => void save()} disabled={saving || lignes.length === 0}
                     className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
-              {saving ? 'Enregistrement…' : 'Enregistrer la pièce'}
+              {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
             </button>
-            <button onClick={() => { setMontantRecu(String(totaux.net)); void save(totaux.net); }}
-                    disabled={saving || lignes.length === 0}
-                    className="rounded-md py-2.5 font-bold disabled:opacity-50"
-                    style={{ background: 'var(--gold-400)', color: '#3A2A05' }}>
-              Encaisser tout · F10
-            </button>
+            {!enEdition && (
+              <button onClick={() => { setMontantRecu(String(totaux.net)); void save(totaux.net); }}
+                      disabled={saving || lignes.length === 0}
+                      className="rounded-md py-2.5 font-bold disabled:opacity-50"
+                      style={{ background: 'var(--gold-400)', color: '#3A2A05' }}>
+                Encaisser tout · F10
+              </button>
+            )}
             <div className="text-[10.5px] text-ink-muted text-center">
-              <DocBadge code={type} /> numérotée automatiquement par le serveur
+              <DocBadge code={type} /> {enEdition ? 'numéro et règlements conservés' : 'numérotée automatiquement par le serveur'}
             </div>
           </div>
         </div>

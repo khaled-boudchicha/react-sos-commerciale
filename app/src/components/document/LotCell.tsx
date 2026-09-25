@@ -1,6 +1,6 @@
 import { useQuery } from '@apollo/client';
 import { LOTS } from '../../api/queries';
-import { fmtDate, fmtQte } from '../../lib/format';
+import { fmtDate, fmtQte, isoDate } from '../../lib/format';
 import { LigneDoc, Sens } from './lignesDocument';
 
 const champTexte = 'w-full bg-transparent money text-[11px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
@@ -42,7 +42,7 @@ export default function LotCell({ sens, line, patch }: {
               const lot = lots.find((l: any) => String(l.n_lot) === e.target.value);
               patch(line.key, {
                 n_lot: e.target.value,
-                date_peremption: lot?.date_peremption ? String(lot.date_peremption).slice(0, 10) : (line.date_peremption ?? ''),
+                date_peremption: lot?.date_peremption ? isoDate(lot.date_peremption) : (line.date_peremption ?? ''),
               });
             }}
             title="Choisir un lot en stock (péremption la plus proche en premier)"

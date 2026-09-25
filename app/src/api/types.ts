@@ -2,6 +2,8 @@
 // Le cloud renvoie ces formes en JSON opaque — on les type ici côté client.
 
 export type Vente = {
+  /** Échéance de paiement (date_reglement) et délai en jours (nbr_jour_reglement) */
+  date_echeance?: string | null; delai_reglement?: number | null;
   id: number; numero: string; type_doc: string; type: number; date: string;
   code_cli?: string | null; raison?: string | null; tel?: string | null;
   total_ht: number; total_ttc: number; net_a_payer: number;
@@ -9,12 +11,37 @@ export type Vente = {
   tva?: number | null; total_taxe?: number | null;
   mode_payement?: string | null; grouped?: number | null; observation?: string | null;
   lignes?: LigneVente[];
+  // ── Détail enrichi (vente(id)) : cycle de vie de la pièce ──
+  /** Remise globale en % (`remise` = son montant HT). */
+  remise_p?: number | null;
+  user_name?: string | null;
+  reglements?: ReglementPiece[];
+  bls_groupes?: { id: number; numero: string; date: string; net_a_payer: number }[];
+  facture_groupee?: { id: number; numero: string } | null;
+  retours?: { id: number; type: number; numero: string; date: string; net_a_payer: number }[];
+  piece_origine?: { id: number; type: number; type_doc: string; numero: string } | null;
+  /** Codes cibles encore possibles (ex. ['BL','FA']). */
+  transformations_possibles?: string[];
+  /** false si BL groupé ou facture issue d'un regroupement. */
+  modifiable?: boolean;
+};
+
+/** Règlement rattaché à une pièce (vente ou achat). */
+export type ReglementPiece = {
+  id: number; montant: number; date: string; mode_payement?: string | null;
+  banque?: string | null; num_cheque?: string | null; compte?: string | null;
+  observation?: string | null; depuis_avance?: number | boolean | null; type_reglement?: string | number | null;
 };
 
 export type LigneVente = {
   id: number; code_article: string; designation: string; qte: number;
   prix_ht: number; prix_ttc: number; total_ht: number; total_ttc: number;
   tva: number; remise?: number | null; n_lot?: string | null;
+  id_article?: number | null; unite?: string | null; remise_montant?: number | null;
+  total_marge?: number | null; date_peremption?: string | null; colis?: number | null;
+  invoice_retour_id?: number | null; invoice_retour_line_id?: number | null;
+  /** Quantité déjà retournée (avoirs / bons de retour). */
+  qte_retournee?: number | null;
 };
 
 export type VentesResult = {
@@ -26,6 +53,26 @@ export type Achat = {
   code_four?: string | null; code_cli?: string | null; raison?: string | null;
   total_ht: number; total_ttc: number; net_a_payer: number;
   regler: number; reste_a_payer: number; mode_payement?: string | null;
+  // ── Détail enrichi (achat(id)) ──
+  type?: number; fournisseur?: string | null;
+  /** Remise globale en % (`remise_montant` = son montant). */
+  remise?: number | null; remise_montant?: number | null;
+  observation?: string | null; user_name?: string | null;
+  code_type?: string;
+  lignes?: LigneAchat[];
+  reglements?: ReglementPiece[];
+  transformations_possibles?: string[];
+  modifiable?: boolean;
+};
+
+export type LigneAchat = {
+  id: number; id_article?: number | null; code_article: string; designation: string;
+  qte: number; unite?: string | null; prix_ht: number; prix_ttc?: number | null;
+  total_ht?: number | null; total_ttc: number; tva: number;
+  remise?: number | null; remise_montant?: number | null;
+  n_lot?: string | null; date_peremption?: string | null; colis?: number | null;
+  /** Quantité déjà retournée au fournisseur (retours liés à cette ligne) */
+  qte_retournee?: number | null;
 };
 
 export type AchatsResult = {

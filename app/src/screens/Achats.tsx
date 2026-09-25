@@ -11,19 +11,32 @@ import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildBordereauPrint } from '../print/templates';
 import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
+import { D, useDroits } from '../lib/droits';
+import { useSession } from '../store/session';
 
 const LIMIT = 50;
 
 export default function Achats() {
   const navigate = useNavigate();
   const [vue, setVue] = useState<'documents' | 'journal'>('documents');
-  const [type, setType] = useState<(typeof TYPES_ACHAT)[number]['code']>('FA');
+  const { peut, peutDoc, restreintAuxSiennes } = useDroits();
+  const peutJournal = peut('achat', D.achat.journal);
+  // « Nouvelle pièce » : le type courant s'il est permis, sinon l'éditeur choisit le premier permis
+  const peutCreer = TYPES_ACHAT.some((t) => peutDoc('achat', t.code, 'creer'));
+  // Onglets limités aux types que l'utilisateur peut consulter (droit Delphi « <type> »)
+  const typesVisibles = TYPES_ACHAT.filter((t) => peutDoc('achat', t.code, 'voir'));
+  const [type, setType] = useState<(typeof TYPES_ACHAT)[number]['code']>(typesVisibles[0]?.code ?? 'FA');
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
   const [offset, setOffset] = useState(0);
 
+  // Droit « <type> par utilisateur » : la liste se limite aux pièces de l'utilisateur connecté
+  const moiId = useSession((s) => s.dossierUser?.id);
+  const siennesSeulement = restreintAuxSiennes('achat', type);
   const { data, loading, error } = useQuery(ACHATS, {
-    variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: LIMIT, offset },
+    variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: LIMIT, offset, user_id: siennesSeulement ? Number(moiId) : undefined },
+    // Les pièces changent ailleurs (modification, transformation, règlement) : toujours revalider
+    fetchPolicy: 'cache-and-network',
   });
   const res: AchatsResult | undefined = data?.achats;
   const rows = res?.data ?? [];
@@ -84,20 +97,22 @@ export default function Achats() {
           {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
         </button>
         )}
-        {vue === 'documents' && (
-        <button onClick={() => navigate(`/achats/nouvelle?type=${type}`)}
+        {vue === 'documents' && peutCreer && (
+        <button onClick={() => navigate(`/achats/nouvelle${peutDoc('achat', type, 'creer') ? `?type=${type}` : ''}`)}
                 className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
           ＋ Nouvelle pièce
         </button>
         )}
       </PageHeader>
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <Tabs value={vue} onChange={setVue}
-            options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
-      {vue === 'journal' && <Journal sens="achat" />}
+      {peutJournal && (
+        <Tabs value={vue} onChange={setVue}
+              options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
+      )}
+      {vue === 'journal' && peutJournal && <Journal sens="achat" />}
       {vue === 'documents' && (
       <>
-      <Tabs value={type} onChange={(t) => { setType(t); setOffset(0); }} options={TYPES_ACHAT} />
+      <Tabs value={type} onChange={(t) => { setType(t); setOffset(0); }} options={typesVisibles} />
       <DataGrid
         titre="Export de la page affichée"
         exportCsv={{ nom: `achats-${type.toLowerCase()}`, columns: csvDocs }}

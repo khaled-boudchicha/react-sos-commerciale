@@ -11,19 +11,34 @@ import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildBordereauPrint } from '../print/templates';
 import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
+import { D, useDroits } from '../lib/droits';
+import { useSession } from '../store/session';
+import GrouperBLModal from '../components/document/GrouperBLModal';
 
 const LIMIT = 50;
 
 export default function Ventes() {
   const navigate = useNavigate();
   const [vue, setVue] = useState<'documents' | 'journal'>('documents');
-  const [type, setType] = useState<(typeof TYPES_VENTE)[number]['code']>('FA');
+  const { peut, peutDoc, restreintAuxSiennes } = useDroits();
+  const peutJournal = peut('vente', D.vente.journal);
+  // « Nouvelle pièce » : le type courant s'il est permis, sinon l'éditeur choisit le premier permis
+  const peutCreer = TYPES_VENTE.some((t) => peutDoc('vente', t.code, 'creer'));
+  const [grouper, setGrouper] = useState(false);
+  // Onglets limités aux types que l'utilisateur peut consulter (droit Delphi « <type> »)
+  const typesVisibles = TYPES_VENTE.filter((t) => peutDoc('vente', t.code, 'voir'));
+  const [type, setType] = useState<(typeof TYPES_VENTE)[number]['code']>(typesVisibles[0]?.code ?? 'FA');
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
   const [offset, setOffset] = useState(0);
 
+  // Droit « <type> par utilisateur » : la liste se limite aux pièces de l'utilisateur connecté
+  const moiId = useSession((s) => s.dossierUser?.id);
+  const siennesSeulement = restreintAuxSiennes('vente', type);
   const { data, loading, error } = useQuery(VENTES, {
-    variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: LIMIT, offset },
+    variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: LIMIT, offset, user_id: siennesSeulement ? Number(moiId) : undefined },
+    // Les pièces changent ailleurs (modification, transformation, règlement) : toujours revalider
+    fetchPolicy: 'cache-and-network',
   });
   const res: VentesResult | undefined = data?.ventes;
   const rows = res?.data ?? [];
@@ -85,20 +100,30 @@ export default function Ventes() {
           {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
         </button>
         )}
-        {vue === 'documents' && (
-        <button onClick={() => navigate(`/ventes/nouvelle?type=${type}`)}
+        {vue === 'documents' && peutDoc('vente', 'FA', 'creer') && (
+          <button onClick={() => setGrouper(true)}
+                  title="Regrouper les bons de livraison d'un client en une facture"
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Facturer des BL
+          </button>
+        )}
+        {vue === 'documents' && peutCreer && (
+        <button onClick={() => navigate(`/ventes/nouvelle${peutDoc('vente', type, 'creer') ? `?type=${type}` : ''}`)}
                 className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
           ＋ Nouvelle pièce
         </button>
         )}
       </PageHeader>
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <Tabs value={vue} onChange={setVue}
-            options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
-      {vue === 'journal' && <Journal sens="vente" />}
+      {grouper && <GrouperBLModal onClose={() => setGrouper(false)} />}
+      {peutJournal && (
+        <Tabs value={vue} onChange={setVue}
+              options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
+      )}
+      {vue === 'journal' && peutJournal && <Journal sens="vente" />}
       {vue === 'documents' && (
       <>
-      <Tabs value={type} onChange={(t) => { setType(t); setOffset(0); }} options={TYPES_VENTE} />
+      <Tabs value={type} onChange={(t) => { setType(t); setOffset(0); }} options={typesVisibles} />
       <DataGrid
         titre="Export de la page affichée"
         exportCsv={{ nom: `ventes-${type.toLowerCase()}`, columns: csvDocs }}

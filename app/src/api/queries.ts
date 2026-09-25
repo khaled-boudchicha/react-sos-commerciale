@@ -3,14 +3,14 @@ import { gql } from '@apollo/client';
 // Toutes les queries proxy renvoient du JSON flat (formes : src/api/types.ts).
 
 export const VENTES = gql`
-  query Ventes($type_doc: String, $code_cli: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $limit: Int, $offset: Int) {
-    ventes(type_doc: $type_doc, code_cli: $code_cli, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, limit: $limit, offset: $offset)
+  query Ventes($type_doc: String, $code_cli: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int) {
+    ventes(type_doc: $type_doc, code_cli: $code_cli, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset)
   }
 `;
 
 export const ACHATS = gql`
-  query Achats($type_doc: String, $code_four: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $limit: Int, $offset: Int) {
-    achats(type_doc: $type_doc, code_four: $code_four, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, limit: $limit, offset: $offset)
+  query Achats($type_doc: String, $code_four: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int) {
+    achats(type_doc: $type_doc, code_four: $code_four, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset)
   }
 `;
 
@@ -287,3 +287,79 @@ export const SET_CREDIT_INITIAL_CLIENT = gql`
     setCreditInitialClient(code: $code, montant: $montant, date: $date)
   }
 `;
+
+// ─── Cycle de vie des pièces : modification, transformation, regroupement, retours ─
+
+export const UPDATE_VENTE = gql`mutation UpdateVente($id: Int!, $input: JSON!) { updateVente(id: $id, input: $input) }`;
+export const TRANSFORMER_VENTE = gql`mutation TransformerVente($id: Int!, $cible: String!, $date: String) { transformerVente(id: $id, cible: $cible, date: $date) }`;
+export const GROUPER_BL = gql`mutation GrouperBL($input: JSON!) { grouperBL(input: $input) }`;
+export const CREER_RETOUR_VENTE = gql`mutation CreerRetourVente($input: JSON!) { creerRetourVente(input: $input) }`;
+export const UPDATE_ACHAT = gql`mutation UpdateAchat($id: Int!, $input: JSON!) { updateAchat(id: $id, input: $input) }`;
+export const TRANSFORMER_ACHAT = gql`mutation TransformerAchat($id: Int!, $cible: String!, $date: String) { transformerAchat(id: $id, cible: $cible, date: $date) }`;
+export const CREER_RETOUR_ACHAT = gql`mutation CreerRetourAchat($input: JSON!) { creerRetourAchat(input: $input) }`;
+
+// ─── Règlements & avances ───────────────────────────────────────────────────
+
+export const ADD_REGLEMENT_CLIENT = gql`mutation AddReglementClient($input: JSON!) { addReglementClient(input: $input) }`;
+export const ADD_REGLEMENT_FOURNISSEUR = gql`mutation AddReglementFournisseur($input: JSON!) { addReglementFournisseur(input: $input) }`;
+export const DELETE_REGLEMENT_CLIENT = gql`mutation DeleteReglementClient($id: Int!) { deleteReglementClient(id: $id) }`;
+export const DELETE_REGLEMENT_FOURNISSEUR = gql`mutation DeleteReglementFournisseur($id: Int!) { deleteReglementFournisseur(id: $id) }`;
+export const REGLER_CLIENT = gql`mutation ReglerClient($input: JSON!) { reglerClient(input: $input) }`;
+export const REGLER_FOURNISSEUR = gql`mutation ReglerFournisseur($input: JSON!) { reglerFournisseur(input: $input) }`;
+export const AVANCES_CLIENTS = gql`query AvancesClients($code_cli: String) { avancesClients(code_cli: $code_cli) }`;
+export const AVANCES_FOURNISSEURS = gql`query AvancesFournisseurs($code_four: String) { avancesFournisseurs(code_four: $code_four) }`;
+export const ADD_AVANCE_CLIENT = gql`mutation AddAvanceClient($input: JSON!) { addAvanceClient(input: $input) }`;
+export const ADD_AVANCE_FOURNISSEUR = gql`mutation AddAvanceFournisseur($input: JSON!) { addAvanceFournisseur(input: $input) }`;
+export const DELETE_AVANCE = gql`mutation DeleteAvance($id: Int!, $sens: String!) { deleteAvance(id: $id, sens: $sens) }`;
+
+// ─── Trésorerie : arrêté de caisse, annulation ──────────────────────────────
+
+export const ARRETE_CAISSE = gql`query ArreteCaisse($compte_id: Int, $compte: String, $date: String!) { arreteCaisse(compte_id: $compte_id, compte: $compte, date: $date) }`;
+export const CLOTURER_CAISSE = gql`mutation CloturerCaisse($input: JSON!) { cloturerCaisse(input: $input) }`;
+export const ANNULER_MOUVEMENT = gql`mutation AnnulerMouvement($cle: String!) { annulerMouvement(cle: $cle) }`;
+
+// ─── Stock : bons d'entrée / sortie, transferts ─────────────────────────────
+
+export const BONS_ENTREE = gql`
+  query BonsEntree($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int) {
+    bonsEntree(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset)
+  }
+`;
+export const BONS_SORTIE = gql`
+  query BonsSortie($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int) {
+    bonsSortie(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset)
+  }
+`;
+export const TRANSFERTS = gql`
+  query Transferts($date_debut: String, $date_fin: String, $limit: Int, $offset: Int) {
+    transferts(date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset)
+  }
+`;
+export const BON_STOCK = gql`query BonStock($sens: String!, $id: Int!) { bon(sens: $sens, id: $id) }`;
+export const CREATE_BON_ENTREE = gql`mutation CreateBonEntree($input: JSON!) { createBonEntree(input: $input) }`;
+export const CREATE_BON_SORTIE = gql`mutation CreateBonSortie($input: JSON!) { createBonSortie(input: $input) }`;
+export const DELETE_BON_ENTREE = gql`mutation DeleteBonEntree($id: Int!) { deleteBonEntree(id: $id) }`;
+export const DELETE_BON_SORTIE = gql`mutation DeleteBonSortie($id: Int!) { deleteBonSortie(id: $id) }`;
+export const TRANSFERT_STOCK = gql`mutation TransfertStock($input: JSON!) { transfertStock(input: $input) }`;
+
+// ─── Utilisateurs dossier & droits ──────────────────────────────────────────
+
+export const DOSSIER_USERS = gql`query DossierUsersAdmin { dossierUsers }`;
+export const DROITS_DOSSIER_USER = gql`query DroitsDossierUser($user_id: Int!) { droitsDossierUser(user_id: $user_id) }`;
+export const CREATE_DOSSIER_USER = gql`mutation CreateDossierUser($input: JSON!) { createDossierUser(input: $input) }`;
+export const UPDATE_DOSSIER_USER = gql`mutation UpdateDossierUser($id: Int!, $input: JSON!) { updateDossierUser(id: $id, input: $input) }`;
+export const DELETE_DOSSIER_USER = gql`mutation DeleteDossierUser($id: Int!) { deleteDossierUser(id: $id) }`;
+
+// ─── Recouvrement, État 104, péremption ─────────────────────────────────────
+
+export const RECOUVREMENT = gql`
+  query Recouvrement($nbrjour: Int, $search: String, $inactifs: Boolean, $limit: Int, $offset: Int) {
+    recouvrement(nbrjour: $nbrjour, search: $search, inactifs: $inactifs, limit: $limit, offset: $offset)
+  }
+`;
+export const ETAT_104 = gql`
+  query Etat104($annee: Int, $date_debut: String, $date_fin: String, $inclure_bl: Boolean) {
+    etat104(annee: $annee, date_debut: $date_debut, date_fin: $date_fin, inclure_bl: $inclure_bl)
+  }
+`;
+export const LOTS_EXPIRANT = gql`query LotsExpirant($jours: Int, $limit: Int) { lotsExpirant(jours: $jours, limit: $limit) }`;

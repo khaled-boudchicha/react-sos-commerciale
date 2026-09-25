@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ACHAT } from '../api/queries';
-import { Article, Fournisseur, TYPES_ACHAT } from '../api/types';
-import { fmtMoney, fmtQte, isoToday } from '../lib/format';
+import { ACHAT, UPDATE_ACHAT } from '../api/queries';
+import { Achat, ACHAT_TYPE_CODE, Article, Fournisseur, TYPES_ACHAT } from '../api/types';
+import { useDroits } from '../lib/droits';
+import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
 import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
 import ArticleSearch from '../components/ArticleSearch';
 import FournisseurSearch from '../components/FournisseurSearch';
 import LignesTable from '../components/document/LignesTable';
-import { LigneDoc, ligneDepuisArticle, totauxDocument, nouvelleCle } from '../components/document/lignesDocument';
+import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import RemiseGlobale from '../components/document/RemiseGlobale';
 
@@ -19,13 +21,24 @@ const MODES = gql`
   query ModesPayementAchat { modesPayement }
 `;
 
+type TypeAchat = (typeof TYPES_ACHAT)[number]['code'];
+
+/**
+ * Éditeur de pièce d'achat : création, duplication (`?from=<id>`) ou
+ * modification (`?edit=<id>`, updateAchat — numéro, type et règlements conservés).
+ */
 export default function AchatEditor() {
   const navigate = useNavigate();
   const toast = useToast();
   const [params] = useSearchParams();
-  const initialType = (params.get('type') as (typeof TYPES_ACHAT)[number]['code']) || 'BR';
+  const { peutDoc } = useDroits();
 
-  const [type, setType] = useState<(typeof TYPES_ACHAT)[number]['code']>(initialType);
+  const editId = params.get('edit');
+  const enEdition = !!editId;
+  const sourceId = editId ?? params.get('from');
+
+  const permis = TYPES_ACHAT.filter((t) => peutDoc('achat', t.code, 'creer'));
+  const [typeChoisi, setType] = useState<TypeAchat>((params.get('type') as TypeAchat) || 'BR');
   const [fournisseur, setFournisseur] = useState<Fournisseur | null>(null);
   const [date, setDate] = useState(isoToday());
   const [mode, setMode] = useState('Espece');
@@ -36,38 +49,41 @@ export default function AchatEditor() {
 
   const { data: refs } = useQuery(MODES);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
-  const [create, { loading: saving }] = useMutation(CREATE_ACHAT);
+  const [create, { loading: creating }] = useMutation(CREATE_ACHAT);
+  const [update, { loading: updating }] = useMutation(UPDATE_ACHAT);
+  const saving = creating || updating;
 
+  // Pièce source (duplication ou modification)
+  const { data: sourceData, error: sourceError } = useQuery(ACHAT, {
+    variables: { id: Number(sourceId) }, skip: !sourceId, fetchPolicy: 'network-only',
+  });
+  const src: Achat | undefined = sourceData?.achat ?? undefined;
+  const typeEdition = enEdition && src
+    ? ((src.code_type ?? ACHAT_TYPE_CODE[Number(src.type)]) as TypeAchat | undefined)
+    : undefined;
+
+  const type: TypeAchat | undefined = enEdition
+    ? typeEdition
+    : (permis.some((t) => t.code === typeChoisi) ? typeChoisi : permis[0]?.code);
   const affecteStock = type === 'FA' || type === 'BR';
 
-  // Duplication : ?from=<id> → reprend les lignes de la pièce source.
-  const dupliquerId = params.get('from');
-  const { data: sourceData } = useQuery(ACHAT, { variables: { id: Number(dupliquerId) }, skip: !dupliquerId });
   const prefaitRef = useRef(false);
   useEffect(() => {
-    if (prefaitRef.current || !dupliquerId) return;
-    const src: any = sourceData?.achat;
-    if (!src) return;
+    if (prefaitRef.current || !src) return;
     prefaitRef.current = true;
-    const src_lignes: any[] = Array.isArray(src.lignes) ? src.lignes : [];
-    setLignes(src_lignes.map((l) => ({
-      key: nouvelleCle(),
-      id_article: l.id_article ?? undefined,
-      code_article: String(l.code_article ?? ''),
-      designation: String(l.designation ?? ''),
-      qte: Number(l.qte) || 0,
-      prix_ht: Number(l.prix_ht) || 0,
-      tva: Number(l.tva) || 0,
-      remise: Number(l.remise) || 0,
-      n_lot: l.n_lot || '',
-      date_peremption: l.date_peremption ? String(l.date_peremption).slice(0, 10) : '',
-    })));
-    if (src.code_four) setFournisseur({ code: src.code_four, nom: src.raison ?? src.code_four, raison: src.raison } as unknown as Fournisseur);
+    setLignes(lignesDepuisPiece(src));
+    const nom = src.fournisseur ?? src.raison ?? src.code_four;
+    if (src.code_four) setFournisseur({ code: src.code_four, nom, raison: nom } as unknown as Fournisseur);
     if (src.mode_payement) setMode(String(src.mode_payement));
-    if (src.remise != null) setRemiseGlobale(Number(src.remise) || 0);
+    // En achat, `remise` est déjà le pourcentage global
+    setRemiseGlobale(Number(src.remise) || 0);
     if (src.observation) setObservation(String(src.observation));
-    toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
-  }, [sourceData, dupliquerId, toast]);
+    if (enEdition) {
+      if (src.date) setDate(isoDate(src.date));
+    } else {
+      toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
+    }
+  }, [src, enEdition, toast]);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -107,55 +123,72 @@ export default function AchatEditor() {
   async function save() {
     setError(null);
     if (lignes.length === 0) { setError('Ajoutez au moins une ligne.'); return; }
+    if (!type) return;
+    const commun = {
+      code_four: fournisseur?.code ?? undefined,
+      date,
+      mode_payement: mode || undefined,
+      remise: remiseGlobale || 0,
+      observation: observation || undefined,
+      lignes: lignesPourServeur(lignes),
+    };
     try {
-      const { data } = await create({
-        variables: {
-          input: {
-            type_doc: type,
-            code_four: fournisseur?.code ?? undefined,
-            date,
-            mode_payement: mode || undefined,
-            remise: remiseGlobale || 0,
-            observation: observation || undefined,
-            lignes: lignes.map((l) => ({
-              id_article: l.id_article,
-              code_article: l.code_article,
-              designation: l.designation,
-              qte: l.qte,
-              prix_ht: l.prix_ht,
-              tva: l.tva,
-              remise: l.remise || 0,
-              n_lot: l.n_lot || undefined,
-              date_peremption: l.date_peremption || undefined,
-              colis: l.colis || undefined,
-            })),
-          },
-        },
-      });
+      if (enEdition) {
+        const { data } = await update({ variables: { id: Number(editId), input: commun } });
+        toast.success(`Pièce ${data?.updateAchat?.numero ?? src?.numero ?? ''} modifiée.`);
+        navigate(`/achats/${editId}`);
+        return;
+      }
+      const { data } = await create({ variables: { input: { type_doc: type, ...commun } } });
       const created = data?.createAchat;
       toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}.`.replace('  ', ' '));
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
     } catch (e: any) {
       setError(e.message ?? 'Erreur à l’enregistrement.');
-      toast.error(`Enregistrement échoué : ${e.message ?? 'erreur'}`);
+      toast.error(`${enEdition ? 'Modification' : 'Enregistrement'} échoué${enEdition ? 'e' : ''} : ${e.message ?? 'erreur'}`);
     }
+  }
+
+  const retour = enEdition ? `/achats/${editId}` : '/achats';
+  const titre = enEdition ? `Modifier ${src ? `${src.type_doc} ${src.numero}` : 'la pièce'}` : "Nouvelle pièce d'achat";
+
+  let blocage: string | null = null;
+  if (enEdition) {
+    if (sourceError) blocage = sourceError.message;
+    else if (src && typeEdition && !peutDoc('achat', typeEdition, 'modifier')) blocage = 'Accès refusé : vous n’avez pas le droit de modifier ce type de pièce.';
+    else if (src && src.modifiable === false) blocage = 'Cette pièce ne peut plus être modifiée.';
+  } else if (permis.length === 0) {
+    blocage = 'Accès refusé : vous n’avez le droit de créer aucun type de pièce d’achat.';
+  }
+  if (blocage || !type) {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <PageHeader title={titre}>
+          <Link to={retour} className="text-[12px] font-bold text-brand-700">← Retour</Link>
+        </PageHeader>
+        {blocage
+          ? <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{blocage}</div>
+          : <div className="text-[12px] text-ink-muted">Chargement…</div>}
+      </div>
+    );
   }
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Nouvelle pièce d'achat">
-        <Link to="/achats" className="text-[12px] font-bold text-brand-700">← Annuler</Link>
+      <PageHeader title={titre}>
+        <Link to={retour} className="text-[12px] font-bold text-brand-700">← Annuler</Link>
       </PageHeader>
 
-      <Tabs value={type} onChange={setType} options={TYPES_ACHAT} />
+      {/* En modification, le type est figé */}
+      <Tabs value={type} onChange={setType}
+            options={enEdition ? TYPES_ACHAT.filter((t) => t.code === type) : permis} />
       {!affecteStock && (
         <div className="text-[11px] text-ink-muted">Ce type de document n'affecte pas le stock (seuls Facture d'achat et Bon de réception le font).</div>
       )}
 
       {error && (
-        <div className="text-[12px] rounded-md px-3 py-2"
-             style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{error}</div>
+        <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>
       )}
 
       <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 grid grid-cols-[2fr_1fr_1fr_1fr] gap-3">
@@ -201,7 +234,7 @@ export default function AchatEditor() {
           <div className="p-3 flex flex-col gap-2">
             <button onClick={save} disabled={saving || lignes.length === 0}
                     className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
-              {saving ? 'Enregistrement…' : 'Enregistrer la pièce'}
+              {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
             </button>
             <div className="text-[10.5px] text-ink-muted text-center flex items-center justify-center gap-1.5">
               <DocBadge code={type === 'FA' ? 'BR' : type} /> {affecteStock ? 'entre en stock' : 'sans impact stock'}
