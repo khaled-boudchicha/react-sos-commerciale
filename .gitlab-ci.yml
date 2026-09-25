@@ -1,0 +1,107 @@
+# Gestion Commerciale Desktop — intégration continue & builds multi-plateformes.
+#
+# - Chaque push / MR : typecheck (renderer + Electron) et tests unitaires.
+# - Tag vX.Y.Z : builds Windows (NSIS) + Linux (AppImage, deb) sur les images
+#   officielles electron-builder, macOS (dmg + zip) sur un runner macOS (tag
+#   `macos`, job manuel), puis dépôt des installateurs et des manifestes
+#   latest*.yml dans le registre de paquets générique du projet.
+#
+# Variables CI à définir (Settings → CI/CD → Variables) :
+#   GC_UPDATE_URL   URL du dossier servant latest.yml / latest-mac.yml / latest-linux.yml
+#                   (active electron-updater dans les builds ; sans elle, pas d'auto-update)
+#   CSC_LINK, CSC_KEY_PASSWORD                    certificat de signature (Windows / macOS)
+#   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID   notarisation macOS (à activer
+#                   aussi dans app/package.json : build.mac.notarize — non fait tant qu'aucune identité n'existe)
+# La version publiée est celle du tag (package.json est aligné avant le build).
+
+stages: [check, build, publish]
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  ELECTRON_CACHE: "$CI_PROJECT_DIR/.cache/electron"
+  ELECTRON_BUILDER_CACHE: "$CI_PROJECT_DIR/.cache/electron-builder"
+
+.npm: &npm
+  before_script:
+    - cd app
+    - npm ci
+  cache:
+    key: { files: [app/package-lock.json] }
+    paths: [.npm, .cache]
+
+check:
+  stage: check
+  image: node:20
+  <<: *npm
+  script:
+    - npm run typecheck
+    - npx tsc -p tsconfig.electron.json --noEmit
+    - TZ=Africa/Algiers npm test
+
+# Aligne la version de l'app sur le tag puis construit ; l'URL de mise à jour
+# n'est injectée que si GC_UPDATE_URL est défini.
+.build: &build
+  stage: build
+  <<: *npm
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - app/release/*.exe
+      - app/release/*.AppImage
+      - app/release/*.deb
+      - app/release/*.dmg
+      - app/release/*.zip
+      - app/release/*.blockmap
+      - app/release/latest*.yml
+
+build:linux:
+  <<: *build
+  image: electronuserland/builder:20
+  script:
+    - npm version --no-git-tag-version --allow-same-version "${CI_COMMIT_TAG#v}"
+    - npm run build
+    - npx electron-builder --linux --publish never ${GC_UPDATE_URL:+-c.publish.provider=generic -c.publish.url=$GC_UPDATE_URL}
+
+build:windows:
+  <<: *build
+  image: electronuserland/builder:20-wine
+  script:
+    - npm version --no-git-tag-version --allow-same-version "${CI_COMMIT_TAG#v}"
+    - npm run build
+    - npx electron-builder --win --publish never ${GC_UPDATE_URL:+-c.publish.provider=generic -c.publish.url=$GC_UPDATE_URL}
+
+build:macos:
+  <<: *build
+  tags: [macos]
+  when: manual
+  allow_failure: true
+  script:
+    - npm version --no-git-tag-version --allow-same-version "${CI_COMMIT_TAG#v}"
+    - npm run build
+    - npx electron-builder --mac --publish never ${GC_UPDATE_URL:+-c.publish.provider=generic -c.publish.url=$GC_UPDATE_URL}
+
+# Dépose installateurs + manifestes dans le registre générique : version = tag,
+# plus une copie sous « latest » (dossier pointé par GC_UPDATE_URL).
+publish:
+  stage: publish
+  image: curlimages/curl:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+  needs:
+    - job: build:linux
+    - job: build:windows
+    - job: build:macos
+      optional: true
+  script:
+    - |
+      BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/gestion-commerciale"
+      for f in app/release/*.exe app/release/*.AppImage app/release/*.deb app/release/*.dmg app/release/*.zip app/release/*.blockmap app/release/latest*.yml; do
+        [ -f "$f" ] || continue
+        nom=$(basename "$f")
+        for version in "${CI_COMMIT_TAG#v}" latest; do
+          curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+               --upload-file "$f" "$BASE/$version/$nom"
+        done
+      done
