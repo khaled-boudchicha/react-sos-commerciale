@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER } from '../api/auth';
 import { apollo } from '../api/client';
-import { useSession } from '../store/session';
+import { useSession, dossierUserDepuisLogin } from '../store/session';
 
 /**
  * Changement de dossier (exercice) sans se déconnecter du cloud.
@@ -79,7 +79,7 @@ export default function DossierSwitcher({ onClose }: { onClose: () => void }) {
         setErreur(res?.message ?? 'Utilisateur ou mot de passe incorrect.');
         return;
       }
-      setSessionDossierUser({ id: res.user_id, username: res.username });
+      setSessionDossierUser(dossierUserDepuisLogin(res));
       // resetStore (et non clearStore) : vide le cache ET relance les requêtes
       // actives, pour que l'écran sous la modale recharge depuis la bonne base.
       // Le changement a réussi : une erreur de refetch ne doit PAS déclencher la

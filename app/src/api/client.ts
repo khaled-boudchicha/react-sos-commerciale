@@ -16,13 +16,15 @@ const httpLink = createHttpLink({
 // celui de la session sans muter l'état global — ex. lister les utilisateurs du
 // dossier cible avant d'y basculer.
 const authLink = setContext((_op, prevContext) => {
-  const { token, dossier } = useSession.getState();
+  const { token, dossier, dossierUser } = useSession.getState();
   const dossierEffectif = prevContext?.dossierOverride ?? dossier;
   return {
     headers: {
       ...prevContext?.headers,
       ...(token ? { authorization: `Bearer ${token}` } : {}),
       ...(dossierEffectif ? { 'X-Druxamed-Dossier': encodeURIComponent(dossierEffectif) } : {}),
+      // Identité de l'utilisateur dossier (jeton signé par l'agent, droits vérifiés côté agent)
+      ...(dossierUser?.user_token ? { 'X-Druxamed-User': dossierUser.user_token } : {}),
     },
   };
 });

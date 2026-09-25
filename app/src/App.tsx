@@ -21,37 +21,53 @@ import Statistiques from './screens/Statistiques';
 import Referentiels from './screens/Referentiels';
 import Parametres from './screens/Parametres';
 import Diagnostic from './screens/Diagnostic';
+import NotFound from './screens/NotFound';
+import MouvementsStock from './screens/MouvementsStock';
+import Utilisateurs from './screens/Utilisateurs';
+import RequireDroit from './components/RequireDroit';
+import { LIBELLES_REFERENTIELS } from './components/AppShell';
+import { D, useDroits } from './lib/droits';
+
+/** Élément de route protégé par un droit (prédicat évalué sur les droits de session). */
+function G({ si, children }: { si: (d: ReturnType<typeof useDroits>) => boolean; children: React.ReactNode }) {
+  const d = useDroits();
+  return <RequireDroit si={si(d)}>{children}</RequireDroit>;
+}
+import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
   const { hydrated, token, dossier, dossierUser } = useSession();
 
   if (!hydrated) return null;
   // Session complète = token cloud + dossier choisi + utilisateur dossier (requis pour créer des pièces)
-  if (!token || !dossier || !dossierUser) return <Login />;
+  if (!token || !dossier || !dossierUser) return <ErrorBoundary><Login /></ErrorBoundary>;
 
   return (
     <HashRouter>
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
-          <Route path="ventes" element={<Ventes />} />
-          <Route path="ventes/nouvelle" element={<VenteEditor />} />
-          <Route path="ventes/:id" element={<VenteDetail />} />
-          <Route path="achats" element={<Achats />} />
-          <Route path="achats/nouvelle" element={<AchatEditor />} />
-          <Route path="achats/:id" element={<AchatDetail />} />
-          <Route path="stock" element={<Stock />} />
-          <Route path="stock/article/:id" element={<ArticleDetail />} />
-          <Route path="stock/inventaires" element={<Inventaires />} />
-          <Route path="stock/inventaires/:id" element={<InventaireDetail />} />
-          <Route path="tiers" element={<Tiers />} />
-          <Route path="tiers/client/:code" element={<ClientDetail />} />
-          <Route path="tiers/fournisseur/:code" element={<FournisseurDetail />} />
-          <Route path="tresorerie" element={<Tresorerie />} />
-          <Route path="statistiques" element={<Statistiques />} />
-          <Route path="referentiels" element={<Referentiels />} />
-          <Route path="parametres" element={<Parametres />} />
+          <Route path="ventes" element={<G si={(d) => d.aModule('vente')}><Ventes /></G>} />
+          <Route path="ventes/nouvelle" element={<G si={(d) => d.aModule('vente')}><VenteEditor /></G>} />
+          <Route path="ventes/:id" element={<G si={(d) => d.aModule('vente')}><VenteDetail /></G>} />
+          <Route path="achats" element={<G si={(d) => d.aModule('achat')}><Achats /></G>} />
+          <Route path="achats/nouvelle" element={<G si={(d) => d.aModule('achat')}><AchatEditor /></G>} />
+          <Route path="achats/:id" element={<G si={(d) => d.aModule('achat')}><AchatDetail /></G>} />
+          <Route path="stock" element={<G si={(d) => d.peut('stock', D.stock.article)}><Stock /></G>} />
+          <Route path="stock/article/:id" element={<G si={(d) => d.peut('stock', D.stock.article)}><ArticleDetail /></G>} />
+          <Route path="stock/inventaires" element={<G si={(d) => d.peut('stock', D.stock.inventaire)}><Inventaires /></G>} />
+          <Route path="stock/mouvements" element={<G si={(d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie])}><MouvementsStock /></G>} />
+          <Route path="stock/inventaires/:id" element={<G si={(d) => d.peut('stock', D.stock.inventaire)}><InventaireDetail /></G>} />
+          <Route path="tiers" element={<G si={(d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs])}><Tiers /></G>} />
+          <Route path="tiers/client/:code" element={<G si={(d) => d.peut('tiers', D.tiers.clients)}><ClientDetail /></G>} />
+          <Route path="tiers/fournisseur/:code" element={<G si={(d) => d.peut('tiers', D.tiers.fournisseurs)}><FournisseurDetail /></G>} />
+          <Route path="tresorerie" element={<G si={(d) => d.peut('autre', D.autre.tresorerie)}><Tresorerie /></G>} />
+          <Route path="statistiques" element={<G si={(d) => d.peut('autre', D.autre.statistiques)}><Statistiques /></G>} />
+          <Route path="referentiels" element={<G si={(d) => d.peutUn('tiers', LIBELLES_REFERENTIELS)}><Referentiels /></G>} />
+          <Route path="parametres" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><Parametres /></G>} />
+          <Route path="parametres/utilisateurs" element={<G si={(d) => d.peut('autre', D.autre.droitsAcces)}><Utilisateurs /></G>} />
           <Route path="diagnostic" element={<Diagnostic />} />
+          <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
     </HashRouter>

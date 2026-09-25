@@ -5,6 +5,7 @@ import { CLIENTS, ARTICLES, FOURNISSEURS } from '../api/queries';
 import { Client, Article, Fournisseur } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import { useDebouncedValue } from '../lib/useDebounce';
+import { D, useDroits } from '../lib/droits';
 
 type Item = {
   id: string;
@@ -16,23 +17,26 @@ type Item = {
 };
 
 /** Commandes statiques : navigation + créations rapides (équivalent du ruban Delphi). */
-const STATIQUES: { groupe: string; titre: string; sous?: string; to: string }[] = [
+type Droit = (d: ReturnType<typeof useDroits>) => boolean;
+const STATIQUES: { groupe: string; titre: string; sous?: string; to: string; si?: Droit }[] = [
   { groupe: 'Aller à', titre: 'Tableau de bord', to: '/' },
-  { groupe: 'Aller à', titre: 'Ventes', sous: 'Documents de vente', to: '/ventes' },
-  { groupe: 'Aller à', titre: 'Achats', sous: "Documents d'achat", to: '/achats' },
-  { groupe: 'Aller à', titre: 'Stock', sous: 'Articles & stock', to: '/stock' },
-  { groupe: 'Aller à', titre: 'Inventaires', to: '/stock/inventaires' },
-  { groupe: 'Aller à', titre: 'Tiers', sous: 'Clients, fournisseurs, débiteurs', to: '/tiers' },
-  { groupe: 'Aller à', titre: 'Trésorerie', to: '/tresorerie' },
-  { groupe: 'Aller à', titre: 'Statistiques', to: '/statistiques' },
-  { groupe: 'Aller à', titre: 'Référentiels', to: '/referentiels' },
-  { groupe: 'Aller à', titre: 'Paramètres', to: '/parametres' },
-  { groupe: 'Créer', titre: 'Nouvelle facture', sous: 'Vente FA', to: '/ventes/nouvelle?type=FA' },
-  { groupe: 'Créer', titre: 'Nouveau bon de livraison', sous: 'Vente BL', to: '/ventes/nouvelle?type=BL' },
-  { groupe: 'Créer', titre: 'Nouveau devis', sous: 'Proforma FP', to: '/ventes/nouvelle?type=FP' },
-  { groupe: 'Créer', titre: 'Nouveau bon de réception', sous: 'Achat BR', to: '/achats/nouvelle?type=BR' },
-  { groupe: 'Créer', titre: "Nouvelle facture d'achat", sous: 'Achat FA', to: '/achats/nouvelle?type=FA' },
-  { groupe: 'Créer', titre: 'Nouvel inventaire', to: '/stock/inventaires' },
+  { groupe: 'Aller à', titre: 'Ventes', sous: 'Documents de vente', to: '/ventes', si: (d) => d.aModule('vente') },
+  { groupe: 'Aller à', titre: 'Achats', sous: "Documents d'achat", to: '/achats', si: (d) => d.aModule('achat') },
+  { groupe: 'Aller à', titre: 'Stock', sous: 'Articles & stock', to: '/stock', si: (d) => d.peut('stock', D.stock.article) },
+  { groupe: 'Aller à', titre: 'Mouvements de stock', sous: "Bons d'entrée, de sortie, transferts", to: '/stock/mouvements', si: (d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) },
+  { groupe: 'Aller à', titre: 'Inventaires', to: '/stock/inventaires', si: (d) => d.peut('stock', D.stock.inventaire) },
+  { groupe: 'Aller à', titre: 'Tiers', sous: 'Clients, fournisseurs, débiteurs', to: '/tiers', si: (d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs]) },
+  { groupe: 'Aller à', titre: 'Trésorerie', to: '/tresorerie', si: (d) => d.peut('autre', D.autre.tresorerie) },
+  { groupe: 'Aller à', titre: 'Statistiques', to: '/statistiques', si: (d) => d.peut('autre', D.autre.statistiques) },
+  { groupe: 'Aller à', titre: 'Référentiels', to: '/referentiels', si: (d) => d.aModule('tiers') },
+  { groupe: 'Aller à', titre: 'Paramètres', to: '/parametres', si: (d) => d.peut('autre', D.autre.parametres) },
+  { groupe: 'Aller à', titre: 'Utilisateurs & droits', to: '/parametres/utilisateurs', si: (d) => d.peut('autre', D.autre.droitsAcces) },
+  { groupe: 'Créer', titre: 'Nouvelle facture', sous: 'Vente FA', to: '/ventes/nouvelle?type=FA', si: (d) => d.peutDoc('vente', 'FA', 'creer') },
+  { groupe: 'Créer', titre: 'Nouveau bon de livraison', sous: 'Vente BL', to: '/ventes/nouvelle?type=BL', si: (d) => d.peutDoc('vente', 'BL', 'creer') },
+  { groupe: 'Créer', titre: 'Nouveau devis', sous: 'Proforma FP', to: '/ventes/nouvelle?type=FP', si: (d) => d.peutDoc('vente', 'FP', 'creer') },
+  { groupe: 'Créer', titre: 'Nouveau bon de réception', sous: 'Achat BR', to: '/achats/nouvelle?type=BR', si: (d) => d.peutDoc('achat', 'BR', 'creer') },
+  { groupe: 'Créer', titre: "Nouvelle facture d'achat", sous: 'Achat FA', to: '/achats/nouvelle?type=FA', si: (d) => d.peutDoc('achat', 'FA', 'creer') },
+  { groupe: 'Créer', titre: 'Nouvel inventaire', to: '/stock/inventaires', si: (d) => d.peut('stock', D.stock.inventaire) },
 ];
 
 function norm(s: string) {
@@ -45,6 +49,7 @@ function norm(s: string) {
  */
 export default function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
+  const droits = useDroits();
   const [term, setTerm] = useState('');
   const termDiffere = useDebouncedValue(term, 220);
   const [hi, setHi] = useState(0);
@@ -76,6 +81,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     const q = norm(term.trim());
 
     const statiques: Item[] = STATIQUES
+      .filter((c) => !c.si || c.si(droits))
       .filter((s) => !q || norm(s.titre).includes(q) || norm(s.sous ?? '').includes(q))
       .map((s, i) => ({ id: `s${i}`, groupe: s.groupe, titre: s.titre, sous: s.sous, action: go(s.to) }));
 
@@ -98,7 +104,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     }));
 
     return [...statiques, ...clients, ...fournisseurs, ...articles];
-  }, [term, cData, aData, fData, navigate, onClose]);
+  }, [term, cData, aData, fData, navigate, onClose, droits.droits]);
 
   useEffect(() => { setHi(0); }, [term]);
 

@@ -49,3 +49,10 @@ export const LOGIN_DOSSIER_USER = gql`
     loginDossierUser(username: $username, password: $password)
   }
 `;
+
+/** Connexion par code d'appairage du tray ({ u, k, a } : utilisateur, clé API, agent). */
+export const LOGIN_WITH_API_KEY = gql`
+  mutation LoginWithApiKey($input: LoginWithApiKeyInput!) {
+    loginWithApiKey(input: $input) { success access_token message statut }
+  }
+`;

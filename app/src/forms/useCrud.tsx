@@ -18,6 +18,7 @@ type Entity = { id: number } & Record<string, unknown>;
  */
 export function useCrud<T extends Entity>({
   label, createTitle, editTitle, deleteTitle, sections, createDoc, updateDoc, deleteDoc, onDone, labelOf, width, formExtra,
+  peutModifier = true, peutSupprimer = true,
 }: {
   label: string;
   /** Titres si l'élision française diffère (ex. « Nouvel article », « Modifier l'article »). */
@@ -35,6 +36,9 @@ export function useCrud<T extends Entity>({
   width?: number;
   /** Aperçu réactif rendu sous le formulaire (ex. matrice de prix calculée). */
   formExtra?: (values: Record<string, unknown>) => ReactNode;
+  /** Droits de l'utilisateur dossier : masquent les actions ✎ / ✕ correspondantes. */
+  peutModifier?: boolean;
+  peutSupprimer?: boolean;
 }) {
   const [editing, setEditing] = useState<T | null | 'new'>(null);
   const [deleting, setDeleting] = useState<T | null>(null);
@@ -117,13 +121,15 @@ export function useCrud<T extends Entity>({
   function rowActions(row: T) {
     return (
       <span className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
-        {updateDoc && (
+        {updateDoc && peutModifier && (
           <button onClick={() => setEditing(row)} title="Modifier"
                   className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted hover:text-brand-700 text-[11px]">✎</button>
         )}
-        <button onClick={() => setDeleting(row)} title="Supprimer"
-                className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]"
-                style={{ color: 'var(--danger)' }}>✕</button>
+        {peutSupprimer && (
+          <button onClick={() => setDeleting(row)} title="Supprimer"
+                  className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]"
+                  style={{ color: 'var(--danger)' }}>✕</button>
+        )}
       </span>
     );
   }

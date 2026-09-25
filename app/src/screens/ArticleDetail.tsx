@@ -5,11 +5,16 @@ import { Article } from '../api/types';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill } from '../components/ui/atoms';
+import { D, useDroits } from '../lib/droits';
 
 type Lot = { id: number; n_lot: string; date_fabrication?: string | null; date_peremption?: string | null; qte: number; prix?: unknown[] };
 type Tarif = Record<string, unknown> & { qte_from?: number; qte_to?: number; prix_ht?: number };
 
 export default function ArticleDetail() {
+  const { peut, droits } = useDroits();
+  // « Cacher l'onglet Tarifs » est un droit restrictif : il ne s'applique que s'il est
+  // explicitement coché (pas pour un administrateur ni un module « tout »).
+  const tarifsCaches = !!droits && !droits.admin && Array.isArray(droits.stock) && droits.stock.includes(D.stock.cacherTarifs);
   const { id } = useParams();
   const articleId = Number(id);
   const { data, loading, error } = useQuery(ARTICLE, { variables: { id: articleId } });
@@ -66,13 +71,20 @@ export default function ArticleDetail() {
       )}
 
       <div className="grid grid-cols-2 gap-3.5 items-start">
+        {peut('stock', D.stock.lots) && (
+          <div className="flex flex-col gap-2">
+            <h2 className="font-bold text-[13px]">Lots & péremption</h2>
+            <DataGrid columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot." />
+          </div>
+        )}
         <div className="flex flex-col gap-2">
-          <h2 className="font-bold text-[13px]">Lots & péremption</h2>
-          <DataGrid columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot." />
-        </div>
-        <div className="flex flex-col gap-2">
-          <h2 className="font-bold text-[13px]">Tarifs par quantité</h2>
-          <DataGrid columns={tarifCols} rows={tarifs} rowKey={(_t, i) => i} emptyMessage="Aucun tarif par quantité." />
+          {/* Droit Delphi « Cacher l'onglet Tarifs » : masque les prix par quantité */}
+          {!tarifsCaches && (
+            <>
+              <h2 className="font-bold text-[13px]">Tarifs par quantité</h2>
+              <DataGrid columns={tarifCols} rows={tarifs} rowKey={(_t, i) => i} emptyMessage="Aucun tarif par quantité." />
+            </>
+          )}
           <h2 className="font-bold text-[13px] mt-2">Codes-barres</h2>
           <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3 flex gap-2 flex-wrap">
             {a?.code_bare && <span className="money text-[11.5px] border border-line rounded px-2 py-1">{a.code_bare}</span>}

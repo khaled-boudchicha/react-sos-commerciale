@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useLazyQuery } from '@apollo/client';
-import { LOGIN_IDENTIFY, LOGIN_WITH_AGENT, DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER } from '../api/auth';
-import { useSession, getDeviceId, AgentInfo } from '../store/session';
+import { LOGIN_IDENTIFY, LOGIN_WITH_AGENT, DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER, LOGIN_WITH_API_KEY } from '../api/auth';
+import { useSession, getDeviceId, AgentInfo, dossierUserDepuisLogin } from '../store/session';
 
 type Step = 'credentials' | 'agent' | 'dossier';
 
@@ -11,12 +11,14 @@ const STATUT_MESSAGES: Record<string, string> = {
   suspendu: 'Abonnement suspendu — contactez SOFTLY.',
   bloque: 'Compte bloqué — contactez SOFTLY.',
   agent_offline: "Cet agent est hors ligne. Démarrez l'agent sur le PC de la pharmacie.",
+  agent_invalide: "Code d'appairage invalide ou révoqué — recopiez-le depuis l'agent.",
   max_appareils_atteint: "Nombre maximum d'appareils atteint pour ce compte.",
 };
 
 export default function Login() {
   const session = useSession();
-  const [step, setStep] = useState<Step>('credentials');
+  // Jeton cloud encore valide (ex. session d'avant les droits serveur) : on reprend au choix du dossier
+  const [step, setStep] = useState<Step>(session.token ? 'dossier' : 'credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +26,9 @@ export default function Login() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [needsForce, setNeedsForce] = useState(false);
+  // Connexion alternative : code d'appairage copié depuis le tray de l'agent
+  const [modeAppairage, setModeAppairage] = useState(false);
+  const [codeAppairage, setCodeAppairage] = useState('');
 
   const [dossierName, setDossierName] = useState('');
   const [dossierUsername, setDossierUsername] = useState('');
@@ -34,6 +39,35 @@ export default function Login() {
   const [loadDossiers, { data: dossiersData, loading: loadingDossiers }] = useLazyQuery(DOSSIERS, { fetchPolicy: 'network-only' });
   const [loadDossierUsers, { data: dossierUsersData }] = useLazyQuery(DOSSIER_USERS, { fetchPolicy: 'network-only' });
   const [loginDossierUser, { loading: loggingDossierUser }] = useMutation(LOGIN_DOSSIER_USER);
+  const [loginWithApiKey, { loading: appairage }] = useMutation(LOGIN_WITH_API_KEY);
+
+  /**
+   * Code d'appairage = contenu du QR du tray : JSON { u, k, a }. Évite le
+   * compte cloud (poste dédié à une pharmacie) ; même flux ensuite (dossier).
+   */
+  async function handleAppairage(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    let code: { u?: string; k?: string; a?: string };
+    try { code = JSON.parse(codeAppairage.trim()); } catch { code = {}; }
+    if (!code.k || !code.a) { setError("Code d'appairage illisible : utilisez « Copier le code d'appairage » dans l'agent."); return; }
+    try {
+      const { data } = await loginWithApiKey({ variables: { input: { apiKey: code.k, agent_id: code.a } } });
+      const res = data?.loginWithApiKey;
+      if (!res?.success || !res.access_token) {
+        setError(STATUT_MESSAGES[res?.statut ?? ''] ?? res?.message ?? 'Appairage refusé.');
+        return;
+      }
+      const agent: AgentInfo = { agentId: code.a, label: code.a, isOnline: true };
+      session.setAuth(res.access_token, agent);
+      setSelectedAgent(agent);
+      setStep('dossier');
+      void loadDossiers();
+      void loadDossierUsers();
+    } catch (err: any) {
+      setError(err.message ?? 'Serveur injoignable.');
+    }
+  }
 
   async function handleIdentify(e: React.FormEvent) {
     e.preventDefault();
@@ -104,11 +138,21 @@ export default function Login() {
         setError(res?.message ?? 'Utilisateur dossier incorrect.');
         return;
       }
-      session.setDossierUser({ id: res.user_id, username: res.username });
+      session.setDossierUser(dossierUserDepuisLogin(res));
     } catch (err: any) {
       setError(err.message ?? 'Erreur de connexion.');
     }
   }
+
+  // Reprise directe à l'étape dossier : charger listes et dossier courant
+  useEffect(() => {
+    if (step === 'dossier' && session.token && !dossiersData) {
+      if (session.dossier) setDossierName(session.dossier);
+      void loadDossiers();
+      void loadDossierUsers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (step === 'dossier' && !dossierName) {
@@ -150,7 +194,27 @@ export default function Login() {
           </div>
         )}
 
-        {step === 'credentials' && (
+        {step === 'credentials' && modeAppairage && (
+          <form onSubmit={handleAppairage} className="flex flex-col gap-3">
+            <div className="text-[11.5px] text-ink-muted">
+              Dans l’agent de la pharmacie, cliquez sur « Copier le code d’appairage », puis collez-le ici.
+            </div>
+            <label className="text-[11px] font-bold text-ink-label">
+              Code d’appairage
+              <textarea className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-[11px] h-20"
+                        value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
+                        placeholder='{"u":"…","k":"…","a":"…"}' />
+            </label>
+            <button type="submit" disabled={appairage || !codeAppairage.trim()}
+                    className="mt-1 rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
+              {appairage ? 'Connexion…' : 'Se connecter'}
+            </button>
+            <button type="button" onClick={() => { setModeAppairage(false); setError(null); }}
+                    className="text-[11.5px] font-bold text-brand-700">← Connexion avec un compte cloud</button>
+          </form>
+        )}
+
+        {step === 'credentials' && !modeAppairage && (
           <form onSubmit={handleIdentify} className="flex flex-col gap-3">
             <label className="text-[11px] font-bold text-ink-label">
               Identifiant
@@ -166,6 +230,8 @@ export default function Login() {
                     className="mt-2 rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
               {identifying ? 'Connexion…' : 'Continuer'}
             </button>
+            <button type="button" onClick={() => { setModeAppairage(true); setError(null); }}
+                    className="text-[11.5px] font-bold text-brand-700">Se connecter avec un code d’appairage</button>
           </form>
         )}
 

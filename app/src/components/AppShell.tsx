@@ -1,36 +1,50 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import ErrorBoundary from './ErrorBoundary';
 import { useQuery } from '@apollo/client';
 import { MY_AGENTS } from '../api/auth';
 import { useSession } from '../store/session';
 import CommandPalette from './CommandPalette';
 import DossierSwitcher from './DossierSwitcher';
 import { useSessionKeepAlive } from '../api/useSessionKeepAlive';
+import { useDroitsSync } from '../api/useDroitsSync';
+import { D, useDroits } from '../lib/droits';
 
-const NAV: { group: string | null; items: { to: string; label: string }[] }[] = [
+/** Libellés « Référentiels » du module tiers (hors Clients / Fournisseurs). */
+export const LIBELLES_REFERENTIELS = Object.entries(D.tiers)
+  .filter(([k]) => k !== 'clients' && k !== 'fournisseurs').map(([, v]) => v as string);
+
+type NavItem = { to: string; label: string; visible?: (d: ReturnType<typeof useDroits>) => boolean };
+
+const NAV: { group: string | null; items: NavItem[] }[] = [
   { group: null, items: [{ to: '/', label: 'Tableau de bord' }] },
   {
     group: 'Activité',
     items: [
-      { to: '/ventes', label: 'Ventes' },
-      { to: '/achats', label: 'Achats' },
-      { to: '/stock', label: 'Stock' },
-      { to: '/tiers', label: 'Tiers' },
-      { to: '/tresorerie', label: 'Trésorerie' },
+      { to: '/ventes', label: 'Ventes', visible: (d) => d.aModule('vente') },
+      { to: '/achats', label: 'Achats', visible: (d) => d.aModule('achat') },
+      { to: '/stock', label: 'Stock', visible: (d) => d.peut('stock', D.stock.article) },
+      { to: '/stock/mouvements', label: 'Mouvements de stock', visible: (d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) },
+      { to: '/tiers', label: 'Tiers', visible: (d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs]) },
+      { to: '/tresorerie', label: 'Trésorerie', visible: (d) => d.peut('autre', D.autre.tresorerie) },
     ],
   },
-  { group: 'Analyse', items: [{ to: '/statistiques', label: 'Statistiques' }] },
+  { group: 'Analyse', items: [{ to: '/statistiques', label: 'Statistiques', visible: (d) => d.peut('autre', D.autre.statistiques) }] },
   {
     group: 'Configuration',
     items: [
-      { to: '/referentiels', label: 'Référentiels' },
-      { to: '/parametres', label: 'Paramètres' },
+      { to: '/referentiels', label: 'Référentiels', visible: (d) => d.peutUn('tiers', LIBELLES_REFERENTIELS) },
+      { to: '/parametres', label: 'Paramètres', visible: (d) => d.peut('autre', D.autre.parametres) },
+      { to: '/parametres/utilisateurs', label: 'Utilisateurs & droits', visible: (d) => d.peut('autre', D.autre.droitsAcces) },
     ],
   },
 ];
 
 export default function AppShell() {
   const { agent, dossier, dossierUser, accessError, logout } = useSession();
+  const location = useLocation();
+  const droits = useDroits();
+  useDroitsSync();
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const [changerDossier, setChangerDossier] = useState(false);
 
@@ -66,7 +80,9 @@ export default function AppShell() {
             <div className="text-[9px] font-semibold tracking-widest text-ink-muted">DESKTOP</div>
           </div>
         </div>
-        {NAV.map((section) => (
+        {NAV.map((section) => ({ ...section, items: section.items.filter((i) => !i.visible || i.visible(droits)) }))
+          .filter((section) => section.items.length > 0)
+          .map((section) => (
           <div key={section.group ?? 'root'}>
             {section.group && (
               <div className="text-[9.5px] font-bold tracking-widest uppercase text-ink-muted px-2.5 pt-3 pb-1">
@@ -74,7 +90,7 @@ export default function AppShell() {
               </div>
             )}
             {section.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === '/'}
+              <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/stock' || item.to === '/parametres'}
                 className={({ isActive }) =>
                   `block px-2.5 py-1.5 rounded-sm text-[12px] font-semibold mb-0.5 ${
                     isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-label hover:bg-line-soft'
@@ -122,7 +138,9 @@ export default function AppShell() {
         {changerDossier && <DossierSwitcher onClose={() => setChangerDossier(false)} />}
 
         <main className="flex-1 p-5 overflow-auto">
-          <Outlet />
+          <ErrorBoundary resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

@@ -1,7 +1,28 @@
 import { create } from 'zustand';
+import type { Droits } from '../lib/droits';
 
 export type AgentInfo = { agentId: string; label: string; isOnline: boolean; lastDossier?: string | null };
-export type DossierUser = { id: number; username: string } & Record<string, unknown>;
+export type DossierUser = {
+  id: number; username: string;
+  name?: string | null; typeuser?: string | null;
+  /** Compte de trésorerie par défaut de l'utilisateur (Delphi : CompteID) */
+  compte?: string | null; compte_id?: number | null;
+  /** Droits d'accès (absent si l'agent ne les fournit pas encore → aucun blocage) */
+  droits?: Droits;
+  /** Jeton signé par l'agent, envoyé à chaque requête : l'agent y vérifie les droits */
+  user_token?: string;
+} & Record<string, unknown>;
+
+/** Construit l'utilisateur de session depuis la réponse `loginDossierUser` de l'agent. */
+export function dossierUserDepuisLogin(res: any): DossierUser {
+  return {
+    id: Number(res.user_id), username: String(res.username),
+    name: res.name ?? null, typeuser: res.typeuser ?? null,
+    compte: res.compte ?? null, compte_id: res.compte_id ?? null,
+    droits: res.droits && typeof res.droits === 'object' ? res.droits : undefined,
+    user_token: typeof res.user_token === 'string' ? res.user_token : undefined,
+  };
+}
 
 export type SessionState = {
   hydrated: boolean;
@@ -62,7 +83,9 @@ export const useSession = create<SessionState>((set, get) => ({
       token: saved?.token ?? null,
       agent: saved?.agent ?? null,
       dossier: saved?.dossier ?? null,
-      dossierUser: saved?.dossierUser ?? null,
+      // Session d'avant les droits côté serveur (sans jeton utilisateur) : on
+      // redemande l'utilisateur du dossier, sans refaire la connexion cloud.
+      dossierUser: saved?.dossierUser?.user_token ? saved.dossierUser : null,
     });
   },
 }));

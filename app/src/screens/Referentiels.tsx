@@ -16,6 +16,7 @@ import {
 } from '../api/queries';
 import { Section } from '../components/ui/FormModal';
 import { useCrud } from '../forms/useCrud';
+import { D, useDroits } from '../lib/droits';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { PageHeader, Tabs } from '../components/ui/atoms';
 import { fmtMoney } from '../lib/format';
@@ -206,13 +207,31 @@ const REFS: Ref[] = [
   },
 ];
 
+/** Libellé de droit Delphi (module Tiers) de chaque onglet ; « charges » relève de la trésorerie. */
+const DROIT_ONGLET: Record<string, { module: 'tiers' | 'autre'; libelle: string }> = {
+  familles: { module: 'tiers', libelle: D.tiers.familles },
+  sfamilles: { module: 'tiers', libelle: D.tiers.sousFamilles },
+  depots: { module: 'tiers', libelle: D.tiers.depots },
+  rayons: { module: 'tiers', libelle: D.tiers.rayons },
+  unites: { module: 'tiers', libelle: D.tiers.unites },
+  tva: { module: 'tiers', libelle: D.tiers.tva },
+  banques: { module: 'tiers', libelle: D.tiers.banques },
+  modes: { module: 'tiers', libelle: D.tiers.modes },
+  commerciaux: { module: 'tiers', libelle: D.tiers.commerciaux },
+  centres: { module: 'tiers', libelle: D.tiers.centresCout },
+  charges: { module: 'autre', libelle: D.autre.tresorerie },
+};
+
 export default function Referentiels() {
-  const [onglet, setOnglet] = useState(REFS[0].code);
-  const ref = REFS.find((r) => r.code === onglet)!;
+  const { peut } = useDroits();
+  const refs = REFS.filter((r) => { const d = DROIT_ONGLET[r.code]; return !d || peut(d.module, d.libelle); });
+  const [onglet, setOnglet] = useState(refs[0]?.code ?? REFS[0].code);
+  const ref = refs.find((r) => r.code === onglet) ?? refs[0];
+  if (!ref) return <PageHeader title="Référentiels" />;
   return (
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Référentiels" />
-      <Tabs value={onglet} onChange={setOnglet} options={REFS.map((r) => ({ code: r.code, label: r.label }))} />
+      <Tabs value={ref.code} onChange={setOnglet} options={refs.map((r) => ({ code: r.code, label: r.label }))} />
       {/* key = remount complet au changement d'onglet (hooks propres à chaque référentiel) */}
       <TableRef key={ref.code} ref_={ref} />
     </div>
