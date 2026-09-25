@@ -51,6 +51,7 @@ function buildSrcDoc(doc: PrintDocument): string {
   // L'iframe srcDoc hérite de la base URL du parent : on résout l'asset en absolu
   // pour être robuste (dev Vite, build web, Electron file://).
   const polyfill = new URL(PAGEDJS_POLYFILL, document.baseURI).href;
+  const config = new URL('vendor/paged-config.js', document.baseURI).href;
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -59,15 +60,7 @@ function buildSrcDoc(doc: PrintDocument): string {
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>${INTERFACE_CSS}</style>
 <style>${doc.css}</style>
-<script>
-window.PagedConfig = {
-  auto: true,
-  after: function (flow) { parent.postMessage({ type: 'paged:rendered', pages: flow.total }, '*'); },
-};
-window.addEventListener('error', function (e) {
-  parent.postMessage({ type: 'paged:error', message: e.message }, '*');
-});
-</script>
+<script src="${config}"></script>
 <script src="${polyfill}"></script>
 </head>
 <body>${doc.html}</body>

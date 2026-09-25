@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { D, useDroits } from '../lib/droits';
 import { useMutation, useQuery } from '@apollo/client';
 import { COORDONNEES_SOCIETE, UPDATE_COORDONNEES, NUMEROTATION_DOCS, SET_NUMEROTATION } from '../api/queries';
 import FormModal from '../components/ui/FormModal';
@@ -22,6 +23,7 @@ export async function loadTheme() {
 
 export default function Parametres() {
   const { cloudUrl, setCloudUrl, agent, dossier } = useSession();
+  const { peut } = useDroits();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [url, setUrl] = useState(cloudUrl);
   const { data, refetch } = useQuery(COORDONNEES_SOCIETE);
@@ -55,7 +57,13 @@ export default function Parametres() {
 
   return (
     <div className="flex flex-col gap-3.5 max-w-[720px]">
-      <PageHeader title="Paramètres" />
+      <PageHeader title="Paramètres">
+        {peut('autre', D.autre.droitsAcces) && (
+          <Link to="/parametres/utilisateurs" className="text-[12px] font-bold text-brand-700">Utilisateurs &amp; droits →</Link>
+        )}
+      </PageHeader>
+
+      <SectionMisesAJour />
 
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
         <h2 className="font-bold text-[13px] mb-3">Apparence</h2>
@@ -115,10 +123,12 @@ export default function Parametres() {
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
         <div className="flex items-center mb-3">
           <h2 className="font-bold text-[13px]">Coordonnées de la société</h2>
-          <button onClick={() => { setErreur(null); setEditCoord(true); }}
-                  className="ml-auto rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
-            Modifier
-          </button>
+          {peut('autre', D.autre.coordonnees) && (
+            <button onClick={() => { setErreur(null); setEditCoord(true); }}
+                    className="ml-auto rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+              Modifier
+            </button>
+          )}
         </div>
         {erreur && <div className="text-[12px] mb-2" style={{ color: 'var(--danger)' }}>{erreur}</div>}
         <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
@@ -181,8 +191,10 @@ export default function Parametres() {
               <span className="font-semibold flex-1">{n.type}</span>
               <span className="text-ink-muted money text-[11px]">{n.masque}</span>
               <span className="money font-bold">{n.compteur}</span>
-              <button onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur) })}
-                      className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]" title="Modifier le compteur">✎</button>
+              {peut('autre', D.autre.numerotation) && (
+                <button onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur) })}
+                        className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]" title="Modifier le compteur">✎</button>
+              )}
             </div>
           ))}
         </div>
@@ -217,5 +229,53 @@ export default function Parametres() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Version installée + état des mises à jour automatiques (application installée uniquement). */
+function SectionMisesAJour() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [etat, setEtat] = useState<Awaited<ReturnType<NonNullable<typeof window.gc.majEtat>>> | null>(null);
+  const electron = typeof window.gc?.majEtat === 'function';
+
+  useEffect(() => {
+    if (!electron) return;
+    void window.gc.version?.().then(setVersion);
+    void window.gc.majEtat?.().then(setEtat);
+    return window.gc.onMaj?.(setEtat);
+  }, [electron]);
+
+  if (!electron) return null;
+  const libelle = !etat ? '…' : {
+    desactive: 'Mises à jour automatiques non configurées pour ce build.',
+    verification: 'Recherche de mises à jour…',
+    a_jour: 'L’application est à jour.',
+    disponible: `Version ${'version' in etat ? etat.version : ''} disponible — téléchargement en cours…`,
+    telechargee: `Version ${'version' in etat ? etat.version : ''} prête : elle sera installée à la fermeture.`,
+    erreur: `Erreur : ${'message' in etat ? etat.message : ''}`,
+  }[etat.etat];
+
+  return (
+    <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <h2 className="font-bold text-[13px]">Application</h2>
+        <span className="text-[11px] text-ink-muted money">v{version ?? '…'}</span>
+      </div>
+      <div className="text-[12px] text-ink-label">{libelle}</div>
+      <div className="flex gap-2 mt-3">
+        {etat?.etat !== 'desactive' && (
+          <button onClick={() => void window.gc.majVerifier?.().then(setEtat)}
+                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+            Rechercher une mise à jour
+          </button>
+        )}
+        {etat?.etat === 'telechargee' && (
+          <button onClick={() => void window.gc.majInstaller?.()}
+                  className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">
+            Redémarrer et installer
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
