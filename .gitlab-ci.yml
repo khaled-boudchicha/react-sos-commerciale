@@ -7,8 +7,12 @@
 #   latest*.yml dans le registre de paquets générique du projet.
 #
 # Variables CI à définir (Settings → CI/CD → Variables) :
-#   GC_UPDATE_URL   URL du dossier servant latest.yml / latest-mac.yml / latest-linux.yml
+#   GC_UPDATE_URL   URL publique du dossier des mises à jour, ex.
+#                   https://api.druxamed.com/mises-a-jour/gestion-commerciale
 #                   (active electron-updater dans les builds ; sans elle, pas d'auto-update)
+#   GC_DEPLOY_HOST, GC_DEPLOY_USER, GC_DEPLOY_PATH   dépôt SSH sur le VPS, ex. PATH =
+#                   /opt/sos-cloud-server/mises-a-jour/gestion-commerciale (servi par Caddy)
+#   GC_DEPLOY_SSH_KEY (type « File »), GC_DEPLOY_KNOWN_HOSTS   clé de déploiement + empreinte
 #   CSC_LINK, CSC_KEY_PASSWORD                    certificat de signature (Windows / macOS)
 #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID   notarisation macOS (à activer
 #                   aussi dans app/package.json : build.mac.notarize — non fait tant qu'aucune identité n'existe)
@@ -82,11 +86,13 @@ build:macos:
     - npm run build
     - npx electron-builder --mac --publish never ${GC_UPDATE_URL:+-c.publish.provider=generic -c.publish.url=$GC_UPDATE_URL}
 
-# Dépose installateurs + manifestes dans le registre générique : version = tag,
-# plus une copie sous « latest » (dossier pointé par GC_UPDATE_URL).
+# 1. Archive par version dans le registre de paquets générique du projet.
+# 2. Dépôt sur le VPS (dossier servi publiquement par Caddy, lu par electron-updater) :
+#    installeurs d'abord, manifestes latest*.yml en dernier — un poste ne doit jamais voir
+#    une version annoncée dont le fichier n'est pas encore en ligne.
 publish:
   stage: publish
-  image: curlimages/curl:latest
+  image: alpine:3.20
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   needs:
@@ -94,14 +100,25 @@ publish:
     - job: build:windows
     - job: build:macos
       optional: true
+  before_script:
+    - apk add --no-cache curl rsync openssh-client
   script:
     - |
       BASE="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/gestion-commerciale"
       for f in app/release/*.exe app/release/*.AppImage app/release/*.deb app/release/*.dmg app/release/*.zip app/release/*.blockmap app/release/latest*.yml; do
         [ -f "$f" ] || continue
-        nom=$(basename "$f")
-        for version in "${CI_COMMIT_TAG#v}" latest; do
-          curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-               --upload-file "$f" "$BASE/$version/$nom"
-        done
+        curl --fail --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+             --upload-file "$f" "$BASE/${CI_COMMIT_TAG#v}/$(basename "$f")"
       done
+    - |
+      if [ -z "${GC_DEPLOY_HOST:-}" ]; then echo "GC_DEPLOY_HOST absent : pas de publication des mises à jour"; exit 0; fi
+      mkdir -p ~/.ssh && chmod 700 ~/.ssh
+      cp "$GC_DEPLOY_SSH_KEY" ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+      echo "$GC_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      SSH="ssh -i $HOME/.ssh/id_deploy"
+      DEST="${GC_DEPLOY_USER}@${GC_DEPLOY_HOST}:${GC_DEPLOY_PATH}/"
+      # Seuls les fichiers réellement produits (macOS est facultatif)
+      INSTALLEURS=$(ls app/release/*.exe app/release/*.AppImage app/release/*.deb app/release/*.dmg \
+                       app/release/*.zip app/release/*.blockmap 2>/dev/null || true)
+      [ -n "$INSTALLEURS" ] && rsync -av -e "$SSH" $INSTALLEURS "$DEST"
+      rsync -av -e "$SSH" app/release/latest*.yml "$DEST"

@@ -40,11 +40,20 @@ Déployer **dans cet ordre** ; chaque étape reste compatible avec les versions 
 - [ ] Sauvegarde des bases des dossiers sur chaque PC pharmacie (le tray / l'outil habituel) — par
       précaution, même sans migration.
 
-> **Où héberger les mises à jour ?** electron-updater télécharge `latest.yml` / `latest-mac.yml`
-> **sans authentification**. Le registre de paquets d'un projet GitLab privé n'est pas lisible
-> anonymement : servir plutôt les fichiers depuis le VPS, par ex. un dossier statique derrière
-> Caddy (`https://api.druxamed.com/mises-a-jour/gestion-commerciale/`), alimenté par la CI
-> (job `publish` à adapter : `scp` / `rsync` vers le VPS au lieu du registre GitLab).
+> **Mises à jour automatiques — hébergement sur le VPS.** Caddy sert le dossier
+> `sos-cloud-server/mises-a-jour/` à l'adresse `https://<domaine>/mises-a-jour/` (sans
+> authentification, `latest*.yml` non mis en cache). Mise en place, une fois :
+>
+> 1. Sur le VPS : `mkdir -p ~/sos-cloud-server/mises-a-jour/gestion-commerciale`, puis créer une
+>    clé SSH dédiée (`ssh-keygen -t ed25519 -f deploy_gc -N ''`) et ajouter `deploy_gc.pub` à
+>    `~/.ssh/authorized_keys` de l'utilisateur de déploiement (idéalement restreint à rsync).
+> 2. Variables CI du projet desktop :
+>    - `GC_UPDATE_URL` = `https://api.druxamed.com/mises-a-jour/gestion-commerciale`
+>    - `GC_DEPLOY_HOST`, `GC_DEPLOY_USER`, `GC_DEPLOY_PATH` (= chemin absolu du dossier ci-dessus)
+>    - `GC_DEPLOY_SSH_KEY` (type **File**, contenu de `deploy_gc`)
+>    - `GC_DEPLOY_KNOWN_HOSTS` (sortie de `ssh-keyscan <vps>`)
+> 3. Le job `publish` dépose les installeurs puis, en dernier, les manifestes `latest*.yml`.
+>
 > Sans `GC_UPDATE_URL`, les builds fonctionnent mais la mise à jour automatique reste désactivée
 > (Paramètres → Application l'indique).
 
@@ -54,6 +63,7 @@ Déployer **dans cet ordre** ; chaque étape reste compatible avec les versions 
 ssh <vps>
 cd sos-cloud-server
 ./update.sh          # sauvegarde sos_admin → git pull → rebuild → contrôle de santé
+mkdir -p mises-a-jour/gestion-commerciale   # dossier servi par Caddy (monté en lecture seule)
 ```
 
 Vérifications :
@@ -63,6 +73,8 @@ Vérifications :
       -H 'Access-Control-Request-Headers: x-druxamed-user' | grep -i allow-headers` contient
       `X-Druxamed-User`.
 - [ ] Une app mobile **actuelle** fonctionne toujours (connexion, liste des ventes).
+- [ ] `curl -sI https://api.druxamed.com/mises-a-jour/gestion-commerciale/latest.yml` répond 200
+      avec `Cache-Control: no-cache` (après la première publication).
 
 Retour arrière : `git checkout <commit précédent> && docker compose -f docker-compose.prod.yml up -d --build`.
 
