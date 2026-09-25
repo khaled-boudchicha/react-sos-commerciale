@@ -1,4 +1,12 @@
-# Déploiement — lot « cycle des pièces, droits, caisse, stock, timbre » (septembre 2026)
+# Déploiement — version 0.2.0 (septembre 2026)
+
+Première mise en production de l'app desktop. Elle regroupe : cycle des pièces, droits, caisse,
+stock, timbre (25/09) ; grille de données avec tri / filtres / groupes **côté serveur**, fiche de
+stock, paiement immédiat des achats, correctifs du crédit initial et du schéma (26/09).
+
+> **À déployer rapidement même sans l'app desktop : l'agent.** Il corrige deux défauts qui
+> touchent les installations actuelles : la mutation « crédit initial client » effaçait les
+> paiements du crédit, et l'agent s'arrêtait lors d'une reconnexion au cloud.
 
 Procédure pas à pas pour mettre en production les évolutions des dépôts :
 
@@ -23,15 +31,17 @@ Déployer **dans cet ordre** ; chaque étape reste compatible avec les versions 
    ancien agent l'ignore). Il corrige aussi `refreshToken` pour tous les clients.
 2. **Agents** (nouvel installeur du tray) — compatibles avec l'ancienne app desktop et l'app mobile
    actuelle : sans jeton utilisateur, les commandes historiques restent acceptées (mode non strict).
-3. **App desktop** — exige cloud **et** agent à jour (nouvelles commandes, jeton utilisateur).
+3. **App desktop** — exige cloud **et** agent à jour (nouvelles commandes, jeton utilisateur,
+   argument `grille` des listes : avec un ancien agent, les listes ne seraient ni triées ni
+   filtrées côté serveur et la liste des transferts ne s'afficherait pas).
 4. **App mobile** avec envoi du jeton utilisateur.
 5. **Plus tard** : mode strict sur chaque agent (`exiger_jeton_utilisateur: true`), une fois tous
    les postes desktop et mobiles mis à jour (voir § 5).
 
 ## 1. Préparation (la veille)
 
-- [ ] Commits poussés : `git push` sur `main` dans les 4 dépôts (le mobile : après intégration du
-      travail en cours, voir § 4).
+- [x] Commits poussés sur `main` : `sos-cloud-server`, `sos-agent`, `agent_tray`,
+      `gestion-commerciale-desktop`, `app_mobile_client` (26/09/2026).
 - [ ] Variables CI du projet desktop (GitLab → Settings → CI/CD → Variables) :
   - `GC_UPDATE_URL` : URL **publique** du dossier des mises à jour (voir encadré ci-dessous).
   - Signature (facultatif mais recommandé) : `CSC_LINK`, `CSC_KEY_PASSWORD` ; macOS :
@@ -119,10 +129,9 @@ choix du dossier** (pour obtenir le jeton utilisateur) — pas besoin de ressais
 
 ### Mobile
 
-Les modifications (mémorisation et envoi du jeton `X-Druxamed-User`) sont dans l'arbre de travail
-de `app_mobile_client` (`lib/storage.ts`, `lib/store.ts`, `lib/apollo.ts`,
-`app/(startup)/session.tsx`, `app/(app)/select-dossier-user.tsx`), à commiter avec le travail en
-cours puis publier via EAS. Les utilisateurs mémorisés avant cette version ressaisissent **une
+Commité et poussé (commit `b9768e7`, versionCode 32) : envoi du jeton `X-Druxamed-User` et travaux
+en cours de l'équipe. Publier via EAS (`eas build --profile production`). 4 erreurs de typage
+restent dans `app/(app)/tiers/preview.tsx` (sans effet sur le build). Les utilisateurs mémorisés avant cette version ressaisissent **une
 fois** leur mot de passe (pour obtenir leur jeton).
 
 ## 5. Recette après déploiement (sur un poste desktop)
@@ -138,12 +147,23 @@ Sur un **dossier de test** de préférence (copie de base) :
 - [ ] Mouvements de stock : bon d'entrée, transfert, suppression.
 - [ ] Recouvrement, État 104 (impression paysage à contrôler visuellement), péremption.
 - [ ] Paramètres → Application : version affichée, état des mises à jour.
+- [ ] Ventes (période avec des pièces) : tri par montant sur toute la liste (pas seulement la page),
+      recherche, groupement par client (effectifs et totaux), export Excel = tout le résultat filtré.
+- [ ] Fiche article : en-tête renseigné, fiche de stock (stock final = stock enregistré, sinon
+      l'alerte « Recalculer » apparaît).
+- [ ] Achat BR avec « Payer tout » → pièce « Payée ».
+- [ ] Fiche client → Crédit initial : un montant inférieur au déjà payé est refusé ; les paiements
+      du crédit restent dans le relevé.
+- [ ] Référentiels : créer / supprimer un centre de coût et un commercial.
 
 Automatisé (sur une copie de dossier uniquement) :
 
 ```bash
-# Agent : 101 vérifications, base gc_test_* (voir en-tête du script)
-cd sos-agent && npm run build && node test/integration/cycle-pieces.itest.js
+# Agent (base gc_test_*, voir l'en-tête des scripts)
+cd sos-agent && npm run build
+node test/integration/cycle-pieces.itest.js   # 109 vérifications (cycle des pièces, droits, crédit initial…)
+node test/integration/lectures.itest.js       # les 91 commandes de lecture, 0 erreur SQL attendue
+node test/integration/schema.itest.js         # tables et colonnes utilisées = schéma Delphi réel
 # Chaîne complète cloud → agent → base (refuse un dossier qui ne commence pas par gc_test)
 cd gestion-commerciale-desktop/app && GC_CLOUD_URL=… GC_API_KEY=… GC_AGENT_ID=… GC_DOSSIER=gc_test_… npm run test:e2e
 ```
@@ -163,6 +183,10 @@ appliqués côté serveur pour tous les clients.
 
 ## 7. Points connus
 
+- Stocks non recalculés : la fiche de stock les signale (7 articles sur 2036 dans la base de
+  test) ; le recalcul passe par la procédure standard `UpdateSingleArticleStock`.
+- Solde cumulé de la trésorerie : non triable ni filtrable (n'a de sens qu'en ordre chronologique).
+- Bordereau / impressions « tout » des listes : critères de l'écran, sans les filtres de la grille.
 - Transfert inter-dépôts : trace documentaire (les lots ne portent pas de dépôt dans ce schéma).
 - PMP non recalculé à la modification d'un achat (volontaire, parité de valorisation avec Delphi).
 - Timbre : appliqué d'office aux nouvelles factures / comptoirs en espèces ; les pièces Delphi
