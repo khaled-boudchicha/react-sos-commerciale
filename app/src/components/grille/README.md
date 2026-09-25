@@ -13,6 +13,16 @@ Composant `Grille<T>` inspiré du DataGrid DevExtreme, sans dépendance externe
 | `exportGrille.ts` | Export Excel (typé, groupes en plan, totaux), CSV, PDF (moteur d'impression) |
 | `Grille.tsx` | Le composant |
 
+## Dans l'application
+
+Tous les tableaux de consultation passent par `components/ui/DataGrid` (API `columns` / `rows`),
+qui rend cette grille : colonnes réorganisables, redimensionnables, masquables, export,
+clavier. Tri, filtres (bouton « Filtres »), recherche et regroupement (glisser un en-tête :
+la zone apparaît) s'activent sur les colonnes qui ont un `sortAccessor`, ou sur toutes les
+colonnes homonymes d'un champ avec `complet` — à réserver aux listes chargées en entier
+(sur une liste paginée côté serveur, on ne trierait que la page). Les tableaux de saisie
+(lignes de pièce, inventaire, modales) restent des formulaires dédiés.
+
 ## Exemple minimal
 
 ```tsx

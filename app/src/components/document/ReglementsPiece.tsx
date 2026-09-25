@@ -5,6 +5,7 @@ import { ReglementPiece } from '../../api/types';
 import { D, useDroits } from '../../lib/droits';
 import { fmtDate, fmtMoney } from '../../lib/format';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import DataGrid from '../ui/DataGrid';
 import { useToast } from '../ui/Toast';
 import ReglerPieceModal from './ReglerPieceModal';
 
@@ -53,58 +54,32 @@ export default function ReglementsPiece({ sens, pieceId, numero, reglements, res
   }
 
   return (
-    <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-line-soft">
-        <span className="text-[12px] font-extrabold">Règlements <span className="text-ink-muted font-bold">({reglements.length})</span></span>
-        {reste > 0.009 && (
-          <button onClick={() => setAjout(true)}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">
-            {verbe}
-          </button>
-        )}
-      </div>
-      {reglements.length === 0 ? (
-        <div className="px-4 py-3 text-[12px] text-ink-muted">Aucun règlement sur cette pièce.</div>
-      ) : (
-        <table className="w-full text-[12px]">
-          <thead>
-            <tr className="text-[10.5px] uppercase text-ink-muted bg-bg">
-              <th className="text-left px-4 py-1.5 w-[95px]">Date</th>
-              <th className="text-left px-2 py-1.5 w-[130px]">Mode</th>
-              <th className="text-left px-2 py-1.5">Observation</th>
-              <th className="text-right px-2 py-1.5 w-[120px]">Montant</th>
-              {peutSupprimer && <th className="w-[40px]" />}
-            </tr>
-          </thead>
-          <tbody>
-            {reglements.map((r) => (
-              <tr key={r.id} className="border-t border-line-soft">
-                <td className="px-4 py-1.5">{fmtDate(r.date)}</td>
-                <td className="px-2 py-1.5">
-                  {r.mode_payement ?? '—'}
-                  {r.num_cheque ? <span className="text-ink-muted money text-[10.5px]"> · n° {r.num_cheque}</span> : null}
-                </td>
-                <td className="px-2 py-1.5 text-ink-muted">
-                  {r.depuis_avance ? <span className="font-bold mr-1">Avance</span> : null}
-                  {r.observation ?? ''}
-                </td>
-                <td className="px-2 py-1.5 text-right money font-medium">{fmtMoney(r.montant)}</td>
-                {peutSupprimer && (
-                  <td className="px-2 py-1.5 text-right">
-                    <button onClick={() => setASupprimer(r)} title="Supprimer ce règlement"
-                            className="font-bold" style={{ color: 'var(--danger)' }}>✕</button>
-                  </td>
-                )}
-              </tr>
-            ))}
-            <tr className="border-t border-line-soft font-bold">
-              <td className="px-4 py-1.5 text-ink-label" colSpan={3}>Total réglé</td>
-              <td className="px-2 py-1.5 text-right money">{fmtMoney(total)}</td>
-              {peutSupprimer && <td />}
-            </tr>
-          </tbody>
-        </table>
-      )}
+    <div>
+      <DataGrid<ReglementPiece>
+        complet
+        titre={<>Règlements <span className="text-ink-muted font-bold">({reglements.length})</span></>}
+        actions={reste > 0.009 ? (
+          <button onClick={() => setAjout(true)} className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">{verbe}</button>
+        ) : undefined}
+        rows={reglements}
+        rowKey={(r) => r.id}
+        emptyMessage="Aucun règlement sur cette pièce."
+        footer={reglements.length ? { _label: 'Total réglé', montant: <span className="money">{fmtMoney(total)}</span> } : undefined}
+        columns={[
+          { key: 'date', header: 'Date', width: '95px', render: (r) => fmtDate(r.date) },
+          { key: 'mode_payement', header: 'Mode', width: '150px', render: (r) => (
+            <>{r.mode_payement ?? '—'}{r.num_cheque ? <span className="text-ink-muted money text-[10.5px]"> · n° {r.num_cheque}</span> : null}</>
+          ) },
+          { key: 'observation', header: 'Observation', render: (r) => (
+            <span className="text-ink-muted">{r.depuis_avance ? <span className="font-bold mr-1">Avance</span> : null}{r.observation ?? ''}</span>
+          ) },
+          { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (r) => <span className="money font-medium">{fmtMoney(r.montant)}</span> },
+          ...(peutSupprimer ? [{ key: '_suppr', header: '', width: '44px', align: 'right' as const, render: (r: ReglementPiece) => (
+            <button onClick={(e) => { e.stopPropagation(); setASupprimer(r); }} title="Supprimer ce règlement"
+                    className="font-bold" style={{ color: 'var(--danger)' }}>✕</button>
+          ) }] : []),
+        ]}
+      />
 
       {ajout && (
         <ReglerPieceModal sens={sens} pieceId={pieceId} numero={numero} reste={reste}

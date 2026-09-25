@@ -242,6 +242,8 @@ export default function Grille<T>(props: GrilleProps<T>) {
 
   // ─── Colonnes : glisser-déposer, redimensionnement, menus ─────────────────
   const [flottant, setFlottant] = useState<ReactNode>(null);
+  const [filtresOuverts, setFiltresOuverts] = useState(false);
+  const [glisseEnTete, setGlisseEnTete] = useState(false);
   const [pdf, setPdf] = useState<PrintDocument | null>(null);
   const [survolGroupes, setSurvolGroupes] = useState(false);
   const redim = useRef<{ champ: string; x: number; l: number } | null>(null);
@@ -381,7 +383,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
           if ((modeEdition === 'cellule' || modeEdition === 'lot') && c && c.editable !== false && !c.valeur)
             setCelluleEditee({ cle: cleDe(el.ligne), champ: c.champ, valeur: valeurDe(c, el.ligne) });
           else if (modeEdition && edition?.modification !== false && e.key === 'F2') commencerModification(el.ligne);
-          else props.surDoubleClicLigne?.(el.ligne);
+          else (props.surDoubleClicLigne ?? props.surClicLigne)?.(el.ligne);
         }
         break;
       }
@@ -451,7 +453,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
       <Fragment key={String(k)}>
         <tr data-index={indexPage} onClick={(e) => cliquerLigne(e, ligne)}
             onDoubleClick={() => { if (modeEdition === 'ligne' || modeEdition === 'formulaire') { if (edition?.modification !== false) commencerModification(ligne); } else props.surDoubleClicLigne?.(ligne); }}
-            className={`${supprimee ? 'line-through opacity-50' : ''} ${bordures ? '' : 'border-b border-line-soft'} hover:brightness-[0.98]`}
+            className={`${supprimee ? 'line-through opacity-50' : ''} ${bordures ? '' : 'border-b border-line-soft'} ${props.surClicLigne ? 'cursor-pointer' : ''} hover:brightness-[0.98]`}
             style={{ background: fond, height: defilementVirtuel ? hauteurLigne : undefined, ...(props.styleLigne?.(ligne) ?? {}) }}>
           {etat.groupes.map((g) => <td key={g} style={{ width: 18 }} />)}
           {aSelection && (
@@ -572,13 +574,15 @@ export default function Grille<T>(props: GrilleProps<T>) {
 
   // ─── Export ───────────────────────────────────────────────────────────────
   const opts = props.export;
+  // Colonnes sans titre (boutons d'action) exclues de l'export
+  const colonnesExport = opts?.colonnes ?? visibles.filter((c) => c.titre !== '');
   const lignesExport = () => (opts?.selectionSeule && selectionnees.size ? triees.filter((l) => selectionnees.has(cleDe(l))) : triees);
   function menuExport(e: ME) {
     const nom = opts?.nom ?? 'export';
     const entrees: EntreeMenu[] = [
-      ...(opts?.excel !== false ? [{ libelle: 'Excel (.xlsx)', action: () => void exporterGrilleExcel(nom, visibles, lignesExport(), { groupes: arbre ?? undefined, resumes }) }] : []),
-      ...(opts?.csv !== false ? [{ libelle: 'CSV (Excel FR)', action: () => exporterGrilleCsv(nom, visibles, lignesExport()) }] : []),
-      ...(opts?.pdf !== false ? [{ libelle: 'PDF / Imprimer', action: () => setPdf(documentPdfGrille(typeof titre === 'string' ? titre : nom, visibles, lignesExport(), resumes)) }] : []),
+      ...(opts?.excel !== false ? [{ libelle: 'Excel (.xlsx)', action: () => void exporterGrilleExcel(nom, colonnesExport, lignesExport(), { groupes: opts?.colonnes ? undefined : arbre ?? undefined, resumes }) }] : []),
+      ...(opts?.csv !== false ? [{ libelle: 'CSV (Excel FR)', action: () => exporterGrilleCsv(nom, colonnesExport, lignesExport()) }] : []),
+      ...(opts?.pdf !== false ? [{ libelle: 'PDF / Imprimer', action: () => setPdf(documentPdfGrille(typeof titre === 'string' ? titre : nom, colonnesExport, lignesExport(), resumes)) }] : []),
       ...(selectionnees.size ? [{ libelle: `Sélection seule (${selectionnees.size})`, separateur: true, actif: !!opts?.selectionSeule, action: () => void 0, desactive: true }] : []),
     ];
     setFlottant(<MenuContextuel ancre={(e.currentTarget as HTMLElement).getBoundingClientRect()} entrees={entrees} onFermer={() => setFlottant(null)} />);
@@ -636,6 +640,12 @@ export default function Grille<T>(props: GrilleProps<T>) {
             <input value={etat.recherche} onChange={(e) => actions.rechercher(e.target.value)} placeholder="Rechercher…"
                    className="border border-line rounded-sm px-2.5 py-1 bg-surface text-ink text-[12px] w-48" />
           )}
+          {ligneFiltre === 'bascule' && (
+            <button onClick={() => setFiltresOuverts((o) => !o)} title="Afficher la ligne de filtre"
+                    className={`rounded-sm px-2 py-1 text-[11.5px] border ${filtresOuverts ? 'border-brand-500 text-brand-700' : 'border-line text-ink-label'}`}>
+              ⏷ Filtres{Object.keys(etat.filtres).length ? ` (${Object.keys(etat.filtres).length})` : ''}
+            </button>
+          )}
           {selecteurColonnes && (
             <button onClick={(e) => setFlottant(
               <SelecteurColonnes ancre={e.currentTarget.getBoundingClientRect()}
@@ -649,10 +659,10 @@ export default function Grille<T>(props: GrilleProps<T>) {
       </div>
 
       {/* Zone de regroupement (glisser un en-tête ici) */}
-      {panneauGroupes && (
+      {(panneauGroupes === true || (panneauGroupes === 'auto' && (glisseEnTete || etat.groupes.length > 0))) && (
         <div onDragOver={(e) => { if (e.dataTransfer.types.includes(TYPE_DND)) { e.preventDefault(); setSurvolGroupes(true); } }}
              onDragLeave={() => setSurvolGroupes(false)}
-             onDrop={(e) => { const champ = e.dataTransfer.getData(TYPE_DND); setSurvolGroupes(false); if (champ && colonnes.find((c) => c.champ === champ)?.groupable !== false) actions.grouper(champ); }}
+             onDrop={(e) => { const champ = e.dataTransfer.getData(TYPE_DND); setSurvolGroupes(false); setGlisseEnTete(false); if (champ && colonnes.find((c) => c.champ === champ)?.groupable !== false) actions.grouper(champ); }}
              className="flex items-center gap-1.5 flex-wrap px-3 py-1.5 border-b border-line-soft min-h-[34px] text-[11.5px]"
              style={{ background: survolGroupes ? 'var(--brand-50)' : 'color-mix(in srgb, var(--line-soft) 40%, var(--surface))' }}>
           {etat.groupes.length === 0 && <span className="text-ink-muted">Glissez un en-tête de colonne ici pour grouper par cette colonne</span>}
@@ -688,7 +698,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
             {etat.groupes.map((g) => <col key={g} style={{ width: 18 }} />)}
             {aSelection && <col style={{ width: L_SELECTION }} />}
             {aDetail && <col style={{ width: L_DETAIL }} />}
-            {visibles.map((c) => <col key={c.champ} style={{ width: largeurEff(c) }} />)}
+            {visibles.map((c) => <col key={c.champ} style={{ width: c.flexible && !etat.largeurs[c.champ] && largeurTemp?.champ !== c.champ ? undefined : largeurEff(c) }} />)}
             {aCommandes && <col style={{ width: L_COMMANDES }} />}
           </colgroup>
           <thead className="sticky top-0 z-[3]">
@@ -720,8 +730,9 @@ export default function Grille<T>(props: GrilleProps<T>) {
                 const tri = t >= 0 ? etat.tri[t] : null;
                 const filtreEnt = !!etat.filtresEntete[c.champ]?.length;
                 return (
-                  <th key={c.champ} draggable={reorganisationColonnes || panneauGroupes}
-                      onDragStart={(e) => { e.dataTransfer.setData(TYPE_DND, c.champ); e.dataTransfer.effectAllowed = 'move'; }}
+                  <th key={c.champ} draggable={reorganisationColonnes || !!panneauGroupes}
+                      onDragStart={(e) => { e.dataTransfer.setData(TYPE_DND, c.champ); e.dataTransfer.effectAllowed = 'move'; setGlisseEnTete(true); }}
+                      onDragEnd={() => setGlisseEnTete(false)}
                       onDragOver={(e) => { if (reorganisationColonnes && e.dataTransfer.types.includes(TYPE_DND)) e.preventDefault(); }}
                       onDrop={(e) => {
                         const champ = e.dataTransfer.getData(TYPE_DND);
@@ -753,7 +764,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
               })}
               {aCommandes && <th className={thBase} style={{ position: 'sticky', right: 0, zIndex: 4 }} />}
             </tr>
-            {ligneFiltre && (
+            {(ligneFiltre === true || (ligneFiltre === 'bascule' && filtresOuverts)) && (
               <tr>
                 {debutColonnesSysteme > 0 && <th colSpan={debutColonnesSysteme} className="bg-surface border-b border-line-soft" />}
                 {visibles.map((c) => {
@@ -829,6 +840,19 @@ export default function Grille<T>(props: GrilleProps<T>) {
                 {aCommandes && <td className="bg-surface border-t border-line" style={{ position: 'sticky', right: 0 }} />}
               </tr>
             </tfoot>
+          ) : props.pied && triees.length > 0 ? (
+            <tfoot className="sticky bottom-0 z-[3]">
+              <tr className="font-bold">
+                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-surface border-t border-line" />}
+                {visibles.map((c, i) => (
+                  <td key={c.champ} className="px-2.5 py-2 bg-surface border-t border-line whitespace-nowrap text-[11.5px]"
+                      style={{ textAlign: alignement(c), ...styleFige(c, 'var(--surface)') }}>
+                    {i === 0 && props.pied!._label !== undefined ? props.pied!._label : props.pied![c.champ]}
+                  </td>
+                ))}
+                {aCommandes && <td className="bg-surface border-t border-line" style={{ position: 'sticky', right: 0 }} />}
+              </tr>
+            </tfoot>
           ) : null}
         </table>
         {!chargement && elementsPage.length === 0 && !ligneEditee?.nouvelle && (
@@ -877,7 +901,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
       )}
       {!pagine && (
         <div className="px-3 py-1.5 border-t border-line-soft text-[11.5px] text-ink-muted">
-          {triees.length} ligne{triees.length > 1 ? 's' : ''}{selectionnees.size ? ` · ${selectionnees.size} sélectionnée(s)` : ''}
+          {triees.length} ligne{triees.length > 1 ? 's' : ''}{triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''}{selectionnees.size ? ` · ${selectionnees.size} sélectionnée(s)` : ''}
         </div>
       )}
 

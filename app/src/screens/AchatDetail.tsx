@@ -63,13 +63,13 @@ export default function AchatDetail() {
   }
 
   const columns: Column<LigneAchat>[] = [
-    { key: 'code', header: 'Code', width: '100px', render: (l) => <span className="money">{String(l.code_article ?? '')}</span> },
+    { key: 'code', header: 'Code', width: '100px', sortAccessor: (l) => String(l.code_article ?? ''), render: (l) => <span className="money">{String(l.code_article ?? '')}</span> },
     { key: 'designation', header: 'Désignation', render: (l) => <span><b>{String(l.designation ?? '')}</b>{l.n_lot ? <span className="text-ink-muted money text-[10.5px]"> · lot {String(l.n_lot)}</span> : null}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
-    { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', render: (l) => <Money value={l.prix_ht} /> },
+    { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', sortAccessor: (l) => Number(l.prix_ht ?? 0), render: (l) => <Money value={l.prix_ht} /> },
     { key: 'remise', header: 'Rem. %', align: 'right', width: '70px', render: (l) => <span className="money">{fmtMoney(l.remise ?? 0, 1)}</span> },
     { key: 'tva', header: 'TVA %', align: 'right', width: '65px', render: (l) => <span className="money">{fmtMoney(l.tva, 0)}</span> },
-    { key: 'ttc', header: 'Total TTC', align: 'right', width: '110px', render: (l) => <Money value={l.total_ttc} /> },
+    { key: 'ttc', header: 'Total TTC', align: 'right', width: '110px', sortAccessor: (l) => Number(l.total_ttc ?? 0), render: (l) => <Money value={l.total_ttc} /> },
   ];
 
   // Consultation : droit sur le type de pièce, et pièces des autres masquées si « … par utilisateur »
@@ -141,7 +141,7 @@ export default function AchatDetail() {
 
       <div className="grid grid-cols-[1fr_270px] gap-3.5 items-start">
         <div className="flex flex-col gap-3.5 min-w-0">
-          <DataGrid columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
+          <DataGrid complet columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
                     emptyMessage="Aucune ligne."
                     footer={{ _label: `${lignes.length} ligne(s)`, ttc: <Money value={a?.total_ttc} /> }} />
           {a && (

@@ -42,6 +42,8 @@ export type ColonneGrille<T> = {
   type?: TypeDonnee;
   /** Largeur initiale en px */
   largeur?: number;
+  /** Prend l'espace restant (au moins `largeur`, 170 px par défaut) */
+  flexible?: boolean;
   largeurMin?: number;
   alignement?: 'left' | 'right' | 'center';
   visible?: boolean;
@@ -120,9 +122,11 @@ export type GrilleProps<T> = {
 
   // Fonctionnalités (toutes désactivables)
   rechercheGlobale?: boolean;
-  ligneFiltre?: boolean;
+  /** 'bascule' : ligne masquée derrière un bouton « Filtres » de la barre d'outils */
+  ligneFiltre?: boolean | 'bascule';
   panneauFiltre?: boolean;
-  panneauGroupes?: boolean;
+  /** 'auto' : zone affichée seulement si des groupes sont actifs ou pendant un glisser d'en-tête */
+  panneauGroupes?: boolean | 'auto';
   selecteurColonnes?: boolean;
   reorganisationColonnes?: boolean;
   redimensionnementColonnes?: boolean;
@@ -169,12 +173,18 @@ export type GrilleProps<T> = {
   // Totaux
   resumes?: Resume<T>[];
   resumesGroupe?: Resume<T>[];
+  /** Pied libre (totaux calculés par l'appelant) : contenu par champ, `_label` dans la première colonne */
+  pied?: Partial<Record<string, ReactNode>> & { _label?: ReactNode };
 
   // Maître-détail
   detail?: (ligne: T) => ReactNode;
 
   // Export
-  export?: { nom: string; excel?: boolean; csv?: boolean; pdf?: boolean; selectionSeule?: boolean };
+  export?: {
+    nom: string; excel?: boolean; csv?: boolean; pdf?: boolean; selectionSeule?: boolean;
+    /** Colonnes exportées (défaut : colonnes visibles, dans leur ordre) */
+    colonnes?: ColonneGrille<T>[];
+  };
 
   /** Persistance de l'état (colonnes, tri, filtres, groupes, page) dans localStorage */
   cleEtat?: string;

@@ -124,7 +124,7 @@ const REFS: Ref[] = [
     create: CREATE_BANQUE, update: UPDATE_BANQUE, remove: DELETE_BANQUE,
     colonnes: [
       col('code', 'Code', { width: '110px' }),
-      { key: 'nom', header: 'Compte / banque', render: (l) => <b>{l.nom ?? l.banque ?? '—'}</b> },
+      { key: 'nom', header: 'Compte / banque', sortAccessor: (l) => l.nom ?? l.banque ?? '', render: (l) => <b>{l.nom ?? l.banque ?? '—'}</b> },
       col('rib', 'RIB'),
       { key: 'solde_initial', header: 'Solde initial', align: 'right', width: '130px',
         render: (l) => <span className="money">{fmtMoney(l.solde_initial)}</span> },
@@ -153,7 +153,7 @@ const REFS: Ref[] = [
     code: 'commerciaux', label: 'Commerciaux', champ: 'commerciaux', query: COMMERCIAUX,
     create: CREATE_COMMERCIAL, update: UPDATE_COMMERCIAL, remove: DELETE_COMMERCIAL,
     colonnes: [
-      { key: 'nom', header: 'Nom', render: (l) => <b>{[l.nom, l.prenom].filter(Boolean).join(' ') || '—'}</b> },
+      { key: 'nom', header: 'Nom', sortAccessor: (l) => [l.nom, l.prenom].filter(Boolean).join(' '), render: (l) => <b>{[l.nom, l.prenom].filter(Boolean).join(' ') || '—'}</b> },
       col('telephone', 'Téléphone', { width: '140px' }),
       col('email', 'Email', { width: '200px' }),
     ],
@@ -174,8 +174,8 @@ const REFS: Ref[] = [
     code: 'centres', label: 'Centres de coût', champ: 'centresCout', query: CENTRES_COUT,
     create: CREATE_CENTRE_COUT, update: UPDATE_CENTRE_COUT, remove: DELETE_CENTRE_COUT,
     colonnes: [
-      { key: 'designation', header: 'Centre', render: (l) => <b>{l.designation ?? l.Centre ?? '—'}</b> },
-      { key: 'observation', header: 'Observation', render: (l) => <span className="text-ink-muted">{l.observation ?? l.description ?? l.Observation ?? '—'}</span> },
+      { key: 'designation', header: 'Centre', sortAccessor: (l) => l.designation ?? l.Centre ?? '', render: (l) => <b>{l.designation ?? l.Centre ?? '—'}</b> },
+      { key: 'observation', header: 'Observation', sortAccessor: (l) => l.observation ?? l.description ?? l.Observation ?? '', render: (l) => <span className="text-ink-muted">{l.observation ?? l.description ?? l.Observation ?? '—'}</span> },
     ],
     sections: [{ title: 'Centre de coût', fields: [
       { name: 'designation', label: 'Désignation', span: 12, required: true },
@@ -270,7 +270,7 @@ function TableRef({ ref_ }: { ref_: Ref }) {
         </button>
       </div>
       {crud.modals}
-      <DataGrid columns={colonnes} rows={lignes} rowKey={(l, i) => l.id ?? i}
+      <DataGrid complet columns={colonnes} rows={lignes} rowKey={(l, i) => l.id ?? i}
                 loading={loading} error={error?.message}
                 emptyMessage={`Aucun élément dans « ${ref_.label} ».`}
                 footer={{ _label: `${lignes.length} élément(s)` }} />

@@ -55,21 +55,21 @@ export default function ClientDetail() {
 
   const relCols: Column<EtatLigne>[] = [
     { key: 'date', header: 'Date', width: '90px', render: (l) => fmtDate(l.date) },
-    { key: 'type', header: 'Opération', width: '140px', render: (l) => <span className="font-semibold text-ink-label">{l.type_doc}</span> },
+    { key: 'type', header: 'Opération', sortAccessor: (l) => l.type_doc ?? '', width: '140px', render: (l) => <span className="font-semibold text-ink-label">{l.type_doc}</span> },
     { key: 'numero', header: 'N°', width: '130px', render: (l) => <span className="money">{l.numero ?? '—'}</span> },
-    { key: 'mode', header: 'Mode', width: '90px', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
+    { key: 'mode', header: 'Mode', width: '90px', sortAccessor: (l) => l.mode_payement ?? '', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (l) => (
       <span className="money font-semibold" style={{ color: Number(l.montant) < 0 ? 'var(--success)' : undefined }}>{fmtMoney(l.montant)}</span>
     ) },
-    { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
+    { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', sortAccessor: (l) => Number(l.total_cumul ?? 0), render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
   ];
 
   const fnrCols: Column<FactureNR>[] = [
-    { key: 'numero', header: 'Pièce', render: (f) => <span><span className="font-semibold text-ink-label">{f.type_facture}</span> <span className="money">{f.numero}</span></span> },
+    { key: 'numero', header: 'Pièce', sortAccessor: (f) => `${f.type_facture ?? ''} ${f.numero ?? ''}`, render: (f) => <span><span className="font-semibold text-ink-label">{f.type_facture}</span> <span className="money">{f.numero}</span></span> },
     { key: 'date', header: 'Date', width: '90px', render: (f) => fmtDate(f.date) },
-    { key: 'net', header: 'Montant', align: 'right', width: '115px', render: (f) => <Money value={f.net_a_payer} /> },
+    { key: 'net', header: 'Montant', align: 'right', width: '115px', sortAccessor: (f) => Number(f.net_a_payer ?? 0), render: (f) => <Money value={f.net_a_payer} /> },
     { key: 'regler', header: 'Réglé', align: 'right', width: '115px', render: (f) => <Money value={f.regler} /> },
-    { key: 'reste', header: 'Reste', align: 'right', width: '115px', render: (f) => (
+    { key: 'reste', header: 'Reste', align: 'right', width: '115px', sortAccessor: (f) => Number(f.reste_a_payer ?? 0), render: (f) => (
       <span className="money font-semibold" style={{ color: 'var(--danger)' }}>{fmtMoney(f.reste_a_payer)}</span>
     ) },
   ];
@@ -138,7 +138,7 @@ export default function ClientDetail() {
       </div>
 
       {vue === 'releve' && (
-        <DataGrid columns={relCols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
+        <DataGrid complet columns={relCols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
                   emptyMessage="Aucune opération sur la période." />
       )}
       {vue === 'impayees' && impayees.length > 0 && client && (
@@ -150,7 +150,7 @@ export default function ClientDetail() {
         </div>
       )}
       {vue === 'impayees' && (
-        <DataGrid columns={fnrCols} rows={impayees} rowKey={(f) => f.id} loading={fnrLoading}
+        <DataGrid complet columns={fnrCols} rows={impayees} rowKey={(f) => f.id} loading={fnrLoading}
                   emptyMessage="Aucune facture en attente."
                   footer={{ _label: `${impayees.length} facture(s)`,
                             reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(impayees.reduce((s, f) => s + Number(f.reste_a_payer), 0))}</span> }} />

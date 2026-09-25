@@ -29,8 +29,8 @@ export default function ArticleDetail() {
   const barcodes: unknown[] = Array.isArray(bcData?.barcodesArticle) ? bcData.barcodesArticle : [];
 
   const lotCols: Column<Lot>[] = [
-    { key: 'lot', header: 'N° lot', render: (l) => <b className="money">{l.n_lot}</b> },
-    { key: 'per', header: 'Péremption', width: '110px', render: (l) => {
+    { key: 'lot', header: 'N° lot', sortAccessor: (l) => l.n_lot ?? '', render: (l) => <b className="money">{l.n_lot}</b> },
+    { key: 'per', header: 'Péremption', width: '110px', sortAccessor: (l) => l.date_peremption ?? null, render: (l) => {
       if (!l.date_peremption) return <span className="text-ink-muted">—</span>;
       const days = Math.round((new Date(l.date_peremption).getTime() - Date.now()) / 86_400_000);
       const tone = days < 0 ? 'bad' : days <= 60 ? 'warn' : 'ok';
@@ -40,9 +40,9 @@ export default function ArticleDetail() {
   ];
 
   const tarifCols: Column<Tarif>[] = [
-    { key: 'from', header: 'Qté de', align: 'right', render: (t) => <span className="money">{fmtQte(t.qte_from)}</span> },
-    { key: 'to', header: 'Qté à', align: 'right', render: (t) => <span className="money">{fmtQte(t.qte_to)}</span> },
-    { key: 'prix', header: 'Prix HT', align: 'right', render: (t) => <Money value={t.prix_ht} /> },
+    { key: 'from', header: 'Qté de', align: 'right', sortAccessor: (t) => Number(t.qte_from ?? 0), render: (t) => <span className="money">{fmtQte(t.qte_from)}</span> },
+    { key: 'to', header: 'Qté à', align: 'right', sortAccessor: (t) => Number(t.qte_to ?? 0), render: (t) => <span className="money">{fmtQte(t.qte_to)}</span> },
+    { key: 'prix', header: 'Prix HT', align: 'right', sortAccessor: (t) => Number(t.prix_ht ?? 0), render: (t) => <Money value={t.prix_ht} /> },
   ];
 
   return (
@@ -74,7 +74,7 @@ export default function ArticleDetail() {
         {peut('stock', D.stock.lots) && (
           <div className="flex flex-col gap-2">
             <h2 className="font-bold text-[13px]">Lots & péremption</h2>
-            <DataGrid columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot." />
+            <DataGrid complet columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot." />
           </div>
         )}
         <div className="flex flex-col gap-2">
@@ -82,7 +82,7 @@ export default function ArticleDetail() {
           {!tarifsCaches && (
             <>
               <h2 className="font-bold text-[13px]">Tarifs par quantité</h2>
-              <DataGrid columns={tarifCols} rows={tarifs} rowKey={(_t, i) => i} emptyMessage="Aucun tarif par quantité." />
+              <DataGrid complet columns={tarifCols} rows={tarifs} rowKey={(_t, i) => i} emptyMessage="Aucun tarif par quantité." />
             </>
           )}
           <h2 className="font-bold text-[13px] mt-2">Codes-barres</h2>

@@ -74,9 +74,9 @@ export default function AvancesPanel({ sens, code, onChanged }: {
 
   const columns: Column<Avance>[] = [
     { key: 'date', header: 'Date', width: '95px', render: (a) => fmtDate(a.date) },
-    { key: 'mode', header: 'Mode', width: '110px', render: (a) => <span className="text-ink-muted">{a.mode_payement ?? '—'}</span> },
-    { key: 'compte', header: 'Compte', width: '130px', render: (a) => <span className="text-ink-muted">{a.compte ?? a.banque ?? '—'}</span> },
-    { key: 'obs', header: 'Observation', render: (a) => <span className="text-ink-muted">{a.observation || '—'}</span> },
+    { key: 'mode', header: 'Mode', width: '110px', sortAccessor: (a) => a.mode_payement ?? '', render: (a) => <span className="text-ink-muted">{a.mode_payement ?? '—'}</span> },
+    { key: 'compte', header: 'Compte', width: '130px', sortAccessor: (a) => a.compte ?? a.banque ?? '', render: (a) => <span className="text-ink-muted">{a.compte ?? a.banque ?? '—'}</span> },
+    { key: 'obs', header: 'Observation', sortAccessor: (a) => a.observation ?? '', render: (a) => <span className="text-ink-muted">{a.observation || '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '115px', render: (a) => <span className="money">{fmtMoney(a.montant)}</span> },
     { key: 'reste', header: 'Reste', align: 'right', width: '115px', render: (a) => (
       <span className="money font-semibold" style={{ color: Number(a.reste) > 0.009 ? 'var(--info, var(--brand-700))' : 'var(--text-muted)' }}>{fmtMoney(a.reste)}</span>
@@ -106,7 +106,7 @@ export default function AvancesPanel({ sens, code, onChanged }: {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <DataGrid columns={columns} rows={affichees} rowKey={(a) => a.id} loading={loading && avances.length === 0}
+      <DataGrid complet columns={columns} rows={affichees} rowKey={(a) => a.id} loading={loading && avances.length === 0}
                 error={error?.message}
                 titre={sens === 'client' ? 'Avances reçues' : 'Avances versées'}
                 emptyMessage={toutes ? 'Aucune avance.' : 'Aucune avance ouverte.'}

@@ -16,7 +16,7 @@ import TransfertStockModal from '../components/TransfertStockModal';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildBonStockPrint } from '../print/templates';
-import type { BonStock } from '../print/templates';
+import type { BonStock, BonStockLigne } from '../print/templates';
 
 const LIMIT = 50;
 
@@ -212,6 +212,23 @@ export default function MouvementsStock() {
 }
 
 /** Détail d'un bon (lignes) avec impression ; pour un transfert, rappel du trajet. */
+const COLONNES_LIGNES_BON: Column<BonStockLigne>[] = [
+  { key: 'code_article', header: 'Code', width: '110px', render: (l) => <span className="money">{l.code_article}</span> },
+  { key: 'designation', header: 'Désignation', render: (l) => <b>{l.designation}</b> },
+  { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
+  { key: 'unite', header: 'Unité', width: '80px', render: (l) => <span className="text-ink-muted">{l.unite ?? ''}</span> },
+  { key: 'prix_unitaire', header: 'P.U.', align: 'right', width: '110px', render: (l) => <span className="money">{fmtMoney(l.prix_unitaire)}</span> },
+  { key: 'total', header: 'Total', align: 'right', width: '120px', render: (l) => <span className="money font-semibold">{fmtMoney(l.total)}</span> },
+];
+const EXPORT_LIGNES_BON = [
+  { header: 'Code', value: (l: BonStockLigne) => l.code_article ?? '' },
+  { header: 'Désignation', value: (l: BonStockLigne) => l.designation ?? '' },
+  { header: 'Qté', value: (l: BonStockLigne) => Number(l.qte ?? 0), numeric: true },
+  { header: 'Unité', value: (l: BonStockLigne) => l.unite ?? '' },
+  { header: 'P.U.', value: (l: BonStockLigne) => Number(l.prix_unitaire ?? 0), numeric: true },
+  { header: 'Total', value: (l: BonStockLigne) => Number(l.total ?? 0), numeric: true },
+];
+
 function BonDetailModal({ ouvert, onClose, onSupprimer }: {
   ouvert: Ouvert; onClose: () => void; onSupprimer?: (libelle: string) => void;
 }) {
@@ -250,35 +267,10 @@ function BonDetailModal({ ouvert, onClose, onSupprimer }: {
                 <Info label="Agent">{bon.agent || '—'}</Info>
                 {bon.observation ? <Info label="Observation">{bon.observation}</Info> : null}
               </div>
-              <div className="border border-line-soft rounded-md overflow-hidden">
-                <table className="w-full text-[12px] border-collapse">
-                  <thead>
-                    <tr>
-                      {['Code', 'Désignation', 'Qté', 'Unité', 'P.U.', 'Total'].map((h, i) => (
-                        <th key={h} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-2 ${[2, 4, 5].includes(i) ? 'text-right' : 'text-left'}`}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lignes.map((l, i) => (
-                      <tr key={l.id ?? i} className="border-b border-line-soft last:border-b-0">
-                        <td className="px-3 py-1.5 money">{l.code_article}</td>
-                        <td className="px-3 py-1.5"><b>{l.designation}</b></td>
-                        <td className="px-3 py-1.5 text-right money">{fmtQte(l.qte)}</td>
-                        <td className="px-3 py-1.5 text-ink-muted">{l.unite ?? ''}</td>
-                        <td className="px-3 py-1.5 text-right money">{fmtMoney(l.prix_unitaire)}</td>
-                        <td className="px-3 py-1.5 text-right money font-semibold">{fmtMoney(l.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tbody>
-                    <tr className="bg-bg font-bold">
-                      <td className="px-3 py-2" colSpan={5}>{lignes.length} ligne(s)</td>
-                      <td className="px-3 py-2 text-right money">{fmtMoney(bon.total_ht ?? bon.valeur_total ?? lignes.reduce((s, l) => s + Number(l.total ?? 0), 0))}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <DataGrid complet columns={COLONNES_LIGNES_BON} rows={lignes} rowKey={(l, i) => l.id ?? i}
+                        emptyMessage="Aucune ligne."
+                        exportCsv={{ nom: `bon-${bon.numero || bon.id}`, columns: EXPORT_LIGNES_BON }}
+                        footer={{ _label: `${lignes.length} ligne(s)`, total: <span className="money">{fmtMoney(bon.total_ht ?? bon.valeur_total ?? lignes.reduce((s, l) => s + Number(l.total ?? 0), 0))}</span> }} />
             </>
           )}
         </div>

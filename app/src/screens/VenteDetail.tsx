@@ -59,16 +59,16 @@ export default function VenteDetail() {
   }
 
   const columns: Column<LigneVente>[] = [
-    { key: 'code', header: 'Code', width: '100px', render: (l) => <span className="money">{l.code_article}</span> },
+    { key: 'code', header: 'Code', width: '100px', sortAccessor: (l) => String(l.code_article ?? ''), render: (l) => <span className="money">{l.code_article}</span> },
     { key: 'designation', header: 'Désignation', render: (l) => <span><b>{l.designation}</b>{l.n_lot ? <span className="text-ink-muted money text-[10.5px]"> · lot {l.n_lot}</span> : null}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
-    ...(aRetours ? [{ key: 'retour', header: 'Retourné', align: 'right' as const, width: '80px',
+    ...(aRetours ? [{ key: 'retour', header: 'Retourné', align: 'right' as const, width: '80px', sortAccessor: (l: LigneVente) => Number(l.qte_retournee ?? 0),
       render: (l: LigneVente) => Number(l.qte_retournee ?? 0) > 0
         ? <span className="money" style={{ color: 'var(--danger)' }}>{fmtQte(l.qte_retournee)}</span> : null }] : []),
-    { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', render: (l) => <Money value={l.prix_ht} /> },
+    { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', sortAccessor: (l) => Number(l.prix_ht ?? 0), render: (l) => <Money value={l.prix_ht} /> },
     { key: 'remise', header: 'Rem. %', align: 'right', width: '70px', render: (l) => <span className="money">{fmtMoney(l.remise ?? 0, 1)}</span> },
     { key: 'tva', header: 'TVA %', align: 'right', width: '65px', render: (l) => <span className="money">{fmtMoney(l.tva, 0)}</span> },
-    { key: 'ttc', header: 'Total TTC', align: 'right', width: '110px', render: (l) => <Money value={l.total_ttc} /> },
+    { key: 'ttc', header: 'Total TTC', align: 'right', width: '110px', sortAccessor: (l) => Number(l.total_ttc ?? 0), render: (l) => <Money value={l.total_ttc} /> },
   ];
 
   // Consultation : droit sur le type de pièce, et pièces des autres masquées si « … par utilisateur »
@@ -152,7 +152,7 @@ export default function VenteDetail() {
 
       <div className="grid grid-cols-[1fr_270px] gap-3.5 items-start">
         <div className="flex flex-col gap-3.5 min-w-0">
-          <DataGrid columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
+          <DataGrid complet columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
                     emptyMessage="Aucune ligne." footer={{ _label: `${lignes.length} ligne(s)`, ttc: <Money value={v?.total_ttc} /> }} />
           {v && (
             <LiensPiece base="/ventes" factureGroupee={v.facture_groupee} blsGroupes={v.bls_groupes}

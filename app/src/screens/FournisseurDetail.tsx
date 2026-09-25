@@ -36,13 +36,13 @@ export default function FournisseurDetail() {
 
   const cols: Column<EtatFournisseurLigne>[] = [
     { key: 'date', header: 'Date', width: '90px', render: (l) => fmtDate(l.date) },
-    { key: 'type', header: 'Opération', width: '150px', render: (l) => <span className="font-semibold text-ink-label">{l.type_doc}</span> },
+    { key: 'type', header: 'Opération', sortAccessor: (l) => l.type_doc ?? '', width: '150px', render: (l) => <span className="font-semibold text-ink-label">{l.type_doc}</span> },
     { key: 'numero', header: 'N°', width: '130px', render: (l) => <span className="money">{l.numero ?? '—'}</span> },
-    { key: 'mode', header: 'Mode', width: '90px', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
+    { key: 'mode', header: 'Mode', width: '90px', sortAccessor: (l) => l.mode_payement ?? '', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (l) => (
       <span className="money font-semibold" style={{ color: Number(l.montant) < 0 ? 'var(--success)' : undefined }}>{fmtMoney(l.montant)}</span>
     ) },
-    { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
+    { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', sortAccessor: (l) => Number(l.total_cumul ?? 0), render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
   ];
 
   return (
@@ -98,7 +98,7 @@ export default function FournisseurDetail() {
       </div>
 
       {vue === 'releve' && (
-        <DataGrid columns={cols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
+        <DataGrid complet columns={cols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
                   emptyMessage="Aucune opération sur la période." />
       )}
       {/* L'imputation d'une avance réduit le solde dû : on recharge l'état du fournisseur. */}
