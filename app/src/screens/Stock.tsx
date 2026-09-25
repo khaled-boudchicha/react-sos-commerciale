@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useLazyQuery } from '@apollo/client';
 import {
   ARTICLES, COORDONNEES_SOCIETE, REFERENTIELS,
   CREATE_ARTICLE, UPDATE_ARTICLE, DELETE_ARTICLE,
 } from '../api/queries';
 import { useCrud } from '../forms/useCrud';
+import PeremptionPanel from '../components/PeremptionPanel';
+import { D, useDroits } from '../lib/droits';
 import { buildArticleSections } from '../forms/schemas';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
@@ -21,11 +23,14 @@ const VUES = [
   { code: 'tous', label: 'Articles' },
   { code: 'alerte', label: 'Stock en alerte' },
   { code: 'marge', label: 'Marge négative' },
+  { code: 'peremption', label: 'Péremption' },
 ] as const;
 
 export default function Stock() {
   const navigate = useNavigate();
-  const [vue, setVue] = useState<(typeof VUES)[number]['code']>('tous');
+  const [params] = useSearchParams();
+  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(
+    (VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous');
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
 
@@ -36,6 +41,7 @@ export default function Stock() {
       marge_negative: vue === 'marge' ? true : undefined,
       limit: LIMIT, offset,
     },
+    skip: vue === 'peremption',
   });
   const res: ArticlesResult | undefined = data?.articles;
   const rows = res?.data ?? [];
@@ -51,12 +57,15 @@ export default function Stock() {
     unites:   names(refData?.unitesMesure, ['nom', 'designation', 'unite', 'name']),
     tva:      names(refData?.tauxTVA,  ['taux', 'valeur', 'tva', 'nom']),
   });
+  const { peut, peutUn } = useDroits();
   const crud = useCrud<Article & { id: number }>({
     label: 'article', createTitle: 'Nouvel article', editTitle: "Modifier l'article", deleteTitle: 'Supprimer cet article ?', sections: articleSections, width: 820,
     createDoc: CREATE_ARTICLE, updateDoc: UPDATE_ARTICLE, deleteDoc: DELETE_ARTICLE,
     onDone: () => { void refetch(); },
     labelOf: (a) => `${a.designation} (${a.code})`,
     formExtra: (v) => <MatricePrix values={v} />,
+    peutModifier: peut('stock', D.stock.modifierArticle),
+    peutSupprimer: peut('stock', D.stock.supprimerArticle),
   });
 
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
@@ -122,23 +131,38 @@ export default function Stock() {
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {printing ? 'Préparation…' : "Imprimer l'état du stock"}
         </button>
-        <button onClick={() => navigate('/stock/inventaires')}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-          Inventaires
-        </button>
-        <button onClick={crud.openCreate}
-                className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Nouvel article
-        </button>
+        {peut('stock', D.stock.inventaire) && (
+          <button onClick={() => navigate('/stock/inventaires')}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Inventaires
+          </button>
+        )}
+        {peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) && (
+          <button onClick={() => navigate('/stock/mouvements')}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Mouvements
+          </button>
+        )}
+        {peut('stock', D.stock.creerArticle) && (
+          <button onClick={crud.openCreate}
+                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
+            ＋ Nouvel article
+          </button>
+        )}
       </PageHeader>
       {crud.modals}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }} options={VUES} />
-      <DataGrid columns={columns} rows={rows} rowKey={(a) => a.id} loading={loading} error={error?.message}
-                exportCsv={{ nom: 'articles-stock', columns: csvStock }}
-                onRowClick={(a) => navigate(`/stock/article/${a.id}`)}
-                footer={{ _label: `${res?.total ?? 0} article(s)` }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
+      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }}
+            options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
+      {vue === 'peremption' ? <PeremptionPanel /> : (
+        <>
+          <DataGrid columns={columns} rows={rows} rowKey={(a) => a.id} loading={loading} error={error?.message}
+                    exportCsv={{ nom: 'articles-stock', columns: csvStock }}
+                    onRowClick={(a) => navigate(`/stock/article/${a.id}`)}
+                    footer={{ _label: `${res?.total ?? 0} article(s)` }} />
+          {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
+        </>
+      )}
     </div>
   );
 }

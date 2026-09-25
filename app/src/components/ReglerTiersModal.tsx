@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { fmtMoney, isoToday } from '../lib/format';
 import { StatusPill } from './ui/atoms';
+import { useDroits } from '../lib/droits';
 
 const REGLER_CLIENT = gql`
   mutation ReglerClient($input: JSON!) { reglerClient(input: $input) }
@@ -44,7 +45,9 @@ export default function ReglerTiersModal({ kind, codeTiers, nom, onClose, onDone
 
   const { data: refs } = useQuery(MODES);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
-  const banques: any[] = Array.isArray(refs?.banques) ? refs.banques : [];
+  const { comptesAutorises } = useDroits();
+  // Droit PrevilegeBank : seulement les comptes autorisés à l'utilisateur
+  const banques: any[] = comptesAutorises(Array.isArray(refs?.banques) ? refs.banques : [], (b: any) => String(b.nom ?? b.name ?? ''));
 
   const [regler, { loading }] = useMutation(kind === 'client' ? REGLER_CLIENT : REGLER_FOURNISSEUR);
 

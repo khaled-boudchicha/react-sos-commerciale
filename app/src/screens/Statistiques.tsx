@@ -19,6 +19,8 @@ import LineChart from '../components/charts/LineChart';
 import BarChart from '../components/charts/BarChart';
 import DonutChart from '../components/charts/DonutChart';
 import ClientSearch from '../components/ClientSearch';
+import { D, useDroits } from '../lib/droits';
+import Etat104Panel from '../components/Etat104Panel';
 
 /** Cartouche graphique réutilisable (titre + corps). */
 function Carte({ titre, actions, children }: { titre: string; actions?: ReactNode; children: ReactNode }) {
@@ -38,6 +40,7 @@ const SECTIONS = [
   { code: 'achats', label: 'Achats' },
   { code: 'benefices', label: 'Bénéfices' },
   { code: 'stock', label: 'Valorisation du stock' },
+  { code: 'etat104', label: 'État 104' },
 ] as const;
 type Section = (typeof SECTIONS)[number]['code'];
 
@@ -50,6 +53,9 @@ type Groupement = (typeof GROUPEMENTS)[number]['code'];
 const LIMIT_STOCK = 50;
 
 export default function Statistiques() {
+  const { peut } = useDroits();
+  // « Bénéfice Statistique » (Delphi) conditionne l'accès aux marges et bénéfices
+  const sections = SECTIONS.filter((x) => x.code !== 'benefices' || peut('autre', D.autre.beneficeStat));
   const [section, setSection] = useState<Section>('ventes');
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
@@ -57,15 +63,16 @@ export default function Statistiques() {
   return (
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Statistiques">
-        {section !== 'stock' && (
+        {section !== 'stock' && section !== 'etat104' && (
           <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
         )}
       </PageHeader>
-      <Tabs value={section} onChange={setSection} options={SECTIONS} />
+      <Tabs value={section} onChange={setSection} options={sections} />
       {section === 'ventes' && <SectionVentes debut={debut} fin={fin} />}
       {section === 'achats' && <SectionAchats debut={debut} fin={fin} />}
-      {section === 'benefices' && <SectionBenefices debut={debut} fin={fin} />}
+      {section === 'benefices' && sections.some((x) => x.code === 'benefices') && <SectionBenefices debut={debut} fin={fin} />}
       {section === 'stock' && <SectionStock />}
+      {section === 'etat104' && <Etat104Panel />}
     </div>
   );
 }

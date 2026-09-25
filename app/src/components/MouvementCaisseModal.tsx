@@ -4,6 +4,7 @@ import { SOLDES_COMPTES, REFERENTIELS } from '../api/queries';
 import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
 import { useToast } from './ui/Toast';
+import { useDroits } from '../lib/droits';
 
 const ADD_ENCAISSEMENT = gql`mutation AddEncaissement($input: JSON!) { addEncaissement(input: $input) }`;
 const ADD_DECAISSEMENT = gql`mutation AddDecaissement($input: JSON!) { addDecaissement(input: $input) }`;
@@ -38,8 +39,11 @@ export default function MouvementCaisseModal({ kind, onClose, onDone }: {
   const { data: soldesData } = useQuery(SOLDES_COMPTES);
   // Seuls les comptes identifiés sont sélectionnables : les lignes sans compte_id
   // agrègent d'anciens mouvements non rattachés et ne sont pas une destination valide.
+  const droitsComptes = useDroits();
   const comptes: SoldeCompte[] = (Array.isArray(soldesData?.soldesComptes) ? soldesData.soldesComptes : [])
-    .filter((c: SoldeCompte) => c.compte_id != null && String(c.compte ?? '').trim() !== '');
+    .filter((c: SoldeCompte) => c.compte_id != null && String(c.compte ?? '').trim() !== '')
+    // Droit PrevilegeBank : seulement les comptes autorisés à l'utilisateur
+    .filter((c: SoldeCompte) => droitsComptes.comptesAutorises([c], (x) => x.compte).length > 0);
   const { data: refs } = useQuery(REFERENTIELS);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
 
@@ -65,6 +69,8 @@ export default function MouvementCaisseModal({ kind, onClose, onDone }: {
         await transfert({ variables: { input: {
           montant: m, date,
           compte_source_id: Number(compteId),
+          // Nom du compte source : l'agent l'utilise pour imputer la sortie au bon solde
+          compte_source: src?.compte,
           compte_destination_id: Number(compteDestId),
           compte_destination: dest?.compte,
           observation: src?.compte,

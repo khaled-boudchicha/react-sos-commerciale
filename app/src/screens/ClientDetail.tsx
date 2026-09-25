@@ -10,6 +10,7 @@ import { fmtDate, fmtMoney, isoToday } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill, Tabs, PeriodPicker } from '../components/ui/atoms';
 import ReglerTiersModal from '../components/ReglerTiersModal';
+import AvancesPanel from '../components/AvancesPanel';
 
 type CreditDetails = {
   code_cli: string; nom_client: string; credit_initial: number; total_ventes: number;
@@ -27,6 +28,7 @@ type FactureNR = {
 const VUES = [
   { code: 'releve', label: 'Relevé' },
   { code: 'impayees', label: 'Factures non réglées' },
+  { code: 'avances', label: 'Avances' },
 ] as const;
 
 export default function ClientDetail() {
@@ -152,6 +154,10 @@ export default function ClientDetail() {
                   emptyMessage="Aucune facture en attente."
                   footer={{ _label: `${impayees.length} facture(s)`,
                             reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(impayees.reduce((s, f) => s + Number(f.reste_a_payer), 0))}</span> }} />
+      )}
+      {/* L'imputation d'une avance modifie le relevé et les impayés : on les recharge. */}
+      {vue === 'avances' && code && (
+        <AvancesPanel sens="client" code={code} onChanged={() => { void refetch(); void refetchFnr(); }} />
       )}
     </div>
   );

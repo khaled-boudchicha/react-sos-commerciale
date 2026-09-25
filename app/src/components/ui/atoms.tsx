@@ -119,3 +119,25 @@ export function Pagination({ offset, limit, total, onOffset }: {
     </div>
   );
 }
+
+/** Bouton d'export CSV (liste complète, au-delà de la page affichée). */
+export function ExportBtn({ onClick, loading, disabled }: { onClick: () => void; loading?: boolean; disabled?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={loading || disabled}
+            title="Exporter la liste complète en CSV (Excel)"
+            className="rounded-md px-3 py-1.5 font-semibold text-[11.5px] border border-line-soft bg-surface hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed">
+      {loading ? 'Export…' : '⬇ Exporter CSV'}
+    </button>
+  );
+}
+
+/** Carte chiffrée (montant) des tableaux de bord de créances / recouvrement. */
+export function Bucket({ label, value, tone, sub }: { label: string; value: number; tone: string; sub?: string }) {
+  return (
+    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-3.5">
+      <div className="text-[11px] font-semibold text-ink-muted mb-1">{label}</div>
+      <div className="money text-[17px] font-extrabold" style={{ color: tone }}>{fmtMoney(value)}</div>
+      {sub && <div className="text-[10.5px] text-ink-muted mt-0.5">{sub}</div>}
+    </div>
+  );
+}

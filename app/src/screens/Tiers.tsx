@@ -7,6 +7,8 @@ import {
   CREATE_FOURNISSEUR, UPDATE_FOURNISSEUR, DELETE_FOURNISSEUR,
 } from '../api/queries';
 import { useCrud } from '../forms/useCrud';
+import { D, useDroits } from '../lib/droits';
+import RecouvrementPanel from '../components/RecouvrementPanel';
 import { CLIENT_SECTIONS, FOURNISSEUR_SECTIONS } from '../forms/schemas';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
@@ -15,23 +17,13 @@ import { ClientsResult, Client, FournisseursResult, Fournisseur, DebiteursResult
 import { fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column } from '../components/ui/DataGrid';
-import { Money, Tabs, PageHeader, Pagination, SearchInput } from '../components/ui/atoms';
+import { Money, Tabs, PageHeader, Pagination, SearchInput, ExportBtn, Bucket } from '../components/ui/atoms';
 
 const LIMIT = 50;
 // Limite de sécurité pour l'export « tout » : au-delà, on prévient plutôt que
 // d'exporter silencieusement une liste tronquée.
 const LIMIT_EXPORT = 5000;
 
-/** Bouton d'export CSV de la liste COMPLÈTE (au-delà de la page affichée). */
-function ExportBtn({ onClick, loading }: { onClick: () => void; loading?: boolean }) {
-  return (
-    <button type="button" onClick={onClick} disabled={loading}
-            title="Exporter la liste complète en CSV (Excel)"
-            className="rounded-md px-3 py-1.5 font-semibold text-[11.5px] border border-line-soft bg-surface hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed">
-      {loading ? 'Export…' : '⬇ Exporter CSV'}
-    </button>
-  );
-}
 
 const csvClients: ExportColumn<Client>[] = [
   { header: 'Code', value: (c) => c.code },
@@ -61,12 +53,17 @@ const VUES = [
   { code: 'clients', label: 'Clients' },
   { code: 'fournisseurs', label: 'Fournisseurs' },
   { code: 'debiteurs', label: 'Débiteurs' },
+  { code: 'recouvrement', label: 'Recouvrement' },
   { code: 'etat_clients', label: 'États clients' },
   { code: 'etat_fournisseurs', label: 'États fournisseurs' },
 ] as const;
 
 export default function Tiers() {
-  const [vue, setVue] = useState<(typeof VUES)[number]['code']>('clients');
+  const { peut } = useDroits();
+  // Onglets visibles selon les droits Delphi « Clients » / « Fournisseurs »
+  const vues = VUES.filter((v) => (v.code === 'fournisseurs' || v.code === 'etat_fournisseurs')
+    ? peut('tiers', D.tiers.fournisseurs) : peut('tiers', D.tiers.clients));
+  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(vues[0]?.code ?? 'clients');
   const [search, setSearch] = useState('');
   const [offset, setOffset] = useState(0);
 
@@ -75,10 +72,11 @@ export default function Tiers() {
       <PageHeader title="Clients & fournisseurs">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Nom, code…" />
       </PageHeader>
-      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }} options={VUES} />
+      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }} options={vues} />
       {vue === 'clients' && <ClientsGrid search={search} offset={offset} onOffset={setOffset} />}
       {vue === 'fournisseurs' && <FournisseursGrid search={search} offset={offset} onOffset={setOffset} />}
       {vue === 'debiteurs' && <DebiteursGrid search={search} offset={offset} onOffset={setOffset} />}
+      {vue === 'recouvrement' && <RecouvrementPanel search={search} />}
       {vue === 'etat_clients' && <EtatsGrid sens="client" search={search} offset={offset} onOffset={setOffset} />}
       {vue === 'etat_fournisseurs' && <EtatsGrid sens="fournisseur" search={search} offset={offset} onOffset={setOffset} />}
     </div>
@@ -237,15 +235,6 @@ function DebiteursGrid({ search, offset, onOffset }: { search: string; offset: n
   );
 }
 
-function Bucket({ label, value, tone, sub }: { label: string; value: number; tone: string; sub?: string }) {
-  return (
-    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-3.5">
-      <div className="text-[11px] font-semibold text-ink-muted mb-1">{label}</div>
-      <div className="money text-[17px] font-extrabold" style={{ color: tone }}>{fmtMoney(value)}</div>
-      {sub && <div className="text-[10.5px] text-ink-muted mt-0.5">{sub}</div>}
-    </div>
-  );
-}
 
 
 type EtatLigne = Record<string, any> & { code_cli?: string; code_four?: string; nom: string };

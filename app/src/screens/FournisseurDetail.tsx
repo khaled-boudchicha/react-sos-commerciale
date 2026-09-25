@@ -4,12 +4,18 @@ import { useQuery } from '@apollo/client';
 import { ETAT_FOURNISSEUR, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
-import { PageHeader, StatusPill, PeriodPicker } from '../components/ui/atoms';
+import { PageHeader, StatusPill, PeriodPicker, Tabs } from '../components/ui/atoms';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildEtatFournisseurPrint } from '../print/templates';
 import type { EtatFournisseurSolde, EtatFournisseurLigne } from '../print/templates/etatFournisseur';
 import ReglerTiersModal from '../components/ReglerTiersModal';
+import AvancesPanel from '../components/AvancesPanel';
+
+const VUES = [
+  { code: 'releve', label: 'Relevé' },
+  { code: 'avances', label: 'Avances' },
+] as const;
 
 export default function FournisseurDetail() {
   const { code } = useParams();
@@ -17,6 +23,7 @@ export default function FournisseurDetail() {
   const [fin, setFin] = useState('');
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
   const [showRegler, setShowRegler] = useState(false);
+  const [vue, setVue] = useState<(typeof VUES)[number]['code']>('releve');
 
   const { data, loading, error, refetch } = useQuery(ETAT_FOURNISSEUR, {
     variables: { code_four: code, date_debut: debut || undefined, date_fin: fin || undefined },
@@ -83,13 +90,21 @@ export default function FournisseurDetail() {
 
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
 
-      <div className="flex items-center gap-3">
-        <span className="text-[12px] font-bold text-ink-label">Relevé</span>
-        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+      <div className="flex items-center gap-3 flex-wrap">
+        <Tabs value={vue} onChange={setVue} options={VUES} />
+        {vue === 'releve' && (
+          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        )}
       </div>
 
-      <DataGrid columns={cols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
-                emptyMessage="Aucune opération sur la période." />
+      {vue === 'releve' && (
+        <DataGrid columns={cols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
+                  emptyMessage="Aucune opération sur la période." />
+      )}
+      {/* L'imputation d'une avance réduit le solde dû : on recharge l'état du fournisseur. */}
+      {vue === 'avances' && code && (
+        <AvancesPanel sens="fournisseur" code={code} onChanged={() => { void refetch(); }} />
+      )}
     </div>
   );
 }

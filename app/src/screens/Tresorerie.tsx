@@ -1,15 +1,20 @@
-import { useState } from 'react';
-import { useQuery, useLazyQuery } from '@apollo/client';
-import { TRESORIE_COMPLETE, SOLDES_COMPTES, COORDONNEES_SOCIETE } from '../api/queries';
+import { useEffect, useState, useMemo } from 'react';
+import { useQuery, useLazyQuery, useMutation } from '@apollo/client';
+import { TRESORIE_COMPLETE, SOLDES_COMPTES, COORDONNEES_SOCIETE, ANNULER_MOUVEMENT } from '../api/queries';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildTresoreriePrint } from '../print/templates';
 import MouvementCaisseModal, { MouvementKind } from '../components/MouvementCaisseModal';
+import ArreteCaisseModal from '../components/ArreteCaisseModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useToast } from '../components/ui/Toast';
+import { useDroits, D } from '../lib/droits';
 import { TresorieCompleteResult, MouvementTresorie, SoldeCompte } from '../api/types';
 import { fmtDate, fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { PeriodPicker, PageHeader, Pagination } from '../components/ui/atoms';
+import MouvementDetailModal from '../components/MouvementDetailModal';
 
 const LIMIT = 50;
 
@@ -31,11 +36,31 @@ export default function Tresorerie() {
   const [offset, setOffset] = useState(0);
 
   const [mouvement, setMouvement] = useState<MouvementKind | null>(null);
+  const [arrete, setArrete] = useState(false);
+  const [annulation, setAnnulation] = useState<MouvementTresorie | null>(null);
+  const [detail, setDetail] = useState<MouvementTresorie | null>(null);
+  const toast = useToast();
+  const { peut, peutUn, comptesAutorises } = useDroits();
+  const peutCreer = peut('autre', D.autre.nouveauTresorerie);
+  const peutTransfert = peut('autre', D.autre.transfertComptes);
+  const peutAnnuler = peut('autre', D.autre.suppressionTresorerie);
+  const peutArreter = peutUn('autre', [D.autre.arreterCaisse, D.autre.arreterCaisseAlt]);
+  const [annuler, { loading: annulant }] = useMutation(ANNULER_MOUVEMENT);
   const { data: soldesData, refetch: refetchSoldes } = useQuery(SOLDES_COMPTES);
-  const soldes: SoldeCompte[] = Array.isArray(soldesData?.soldesComptes) ? soldesData.soldesComptes : [];
+  const tousSoldes: SoldeCompte[] = Array.isArray(soldesData?.soldesComptes) ? soldesData.soldesComptes : [];
+  // Droit Delphi PrevilegeBank : l'utilisateur ne voit que ses comptes autorisés
+  const soldes = useMemo(() => comptesAutorises(tousSoldes, (c) => c.compte), [tousSoldes, comptesAutorises]);
+  const restreint = soldes.length !== tousSoldes.length;
+  const premierAutorise = soldes[0]?.compte_id ?? null;
+  useEffect(() => {
+    if (restreint && compteId === null && premierAutorise != null) setCompteId(premierAutorise);
+  }, [restreint, compteId, premierAutorise]);
+  // Utilisateur limité à certains comptes : aucune requête « tous comptes » tant qu'un compte autorisé n'est pas choisi
+  const enAttenteCompte = restreint && compteId === null;
 
   const { data, loading, error, refetch: refetchMvts } = useQuery(TRESORIE_COMPLETE, {
     variables: { compte_id: compteId ?? undefined, date_debut: debut, date_fin: fin, limit: LIMIT, offset },
+    skip: enAttenteCompte || !soldesData,
   });
   const res: TresorieCompleteResult | undefined = data?.tresorieComplete;
   const rows = res?.data ?? [];
@@ -69,6 +94,19 @@ export default function Tresorerie() {
     ));
   }
 
+  async function confirmerAnnulation() {
+    if (!annulation) return;
+    try {
+      await annuler({ variables: { cle: annulation.cle } });
+      setAnnulation(null);
+      toast.success('Mouvement annulé.');
+      void refetchMvts(); void refetchSoldes();
+    } catch (e: any) {
+      setAnnulation(null);
+      toast.error(`Annulation impossible : ${e.message ?? 'erreur'}`);
+    }
+  }
+
   const columns: Column<MouvementTresorie>[] = [
     { key: 'date', header: 'Date', width: '90px', render: (m) => fmtDate(m.date) },
     { key: 'categorie', header: 'Catégorie', width: '130px', render: (m) => <span className="text-ink-label font-semibold">{m.categorie ?? m.cle?.replace(/\d+$/, '') ?? '—'}</span> },
@@ -82,6 +120,12 @@ export default function Tresorerie() {
       </span>
     ) },
     { key: 'solde', header: 'Solde cumulé', align: 'right', width: '120px', render: (m) => <span className="money">{fmtMoney(m.solde_cumul)}</span> },
+    ...(peutAnnuler ? [{ key: 'actions', header: '', align: 'right' as const, width: '70px', render: (m: MouvementTresorie) => (
+      <button onClick={(e) => { e.stopPropagation(); setAnnulation(m); }} title="Annuler ce mouvement"
+              className="px-1.5 py-0.5 rounded-sm border border-line text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
+        Annuler
+      </button>
+    ) }] : []),
   ];
 
   return (
@@ -97,20 +141,46 @@ export default function Tresorerie() {
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {exporting ? 'Export…' : '⬇ CSV'}
         </button>
-        <button onClick={() => setMouvement('transfert')}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-          Transfert
-        </button>
-        <button onClick={() => setMouvement('decaissement')}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line"
-                style={{ color: 'var(--danger)' }}>
-          − Décaissement
-        </button>
-        <button onClick={() => setMouvement('encaissement')}
-                className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Encaissement
-        </button>
+        {peutArreter && (
+          <button onClick={() => setArrete(true)}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Arrêté de caisse
+          </button>
+        )}
+        {peutTransfert && (
+          <button onClick={() => setMouvement('transfert')}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+            Transfert
+          </button>
+        )}
+        {peutCreer && (
+          <button onClick={() => setMouvement('decaissement')}
+                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line"
+                  style={{ color: 'var(--danger)' }}>
+            − Décaissement
+          </button>
+        )}
+        {peutCreer && (
+          <button onClick={() => setMouvement('encaissement')}
+                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
+            ＋ Encaissement
+          </button>
+        )}
       </PageHeader>
+      {arrete && (
+        <ArreteCaisseModal onClose={() => setArrete(false)}
+                           onDone={() => { void refetchMvts(); void refetchSoldes(); }} />
+      )}
+      {annulation && (
+        <ConfirmDialog title="Annuler ce mouvement ?"
+          message={<>
+            <b>{annulation.categorie ?? annulation.cle}</b> du {fmtDate(annulation.date)} — <b className="money">{fmtMoney(annulation.montant)} DA</b>
+            {annulation.tier ? <> ({annulation.tier})</> : null}.
+            <div className="mt-2">{messageAnnulation(annulation.cle)}</div>
+          </>}
+          confirmLabel="Annuler le mouvement" danger loading={annulant}
+          onConfirm={() => void confirmerAnnulation()} onCancel={() => setAnnulation(null)} />
+      )}
       {mouvement && (
         <MouvementCaisseModal kind={mouvement} onClose={() => setMouvement(null)}
                               onDone={() => { void refetchMvts(); void refetchSoldes(); }} />
@@ -118,8 +188,8 @@ export default function Tresorerie() {
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
 
       <div className="flex gap-3 flex-wrap">
-        <CompteCard label="Tous les comptes" solde={soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0)}
-                    active={compteId === null} onClick={() => { setCompteId(null); setOffset(0); }} />
+        {!restreint && <CompteCard label="Tous les comptes" solde={soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0)}
+                    active={compteId === null} onClick={() => { setCompteId(null); setOffset(0); }} />}
         {soldes.map((c) => (
           <CompteCard key={c.compte_id ?? c.compte} label={c.compte} solde={c.solde}
                       active={compteId === c.compte_id} onClick={() => { setCompteId(c.compte_id ?? null); setOffset(0); }} />
@@ -135,11 +205,26 @@ export default function Tresorerie() {
         </div>
       )}
 
+      {detail && (
+        <MouvementDetailModal m={detail} onClose={() => setDetail(null)}
+                              onAnnuler={peutAnnuler ? () => { setAnnulation(detail); setDetail(null); } : undefined} />
+      )}
       <DataGrid columns={columns} rows={rows} rowKey={(m) => m.cle} loading={loading} error={error?.message}
+                onRowClick={(m) => setDetail(m)}
                 footer={{ _label: `${res?.total ?? 0} mouvement(s)` }} />
       {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
     </div>
   );
+}
+
+/** Conséquences d'une annulation selon le type de mouvement (préfixe de la clé). */
+function messageAnnulation(cle: string): string {
+  const prefixe = cle.replace(/\d+$/, '').toUpperCase();
+  if (prefixe === 'RGF') return "Le règlement client est supprimé : le reste à payer des factures concernées et le solde du client sont rouverts.";
+  if (prefixe === 'RG') return "Le paiement fournisseur est supprimé : le reste à payer des pièces d'achat concernées et le solde du fournisseur sont rouverts.";
+  if (prefixe === 'TR') return 'Le transfert entre comptes est annulé dans sa totalité (sortie du compte source et entrée du compte destination).';
+  if (prefixe.startsWith('AV')) return "L'avance est supprimée et le solde d'avance du tiers est réduit d'autant.";
+  return 'Le mouvement est supprimé et le solde du compte est recalculé.';
 }
 
 function CompteCard({ label, solde, active, onClick }: { label: string; solde: number; active: boolean; onClick: () => void }) {
