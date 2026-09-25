@@ -36,6 +36,7 @@ const NAV: { group: string | null; items: NavItem[] }[] = [
       { to: '/referentiels', label: 'Référentiels', visible: (d) => d.peutUn('tiers', LIBELLES_REFERENTIELS) },
       { to: '/parametres', label: 'Paramètres', visible: (d) => d.peut('autre', D.autre.parametres) },
       { to: '/parametres/utilisateurs', label: 'Utilisateurs & droits', visible: (d) => d.peut('autre', D.autre.droitsAcces) },
+      { to: '/outils/grille', label: 'Grille (démo)', visible: (d) => d.peut('stock', D.stock.article) },
     ],
   },
 ];
