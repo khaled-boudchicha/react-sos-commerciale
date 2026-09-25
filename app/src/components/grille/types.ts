@@ -107,8 +107,51 @@ export type ChangementsLot<T> = {
   supprimees: Set<string | number>;
 };
 
+/**
+ * Requête envoyée au serveur en mode distant (« remote operations ») : le serveur
+ * trie, filtre, recherche, pagine, regroupe et totalise (agent : common/grille-distante.ts).
+ */
+export type RequeteDistante = {
+  skip: number;
+  take: number;
+  tri: { champ: string; sens: 'asc' | 'desc' }[];
+  filtres: Record<string, FiltreColonne>;
+  /** Valeurs retenues par le filtre d'en-tête (null = vide) */
+  filtresEntete: Record<string, (string | null)[]>;
+  recherche: string;
+  champsRecherche: string[];
+  types: Record<string, 'string' | 'number' | 'date' | 'boolean'>;
+  /** chemin.length < champs.length : groupes du niveau suivant ; sinon lignes du groupe */
+  groupe: { champs: string[]; chemin: unknown[] } | null;
+  resumes: { champ: string; type: TypeResume }[];
+  /** Filtre d'en-tête ignoré (valeurs possibles d'une colonne) */
+  sauf?: string | null;
+};
+
+export type GroupeDistant = { cle: unknown; nombre: number; resumes?: Record<string, number | null> };
+
+export type ReponseDistante<T> = {
+  data: T[];
+  total: number;
+  groupes?: GroupeDistant[];
+  /** Totaux sur tout le résultat filtré, clés `champ:type` */
+  resumes?: Record<string, number | null>;
+  [autre: string]: unknown;
+};
+
+export type SourceDistante<T> = {
+  charger: (requete: RequeteDistante) => Promise<ReponseDistante<T>>;
+  /** Changer cette clé relance le chargement (critères extérieurs : période, type de pièce…) */
+  cle?: string;
+  /** Appelé à chaque réponse de premier niveau (totaux ou données annexes pour l'écran) */
+  surReponse?: (reponse: ReponseDistante<T>) => void;
+};
+
 export type GrilleProps<T> = {
+  /** Données locales (ignorées avec `source`) */
   donnees: T[];
+  /** Mode distant : tri, filtres, recherche, pagination, groupes et totaux faits par le serveur */
+  source?: SourceDistante<T>;
   cle: (ligne: T) => string | number;
   /** Colonnes ; absentes → déduites des clés de la première ligne */
   colonnes?: ColonneGrille<T>[];

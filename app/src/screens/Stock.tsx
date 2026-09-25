@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useLazyQuery } from '@apollo/client';
+import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import {
   ARTICLES, COORDONNEES_SOCIETE, REFERENTIELS,
   CREATE_ARTICLE, UPDATE_ARTICLE, DELETE_ARTICLE,
@@ -14,11 +14,10 @@ import { PrintDocument } from '../print/engine/types';
 import { buildStockPrint } from '../print/templates';
 import { ArticlesResult, Article } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
-import DataGrid, { Column } from '../components/ui/DataGrid';
+import DataGrid, { Column, DataGridDistant } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
-import { Money, Tabs, PageHeader, Pagination, SearchInput, StatusPill } from '../components/ui/atoms';
+import { Money, Tabs, PageHeader, SearchInput, StatusPill } from '../components/ui/atoms';
 
-const LIMIT = 50;
 const VUES = [
   { code: 'tous', label: 'Articles' },
   { code: 'alerte', label: 'Stock en alerte' },
@@ -32,19 +31,23 @@ export default function Stock() {
   const [vue, setVue] = useState<(typeof VUES)[number]['code']>(
     (VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous');
   const [search, setSearch] = useState('');
-  const [offset, setOffset] = useState(0);
+  // Incrémenté après création / modification / suppression : relit la liste
+  const [version, setVersion] = useState(0);
 
-  const { data, loading, error, refetch } = useQuery(ARTICLES, {
-    variables: {
-      search: search || undefined,
-      stock_alerte: vue === 'alerte' ? true : undefined,
-      marge_negative: vue === 'marge' ? true : undefined,
-      limit: LIMIT, offset,
+  const client = useApolloClient();
+  const stockAlerte = vue === 'alerte' ? true : undefined;
+  const margeNegative = vue === 'marge' ? true : undefined;
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur
+  const distant = useMemo<DataGridDistant<Article>>(() => ({
+    cle: JSON.stringify([search, stockAlerte, margeNegative, version]),
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: ARTICLES, fetchPolicy: 'network-only',
+        variables: { search: search || undefined, stock_alerte: stockAlerte, marge_negative: margeNegative, grille },
+      });
+      return data.articles as ArticlesResult;
     },
-    skip: vue === 'peremption',
-  });
-  const res: ArticlesResult | undefined = data?.articles;
-  const rows = res?.data ?? [];
+  }), [client, search, stockAlerte, margeNegative, version]);
 
   // Listes déroulantes du formulaire article (familles, dépôts, unités, TVA)
   const { data: refData } = useQuery(REFERENTIELS);
@@ -61,7 +64,7 @@ export default function Stock() {
   const crud = useCrud<Article & { id: number }>({
     label: 'article', createTitle: 'Nouvel article', editTitle: "Modifier l'article", deleteTitle: 'Supprimer cet article ?', sections: articleSections, width: 820,
     createDoc: CREATE_ARTICLE, updateDoc: UPDATE_ARTICLE, deleteDoc: DELETE_ARTICLE,
-    onDone: () => { void refetch(); },
+    onDone: () => setVersion((v) => v + 1),
     labelOf: (a) => `${a.designation} (${a.code})`,
     formExtra: (v) => <MatricePrix values={v} />,
     peutModifier: peut('stock', D.stock.modifierArticle),
@@ -91,15 +94,15 @@ export default function Stock() {
   }
 
   const columns: Column<Article>[] = [
-    { key: 'code', header: 'Code', width: '110px', render: (a) => <span className="money">{a.code}</span> },
-    { key: 'designation', header: 'Désignation', render: (a) => <b>{a.designation}</b> },
-    { key: 'famille', header: 'Famille', width: '120px', render: (a) => <span className="text-ink-muted">{a.famille ?? '—'}</span> },
-    { key: 'pmp', header: 'PMP', align: 'right', width: '95px', render: (a) => <Money value={a.pmp} /> },
-    { key: 'pv', header: 'P.V. TTC', align: 'right', width: '95px', render: (a) => <Money value={a.prix_vente_ttc} /> },
-    { key: 'margep', header: 'Marge %', align: 'right', width: '80px', render: (a) => (
+    { key: 'code', header: 'Code', width: '110px', field: 'code', render: (a) => <span className="money">{a.code}</span> },
+    { key: 'designation', header: 'Désignation', field: 'designation', render: (a) => <b>{a.designation}</b> },
+    { key: 'famille', header: 'Famille', width: '120px', field: 'famille', render: (a) => <span className="text-ink-muted">{a.famille ?? '—'}</span> },
+    { key: 'pmp', header: 'PMP', align: 'right', width: '95px', field: 'pmp', render: (a) => <Money value={a.pmp} /> },
+    { key: 'pv', header: 'P.V. TTC', align: 'right', width: '95px', field: 'prix_vente_ttc', render: (a) => <Money value={a.prix_vente_ttc} /> },
+    { key: 'margep', header: 'Marge %', align: 'right', width: '80px', field: 'margep', render: (a) => (
       <span className="money" style={{ color: Number(a.margep) < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.margep, 1)}</span>
     ) },
-    { key: 'qte', header: 'Stock', align: 'right', width: '85px', render: (a) => {
+    { key: 'qte', header: 'Stock', align: 'right', width: '85px', field: 'qte_reale', type: 'number', render: (a) => {
       const q = Number(a.qte_reale ?? 0), min = Number(a.stock_min ?? 0);
       return <span className="money font-semibold" style={{ color: q <= 0 ? 'var(--danger)' : q <= min ? 'var(--warning)' : undefined }}>{fmtQte(q)}</span>;
     } },
@@ -126,7 +129,7 @@ export default function Stock() {
   return (
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Articles & stock">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Code, désignation, code-barres…" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Code, désignation, code-barres…" />
         <button onClick={() => void printEtat()} disabled={printing}
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {printing ? 'Préparation…' : "Imprimer l'état du stock"}
@@ -152,15 +155,15 @@ export default function Stock() {
       </PageHeader>
       {crud.modals}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }}
+      <Tabs value={vue} onChange={setVue}
             options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
       {vue === 'peremption' ? <PeremptionPanel /> : (
         <>
-          <DataGrid columns={columns} rows={rows} rowKey={(a) => a.id} loading={loading} error={error?.message}
+          <DataGrid columns={columns} rowKey={(a) => a.id}
+                    distant={distant} cleEtat="stock-articles"
                     exportCsv={{ nom: 'articles-stock', columns: csvStock }}
                     onRowClick={(a) => navigate(`/stock/article/${a.id}`)}
-                    footer={{ _label: `${res?.total ?? 0} article(s)` }} />
-          {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
+                    footer={(r) => ({ _label: `${r?.total ?? 0} article(s)` })} />
         </>
       )}
     </div>

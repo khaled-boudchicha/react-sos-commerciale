@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useLazyQuery } from '@apollo/client';
+import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import {
   CLIENTS, FOURNISSEURS, DEBITEURS, COORDONNEES_SOCIETE, ETAT_CLIENTS, ETAT_FOURNISSEURS,
   CREATE_CLIENT, UPDATE_CLIENT, DELETE_CLIENT,
@@ -16,10 +16,10 @@ import { buildDebiteursPrint } from '../print/templates';
 import { ClientsResult, Client, FournisseursResult, Fournisseur, DebiteursResult, Debiteur } from '../api/types';
 import { fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
-import DataGrid, { Column } from '../components/ui/DataGrid';
-import { Money, Tabs, PageHeader, Pagination, SearchInput, ExportBtn, Bucket } from '../components/ui/atoms';
+import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
+import { RequeteDistante } from '../components/grille/types';
+import { Money, Tabs, PageHeader, SearchInput, ExportBtn, Bucket } from '../components/ui/atoms';
 
-const LIMIT = 50;
 // Limite de sécurité pour l'export « tout » : au-delà, on prévient plutôt que
 // d'exporter silencieusement une liste tronquée.
 const LIMIT_EXPORT = 5000;
@@ -49,6 +49,10 @@ const csvDebiteurs: ExportColumn<Debiteur>[] = [
   { header: 'Jours de retard', value: (d) => Number((d as any).jours_retard ?? 0), numeric: true },
   { header: 'Créance', value: (d) => Number((d as any).montant ?? d.total_reste ?? 0), numeric: true },
 ];
+
+/** Requête de premier niveau (ni valeurs d'un filtre d'en-tête, ni sous-groupe) : ses champs annexes valent pour la liste */
+const estRacine = (req: RequeteDistante) => !req.sauf && (!req.groupe || req.groupe.chemin.length === 0);
+
 const VUES = [
   { code: 'clients', label: 'Clients' },
   { code: 'fournisseurs', label: 'Fournisseurs' },
@@ -65,28 +69,39 @@ export default function Tiers() {
     ? peut('tiers', D.tiers.fournisseurs) : peut('tiers', D.tiers.clients));
   const [vue, setVue] = useState<(typeof VUES)[number]['code']>(vues[0]?.code ?? 'clients');
   const [search, setSearch] = useState('');
-  const [offset, setOffset] = useState(0);
 
   return (
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Clients & fournisseurs">
-        <SearchInput value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="Nom, code…" />
+        <SearchInput value={search} onChange={setSearch} placeholder="Nom, code…" />
       </PageHeader>
-      <Tabs value={vue} onChange={(v) => { setVue(v); setOffset(0); }} options={vues} />
-      {vue === 'clients' && <ClientsGrid search={search} offset={offset} onOffset={setOffset} />}
-      {vue === 'fournisseurs' && <FournisseursGrid search={search} offset={offset} onOffset={setOffset} />}
-      {vue === 'debiteurs' && <DebiteursGrid search={search} offset={offset} onOffset={setOffset} />}
+      <Tabs value={vue} onChange={setVue} options={vues} />
+      {vue === 'clients' && <ClientsGrid search={search} />}
+      {vue === 'fournisseurs' && <FournisseursGrid search={search} />}
+      {vue === 'debiteurs' && <DebiteursGrid search={search} />}
       {vue === 'recouvrement' && <RecouvrementPanel search={search} />}
-      {vue === 'etat_clients' && <EtatsGrid sens="client" search={search} offset={offset} onOffset={setOffset} />}
-      {vue === 'etat_fournisseurs' && <EtatsGrid sens="fournisseur" search={search} offset={offset} onOffset={setOffset} />}
+      {vue === 'etat_clients' && <EtatsGrid sens="client" search={search} />}
+      {vue === 'etat_fournisseurs' && <EtatsGrid sens="fournisseur" search={search} />}
     </div>
   );
 }
 
-function ClientsGrid({ search, offset, onOffset }: { search: string; offset: number; onOffset: (o: number) => void }) {
+function ClientsGrid({ search }: { search: string }) {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useQuery(CLIENTS, { variables: { search: search || undefined, limit: LIMIT, offset } });
-  const res: ClientsResult | undefined = data?.clients;
+  const client = useApolloClient();
+  // Incrémenté après création / modification / suppression : recharge la liste
+  const [version, setVersion] = useState(0);
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur
+  const distant = useMemo<DataGridDistant<Client>>(() => ({
+    cle: JSON.stringify([search, version]),
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: CLIENTS, fetchPolicy: 'network-only',
+        variables: { search: search || undefined, grille },
+      });
+      return data.clients as ClientsResult;
+    },
+  }), [client, search, version]);
   const [fetchAll, { loading: exporting }] = useLazyQuery(CLIENTS, { fetchPolicy: 'network-only' });
   async function exporter() {
     const { data: all } = await fetchAll({ variables: { search: search || undefined, limit: LIMIT_EXPORT, offset: 0 } });
@@ -95,16 +110,16 @@ function ClientsGrid({ search, offset, onOffset }: { search: string; offset: num
   const crud = useCrud<Client & { id: number }>({
     label: 'client', sections: CLIENT_SECTIONS,
     createDoc: CREATE_CLIENT, updateDoc: UPDATE_CLIENT, deleteDoc: DELETE_CLIENT,
-    onDone: () => { void refetch(); },
+    onDone: () => setVersion((v) => v + 1),
     labelOf: (c) => `${c.nom} (${c.code})`,
   });
   const columns: Column<Client>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (c) => <span className="money">{c.code}</span> },
-    { key: 'nom', header: 'Nom', render: (c) => <b>{c.nom}{c.prenom ? ` ${c.prenom}` : ''}</b> },
-    { key: 'tel', header: 'Téléphone', width: '120px', render: (c) => <span className="text-ink-muted">{c.telephone ?? '—'}</span> },
-    { key: 'ville', header: 'Ville', width: '110px', render: (c) => <span className="text-ink-muted">{c.ville ?? '—'}</span> },
+    { key: 'code', header: 'Code', width: '90px', field: 'code', render: (c) => <span className="money">{c.code}</span> },
+    { key: 'nom', header: 'Nom', field: 'nom', render: (c) => <b>{c.nom}{c.prenom ? ` ${c.prenom}` : ''}</b> },
+    { key: 'tel', header: 'Téléphone', width: '120px', field: 'telephone', render: (c) => <span className="text-ink-muted">{c.telephone ?? '—'}</span> },
+    { key: 'ville', header: 'Ville', width: '110px', field: 'ville', render: (c) => <span className="text-ink-muted">{c.ville ?? '—'}</span> },
     { key: 'plafond', header: 'Plafond crédit', align: 'right', width: '120px', render: (c) => <Money value={c.plafond_credit} /> },
-    { key: 'solde', header: 'Solde', align: 'right', width: '120px', render: (c) => (
+    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'ancien_credit', render: (c) => (
       <span className="money font-semibold" style={{ color: Number(c.ancien_credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(c.ancien_credit)}</span>
     ) },
     { key: 'actions', header: '', align: 'right', width: '70px', render: (c) => crud.rowActions(c as Client & { id: number }) },
@@ -118,20 +133,30 @@ function ClientsGrid({ search, offset, onOffset }: { search: string; offset: num
         </button>
       </div>
       {crud.modals}
-      <DataGrid columns={columns} rows={res?.data ?? []} rowKey={(c) => c.id} loading={loading} error={error?.message}
-                titre={`${res?.total ?? 0} client(s)`}
+      <DataGrid columns={columns} rowKey={(c) => c.id}
+                distant={distant} cleEtat="tiers-clients"
                 actions={<ExportBtn onClick={() => void exporter()} loading={exporting} />}
                 onRowClick={(c) => navigate(`/tiers/client/${encodeURIComponent(c.code)}`)}
-                footer={{ _label: `${res?.total ?? 0} client(s)` }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={onOffset} />}
+                footer={(r) => ({ _label: `${r?.total ?? 0} client(s)` })} />
     </>
   );
 }
 
-function FournisseursGrid({ search, offset, onOffset }: { search: string; offset: number; onOffset: (o: number) => void }) {
+function FournisseursGrid({ search }: { search: string }) {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useQuery(FOURNISSEURS, { variables: { search: search || undefined, limit: LIMIT, offset } });
-  const res: FournisseursResult | undefined = data?.fournisseurs;
+  const client = useApolloClient();
+  // Incrémenté après création / modification / suppression : recharge la liste
+  const [version, setVersion] = useState(0);
+  const distant = useMemo<DataGridDistant<Fournisseur>>(() => ({
+    cle: JSON.stringify([search, version]),
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: FOURNISSEURS, fetchPolicy: 'network-only',
+        variables: { search: search || undefined, grille },
+      });
+      return data.fournisseurs as FournisseursResult;
+    },
+  }), [client, search, version]);
   const [fetchAll, { loading: exporting }] = useLazyQuery(FOURNISSEURS, { fetchPolicy: 'network-only' });
   async function exporter() {
     const { data: all } = await fetchAll({ variables: { search: search || undefined, limit: LIMIT_EXPORT, offset: 0 } });
@@ -140,15 +165,15 @@ function FournisseursGrid({ search, offset, onOffset }: { search: string; offset
   const crud = useCrud<Fournisseur & { id: number }>({
     label: 'fournisseur', sections: FOURNISSEUR_SECTIONS,
     createDoc: CREATE_FOURNISSEUR, updateDoc: UPDATE_FOURNISSEUR, deleteDoc: DELETE_FOURNISSEUR,
-    onDone: () => { void refetch(); },
+    onDone: () => setVersion((v) => v + 1),
     labelOf: (f) => `${f.nom} (${f.code})`,
   });
   const columns: Column<Fournisseur>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (f) => <span className="money">{f.code}</span> },
-    { key: 'nom', header: 'Nom', render: (f) => <b>{f.nom}</b> },
-    { key: 'tel', header: 'Téléphone', width: '120px', render: (f) => <span className="text-ink-muted">{f.telephone ?? '—'}</span> },
-    { key: 'ville', header: 'Ville', width: '110px', render: (f) => <span className="text-ink-muted">{f.ville ?? '—'}</span> },
-    { key: 'solde', header: 'Solde', align: 'right', width: '120px', render: (f) => <Money value={f.ancien_credit} /> },
+    { key: 'code', header: 'Code', width: '90px', field: 'code', render: (f) => <span className="money">{f.code}</span> },
+    { key: 'nom', header: 'Nom', field: 'nom', render: (f) => <b>{f.nom}</b> },
+    { key: 'tel', header: 'Téléphone', width: '120px', field: 'telephone', render: (f) => <span className="text-ink-muted">{f.telephone ?? '—'}</span> },
+    { key: 'ville', header: 'Ville', width: '110px', field: 'ville', render: (f) => <span className="text-ink-muted">{f.ville ?? '—'}</span> },
+    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'ancien_credit', render: (f) => <Money value={f.ancien_credit} /> },
     { key: 'actions', header: '', align: 'right', width: '70px', render: (f) => crud.rowActions(f as Fournisseur & { id: number }) },
   ];
   return (
@@ -160,25 +185,36 @@ function FournisseursGrid({ search, offset, onOffset }: { search: string; offset
         </button>
       </div>
       {crud.modals}
-      <DataGrid columns={columns} rows={res?.data ?? []} rowKey={(f) => f.id} loading={loading} error={error?.message}
-                titre={`${res?.total ?? 0} fournisseur(s)`}
+      <DataGrid columns={columns} rowKey={(f) => f.id}
+                distant={distant} cleEtat="tiers-fournisseurs"
                 actions={<ExportBtn onClick={() => void exporter()} loading={exporting} />}
                 onRowClick={(f) => navigate(`/tiers/fournisseur/${encodeURIComponent(f.code)}`)}
-                footer={{ _label: `${res?.total ?? 0} fournisseur(s)` }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={onOffset} />}
+                footer={(r) => ({ _label: `${r?.total ?? 0} fournisseur(s)` })} />
     </>
   );
 }
 
-function DebiteursGrid({ search, offset, onOffset }: { search: string; offset: number; onOffset: (o: number) => void }) {
+function DebiteursGrid({ search }: { search: string }) {
   const navigate = useNavigate();
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
-  const { data, loading, error } = useQuery(DEBITEURS, { variables: { search: search || undefined, limit: LIMIT, offset } });
+  const client = useApolloClient();
+  // Totaux et ventilation par ancienneté de la dernière réponse (restreints aux filtres de la grille)
+  const [res, setRes] = useState<DebiteursResult | null>(null);
+  const distant = useMemo<DataGridDistant<Debiteur>>(() => ({
+    cle: JSON.stringify([search]),
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: DEBITEURS, fetchPolicy: 'network-only',
+        variables: { search: search || undefined, grille },
+      });
+      const r = data.debiteurs as DebiteursResult & { total: number };
+      if (estRacine(grille)) setRes(r);
+      return r;
+    },
+  }), [client, search]);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [fetchAll, { loading: printing }] = useLazyQuery(DEBITEURS, { fetchPolicy: 'network-only' });
   const [fetchExport, { loading: exporting }] = useLazyQuery(DEBITEURS, { fetchPolicy: 'network-only' });
-  const res: DebiteursResult | undefined = data?.debiteurs;
-  const rows: Debiteur[] = res?.data ?? [];
 
   async function printAll() {
     // Récupère la liste complète (pas seulement la page affichée) pour l'état imprimé
@@ -197,14 +233,14 @@ function DebiteursGrid({ search, offset, onOffset }: { search: string; offset: n
   }
   // Champs réels du retour GetDebiteurs : code_cli, raison, montant, nb_factures, jours_retard
   const columns: Column<Debiteur>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (d) => <span className="money">{String(d.code_cli ?? '')}</span> },
-    { key: 'nom', header: 'Client', render: (d) => <b>{String(d.raison ?? '')}</b> },
-    { key: 'nb', header: 'Factures', align: 'right', width: '80px', render: (d) => <span className="money">{String(d.nb_factures ?? '')}</span> },
-    { key: 'retard', header: 'Retard', align: 'right', width: '80px', render: (d) => {
+    { key: 'code', header: 'Code', width: '90px', field: 'code_cli', render: (d) => <span className="money">{String(d.code_cli ?? '')}</span> },
+    { key: 'nom', header: 'Client', field: 'raison', render: (d) => <b>{String(d.raison ?? '')}</b> },
+    { key: 'nb', header: 'Factures', align: 'right', width: '80px', field: 'nb_factures', type: 'number', render: (d) => <span className="money">{String(d.nb_factures ?? '')}</span> },
+    { key: 'retard', header: 'Retard', align: 'right', width: '80px', field: 'jours_retard', type: 'number', render: (d) => {
       const j = Number((d as any).jours_retard ?? 0);
       return <span className="money" style={{ color: j > 60 ? 'var(--danger)' : j > 30 ? 'var(--warning)' : undefined }}>{j} j</span>;
     } },
-    { key: 'reste', header: 'Créance', align: 'right', width: '130px', render: (d) => (
+    { key: 'reste', header: 'Créance', align: 'right', width: '130px', field: 'montant', render: (d) => (
       <span className="money font-semibold" style={{ color: 'var(--danger)' }}>{fmtMoney((d as any).montant ?? d.total_reste)}</span>
     ) },
   ];
@@ -228,9 +264,15 @@ function DebiteursGrid({ search, offset, onOffset }: { search: string; offset: n
         </div>
       )}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <DataGrid columns={columns} rows={rows} rowKey={(d) => String(d.code_cli)} loading={loading} error={error?.message}
-                onRowClick={(d) => d.code_cli && navigate(`/tiers/client/${encodeURIComponent(String(d.code_cli))}`)} />
-      {res && res.total_clients > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total_clients} onOffset={onOffset} />}
+      <DataGrid columns={columns} rowKey={(d) => String(d.code_cli)}
+                distant={distant} cleEtat="tiers-debiteurs"
+                onRowClick={(d) => d.code_cli && navigate(`/tiers/client/${encodeURIComponent(String(d.code_cli))}`)}
+                footer={(r) => ({
+                  _label: `${r?.total ?? 0} débiteur(s)`,
+                  reste: r?.total_creances != null
+                    ? <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(r.total_creances as number)}</span>
+                    : undefined,
+                })} />
     </>
   );
 }
@@ -243,18 +285,24 @@ type EtatLigne = Record<string, any> & { code_cli?: string; code_four?: string; 
  * État financier global des tiers (équivalent EtatClients.pas / StatFournisseurs.pas) :
  * une ligne par tiers avec solde de départ, mouvements de la période et solde final.
  */
-function EtatsGrid({ sens, search, offset, onOffset }: {
-  sens: 'client' | 'fournisseur'; search: string; offset: number; onOffset: (o: number) => void;
-}) {
+function EtatsGrid({ sens, search }: { sens: 'client' | 'fournisseur'; search: string }) {
   const navigate = useNavigate();
   const [sansZeros, setSansZeros] = useState(true);
   const client = sens === 'client';
-  const { data, loading, error } = useQuery(client ? ETAT_CLIENTS : ETAT_FOURNISSEURS, {
-    variables: { search: search || undefined, sans_zeros: sansZeros, limit: LIMIT, offset },
-  });
-  const res = (client ? data?.etatClients : data?.etatFournisseurs) as
-    { data: EtatLigne[]; total: number; total_credit?: number } | undefined;
-  const lignes = res?.data ?? [];
+  const apollo = useApolloClient();
+  const distant = useMemo<DataGridDistant<EtatLigne>>(() => ({
+    cle: JSON.stringify([sens, search, sansZeros]),
+    totaux: [{ field: 'ca', type: 'sum' }],
+    charger: async (grille) => {
+      const { data } = await apollo.query({
+        query: client ? ETAT_CLIENTS : ETAT_FOURNISSEURS, fetchPolicy: 'network-only',
+        variables: { search: search || undefined, sans_zeros: sansZeros, grille },
+      });
+      // total_credit : somme des seuls crédits positifs, renvoyée à part par le serveur
+      return (client ? data.etatClients : data.etatFournisseurs) as
+        { data: EtatLigne[]; total: number; total_credit?: number; resumes?: Record<string, number | null> };
+    },
+  }), [apollo, sens, client, search, sansZeros]);
 
   const [fetchExport, { loading: exporting }] = useLazyQuery(client ? ETAT_CLIENTS : ETAT_FOURNISSEURS, { fetchPolicy: 'network-only' });
   async function exporter() {
@@ -272,16 +320,18 @@ function EtatsGrid({ sens, search, offset, onOffset }: {
   }
 
   const cols: Column<EtatLigne>[] = [
-    { key: 'code', header: 'Code', width: '90px',
+    { key: 'code', header: 'Code', width: '90px', field: client ? 'code_cli' : 'code_four',
       render: (l) => <span className="money">{l.code_cli ?? l.code_four}</span> },
-    { key: 'nom', header: client ? 'Client' : 'Fournisseur', render: (l) => <b>{l.nom || '—'}</b> },
-    { key: 'depart', header: 'Solde départ', align: 'right', width: '120px',
+    { key: 'nom', header: client ? 'Client' : 'Fournisseur', field: 'nom', render: (l) => <b>{l.nom || '—'}</b> },
+    { key: 'depart', header: 'Solde départ', align: 'right', width: '120px', field: 'solde_depart',
       render: (l) => <span className="money">{fmtMoney(l.solde_depart)}</span> },
-    { key: 'mouv', header: client ? 'Ventes' : 'Achats', align: 'right', width: '130px',
+    { key: 'mouv', header: client ? 'Ventes' : 'Achats', align: 'right', width: '130px', field: client ? 'total_ventes' : 'total_achats',
       render: (l) => <span className="money">{fmtMoney(l.total_ventes ?? l.total_achats)}</span> },
-    { key: 'regler', header: 'Réglé', align: 'right', width: '130px',
+    { key: 'regler', header: 'Réglé', align: 'right', width: '130px', field: 'regler',
       render: (l) => <span className="money">{fmtMoney(l.regler)}</span> },
-    { key: 'credit', header: 'Solde', align: 'right', width: '130px',
+    { key: 'ca', header: "Chiffre d'affaires", align: 'right', width: '130px', field: 'ca',
+      render: (l) => <span className="money">{fmtMoney(l.ca)}</span> },
+    { key: 'credit', header: 'Solde', align: 'right', width: '130px', field: 'credit',
       render: (l) => (
         <span className="money font-semibold"
               style={{ color: Number(l.credit) > 0 ? 'var(--warning)' : undefined }}>
@@ -294,24 +344,24 @@ function EtatsGrid({ sens, search, offset, onOffset }: {
     <>
       <div className="flex items-center justify-between gap-3">
         <label className="text-[12px] font-semibold text-ink-label flex items-center gap-1.5">
-          <input type="checkbox" checked={sansZeros} onChange={(e) => { setSansZeros(e.target.checked); onOffset(0); }} />
+          <input type="checkbox" checked={sansZeros} onChange={(e) => setSansZeros(e.target.checked)} />
           Masquer les tiers soldés
         </label>
         <ExportBtn onClick={() => void exporter()} loading={exporting} />
       </div>
-      <DataGrid columns={cols} rows={lignes} rowKey={(l, i) => l.code_cli ?? l.code_four ?? i}
-                loading={loading} error={error?.message}
+      <DataGrid columns={cols} rowKey={(l, i) => l.code_cli ?? l.code_four ?? i}
+                distant={distant} cleEtat={client ? 'tiers-etat-clients' : 'tiers-etat-fournisseurs'}
                 onRowClick={(l) => {
                   const code = l.code_cli ?? l.code_four;
                   if (code) navigate(`/tiers/${client ? 'client' : 'fournisseur'}/${encodeURIComponent(code)}`);
                 }}
-                footer={{
-                  _label: `${res?.total ?? 0} tiers`,
-                  credit: res?.total_credit != null
-                    ? <span className="money">{fmtMoney(res.total_credit)}</span>
+                footer={(r) => ({
+                  _label: `${r?.total ?? 0} tiers`,
+                  ca: <span className="money">{fmtMoney(totalDistant(r, 'ca'))}</span>,
+                  credit: r?.total_credit != null
+                    ? <span className="money">{fmtMoney(r.total_credit as number)}</span>
                     : undefined,
-                }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={onOffset} />}
+                })} />
     </>
   );
 }

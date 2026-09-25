@@ -13,6 +13,7 @@ import {
 import { documentPdfGrille, exporterGrilleCsv, exporterGrilleExcel } from './exportGrille';
 import { ColonneGrille, FiltreColonne, GrilleProps, Resume } from './types';
 import { useEtatGrille } from './useEtatGrille';
+import { useSourceDistante } from './useSourceDistante';
 
 type Cle = string | number;
 const CLE_NOUVELLE = '__nouvelle__';
@@ -53,6 +54,9 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const { etat, actions } = useEtatGrille(colonnes, optPagination.taille ?? 20, cleEtat);
   const visibles = useMemo(() => colonnesVisibles(colonnes, etat), [colonnes, etat]);
   const largeur = (c: ColonneGrille<T>) => etat.largeurs[c.champ] ?? largeurDefaut(c);
+  // Mode distant : le serveur trie, filtre, pagine, regroupe et totalise
+  const distant = useSourceDistante(props.source, colonnes, etat, resumes, resumesGroupe);
+  const sourceDonnees = distant.actif ? distant.lignes : donnees;
 
   // ─── Édition (lot : changements en attente fusionnés à l'affichage) ─────────
   const [lot, setLot] = useState<{ modifiees: Record<string, Partial<T>>; ajoutees: T[]; supprimees: Cle[] }>({ modifiees: {}, ajoutees: [], supprimees: [] });
@@ -71,26 +75,34 @@ export default function Grille<T>(props: GrilleProps<T>) {
   }, [cle]);
 
   const donneesAffichees = useMemo(() => {
-    const fusion = donnees.map((d) => {
+    const fusion = sourceDonnees.map((d) => {
       const m = lot.modifiees[String(cle(d))];
       return m ? ({ ...d, ...m }) as T : d;
     });
     return edition?.positionNouvelle === 'fin' ? [...fusion, ...lot.ajoutees] : [...lot.ajoutees, ...fusion];
-  }, [donnees, lot, cle, edition?.positionNouvelle]);
+  }, [sourceDonnees, lot, cle, edition?.positionNouvelle]);
 
   // ─── Chaîne de données ────────────────────────────────────────────────────
-  const filtrees = useMemo(() => filtrer(donneesAffichees, colonnes, etat), [donneesAffichees, colonnes, etat]);
-  const triees = useMemo(() => trier(filtrees, colonnes, etat.tri), [filtrees, colonnes, etat.tri]);
-  const arbre = useMemo(() => (etat.groupes.length ? grouper(triees, colonnes, etat.groupes) : null), [triees, colonnes, etat.groupes]);
+  // En mode distant, les lignes reçues sont déjà filtrées, triées et paginées
+  const filtrees = useMemo(() => (distant.actif ? donneesAffichees : filtrer(donneesAffichees, colonnes, etat)), [distant.actif, donneesAffichees, colonnes, etat]);
+  const triees = useMemo(() => (distant.actif ? filtrees : trier(filtrees, colonnes, etat.tri)), [distant.actif, filtrees, colonnes, etat.tri]);
+  const arbre = useMemo(() => (!distant.actif && etat.groupes.length ? grouper(triees, colonnes, etat.groupes) : null), [distant.actif, triees, colonnes, etat.groupes]);
   const elements: ElementAffiche<T>[] = useMemo(
-    () => (arbre ? aplatir(arbre, etat) : triees.map((ligne) => ({ type: 'ligne' as const, ligne }))),
-    [arbre, triees, etat],
+    () => distant.elements ?? (arbre ? aplatir(arbre, etat) : triees.map((ligne) => ({ type: 'ligne' as const, ligne }))),
+    [distant.elements, arbre, triees, etat],
   );
-  const pagine = !defilementVirtuel && pagination !== false;
-  const { elements: elementsPage, pages, page } = useMemo(
-    () => (pagine ? paginer(elements, etat.page, etat.taillePage) : { elements, pages: 1, page: 0 }),
-    [elements, pagine, etat.page, etat.taillePage],
-  );
+  /** Nombre de lignes du résultat (serveur : total filtré, toutes pages) */
+  const nbResultat = distant.actif ? distant.total : triees.length;
+  const groupeDistant = distant.actif && etat.groupes.length > 0;
+  const pagine = !defilementVirtuel && pagination !== false && !groupeDistant;
+  const { elements: elementsPage, pages, page } = useMemo(() => {
+    if (!pagine) return { elements, pages: 1, page: 0 };
+    if (distant.actif) {
+      const nb = Math.max(1, Math.ceil(distant.total / Math.max(1, etat.taillePage)));
+      return { elements, pages: nb, page: Math.min(etat.page, nb - 1) };
+    }
+    return paginer(elements, etat.page, etat.taillePage);
+  }, [elements, pagine, distant.actif, distant.total, etat.page, etat.taillePage]);
 
   // ─── Sélection, ligne active, détail ──────────────────────────────────────
   const [selectionnees, setSelectionnees] = useState<Set<Cle>>(() => new Set(props.selectionnees ?? []));
@@ -144,7 +156,8 @@ export default function Grille<T>(props: GrilleProps<T>) {
   };
   async function executer(fn: () => Promise<void> | void) {
     setEnCours(true); setErreurEdition(null);
-    try { await fn(); return true; }
+    // Mode distant : la vérité est côté serveur, on relit la page / les groupes après écriture
+    try { await fn(); distant.recharger(); return true; }
     catch (e: any) { setErreurEdition(e?.message ?? 'Enregistrement impossible.'); return false; }
     finally { setEnCours(false); }
   }
@@ -218,11 +231,11 @@ export default function Grille<T>(props: GrilleProps<T>) {
         await edition?.surAjout?.(propre as T);
       }
       for (const [k, changements] of Object.entries(lot.modifiees)) {
-        const ligne = donnees.find((d) => String(cle(d)) === k);
+        const ligne = sourceDonnees.find((d) => String(cle(d)) === k);
         if (ligne && !lot.supprimees.some((s) => String(s) === k)) await edition?.surModification?.(cle(ligne), changements, ligne);
       }
       for (const k of lot.supprimees) {
-        const ligne = donnees.find((d) => cle(d) === k);
+        const ligne = sourceDonnees.find((d) => cle(d) === k);
         if (ligne) await edition?.surSuppression?.(k, ligne);
       }
     });
@@ -244,6 +257,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const [flottant, setFlottant] = useState<ReactNode>(null);
   const [filtresOuverts, setFiltresOuverts] = useState(false);
   const [glisseEnTete, setGlisseEnTete] = useState(false);
+  const [exportEnCours, setExportEnCours] = useState(false);
   const [pdf, setPdf] = useState<PrintDocument | null>(null);
   const [survolGroupes, setSurvolGroupes] = useState(false);
   const redim = useRef<{ champ: string; x: number; l: number } | null>(null);
@@ -282,7 +296,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
       { libelle: groupe ? 'Ne plus grouper' : 'Grouper par cette colonne', separateur: true, desactive: c.groupable === false,
         action: () => (groupe ? actions.degrouper(c.champ) : actions.grouper(c.champ)) },
       ...(etat.groupes.length ? [
-        { libelle: 'Tout déplier', action: actions.toutDeplier },
+        ...(distant.actif ? [] : [{ libelle: 'Tout déplier', action: actions.toutDeplier }]),
         { libelle: 'Tout replier', action: actions.toutReplier },
       ] : []),
       { libelle: 'Masquer la colonne', separateur: true, action: () => actions.basculerVisibilite(c.champ), desactive: c.masquable === false },
@@ -292,12 +306,24 @@ export default function Grille<T>(props: GrilleProps<T>) {
   }
   function ouvrirFiltreEntete(e: ME, c: ColonneGrille<T>) {
     e.stopPropagation();
+    const ancre = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const ouvrir = (valeurs: { cle?: string; texte: string; nombre: number }[]) => setFlottant(
+      <FiltreEntete ancre={ancre} valeurs={valeurs}
+                    retenues={etat.filtresEntete[c.champ]} onAppliquer={(v) => actions.filtrerEntete(c.champ, v)}
+                    onFermer={() => setFlottant(null)} />);
+    // Mode distant : valeurs et effectifs calculés par le serveur (GROUP BY)
+    if (distant.actif) {
+      setFlottant(<Flottant ancre={ancre} onFermer={() => setFlottant(null)} largeur={260}><div className="p-3 text-ink-muted">Chargement…</div></Flottant>);
+      distant.valeursEntete(c.champ, c).then(ouvrir).catch((err) => {
+        setFlottant(null);
+        setErreurEdition(err?.message ?? 'Valeurs indisponibles.');
+      });
+      return;
+    }
     // Valeurs possibles compte tenu des AUTRES filtres (comme DevExtreme)
     const { [c.champ]: _moi, ...autres } = etat.filtresEntete;
     const base = filtrer(donneesAffichees, colonnes, { ...etat, filtresEntete: autres });
-    setFlottant(<FiltreEntete ancre={(e.currentTarget as HTMLElement).getBoundingClientRect()} valeurs={valeursDistinctes(base, c)}
-                              retenues={etat.filtresEntete[c.champ]} onAppliquer={(v) => actions.filtrerEntete(c.champ, v)}
-                              onFermer={() => setFlottant(null)} />);
+    ouvrir(valeursDistinctes(base, c));
   }
   function ouvrirOperateur(e: ME, c: ColonneGrille<T>) {
     const courant = etat.filtres[c.champ];
@@ -378,6 +404,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
       case 'Enter':
       case 'F2': {
         if (el?.type === 'groupe') { actions.basculerGroupe(el.noeud.cle); break; }
+        if (el?.type === 'info') { el.action?.(); break; }
         if (el?.type === 'ligne') {
           const c = visibles[col];
           if ((modeEdition === 'cellule' || modeEdition === 'lot') && c && c.editable !== false && !c.valeur)
@@ -545,8 +572,9 @@ export default function Grille<T>(props: GrilleProps<T>) {
     );
   }
 
-  function valeurResume(r: Resume<T>, lignes: T[]): ReactNode {
-    const v = calculerResume(r, lignes, colonnes);
+  /** Total affiché : calculé sur `lignes`, ou fourni par le serveur (mode distant, clés `champ:type`) */
+  function valeurResume(r: Resume<T>, lignes: T[], serveur?: Record<string, number | null>): ReactNode {
+    const v = serveur && r.type !== 'custom' ? serveur[`${r.colonne}:${r.type}`] ?? null : calculerResume(r, lignes, colonnes);
     if (v === null) return null;
     const col = colonnes.find((c) => c.champ === r.colonne);
     const texte = r.format ? r.format(v) : typeof v === 'number' && col && r.type !== 'count' ? texteDe(col, v) : String(v);
@@ -555,7 +583,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
 
   function rendreGroupe(n: NoeudGroupe<T>, replie: boolean, indexPage: number) {
     const col = colonnes.find((c) => c.champ === n.champ);
-    const resumesTexte = (resumesGroupe ?? []).map((r, i) => <span key={i} className="ml-3">{valeurResume(r, n.lignes)}</span>);
+    const resumesTexte = (resumesGroupe ?? []).map((r, i) => <span key={i} className="ml-3">{valeurResume(r, n.lignes, n.resumesDistants)}</span>);
     return (
       <tr key={n.cle} data-index={indexPage} className="border-b border-line-soft cursor-pointer select-none"
           onClick={() => { actions.basculerGroupe(n.cle); setFocus({ index: indexPage, col: focus.col }); }}
@@ -565,8 +593,24 @@ export default function Grille<T>(props: GrilleProps<T>) {
             className="px-2.5 py-1.5 font-bold text-[12px] text-ink" style={{ paddingInlineStart: 10 + n.niveau * 18 }}>
           <span className="inline-block w-4 text-brand-700">{replie ? '▸' : '▾'}</span>
           {col?.titre ?? n.champ} : {n.texte}
-          <span className="text-ink-muted font-normal"> ({n.lignes.length})</span>
+          <span className="text-ink-muted font-normal"> ({n.nombre ?? n.lignes.length})</span>
           {resumesTexte}
+        </td>
+      </tr>
+    );
+  }
+
+  /** Mode distant : « Chargement… », erreur ou « Afficher plus » sous un groupe ouvert */
+  function rendreInfo(el: Extract<ElementAffiche<T>, { type: 'info' }>, indexPage: number) {
+    return (
+      <tr key={el.cle} data-index={indexPage} className="border-b border-line-soft"
+          style={{ height: defilementVirtuel ? hauteurLigne : undefined,
+                   outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}>
+        <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0) + (aCommandes ? 1 : 0)}
+            className="px-2.5 py-1.5 text-[11.5px]" style={{ paddingInlineStart: 28 + el.niveau * 18 }}>
+          {el.action
+            ? <button onClick={el.action} className="font-bold text-brand-700 hover:underline">{el.texte}</button>
+            : <span className="text-ink-muted">{el.texte}</span>}
         </td>
       </tr>
     );
@@ -576,13 +620,19 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const opts = props.export;
   // Colonnes sans titre (boutons d'action) exclues de l'export
   const colonnesExport = opts?.colonnes ?? visibles.filter((c) => c.titre !== '');
-  const lignesExport = () => (opts?.selectionSeule && selectionnees.size ? triees.filter((l) => selectionnees.has(cleDe(l))) : triees);
+  // Mode distant : tout le résultat filtré et trié est redemandé au serveur (pas seulement la page)
+  const lignesExport = async (): Promise<T[]> => {
+    if (opts?.selectionSeule && selectionnees.size) return triees.filter((l) => selectionnees.has(cleDe(l)));
+    if (!distant.actif) return triees;
+    setExportEnCours(true);
+    try { return await distant.chargerTout(); } finally { setExportEnCours(false); }
+  };
   function menuExport(e: ME) {
     const nom = opts?.nom ?? 'export';
     const entrees: EntreeMenu[] = [
-      ...(opts?.excel !== false ? [{ libelle: 'Excel (.xlsx)', action: () => void exporterGrilleExcel(nom, colonnesExport, lignesExport(), { groupes: opts?.colonnes ? undefined : arbre ?? undefined, resumes }) }] : []),
-      ...(opts?.csv !== false ? [{ libelle: 'CSV (Excel FR)', action: () => exporterGrilleCsv(nom, colonnesExport, lignesExport()) }] : []),
-      ...(opts?.pdf !== false ? [{ libelle: 'PDF / Imprimer', action: () => setPdf(documentPdfGrille(typeof titre === 'string' ? titre : nom, colonnesExport, lignesExport(), resumes)) }] : []),
+      ...(opts?.excel !== false ? [{ libelle: 'Excel (.xlsx)', action: () => void lignesExport().then((l) => exporterGrilleExcel(nom, colonnesExport, l, { groupes: opts?.colonnes ? undefined : arbre ?? undefined, resumes })).catch((e) => setErreurEdition(e?.message ?? 'Export impossible.')) }] : []),
+      ...(opts?.csv !== false ? [{ libelle: 'CSV (Excel FR)', action: () => void lignesExport().then((l) => exporterGrilleCsv(nom, colonnesExport, l)).catch((e) => setErreurEdition(e?.message ?? 'Export impossible.')) }] : []),
+      ...(opts?.pdf !== false ? [{ libelle: 'PDF / Imprimer', action: () => void lignesExport().then((l) => setPdf(documentPdfGrille(typeof titre === 'string' ? titre : nom, colonnesExport, l, resumes))).catch((e) => setErreurEdition(e?.message ?? 'Export impossible.')) }] : []),
       ...(selectionnees.size ? [{ libelle: `Sélection seule (${selectionnees.size})`, separateur: true, actif: !!opts?.selectionSeule, action: () => void 0, desactive: true }] : []),
     ];
     setFlottant(<MenuContextuel ancre={(e.currentTarget as HTMLElement).getBoundingClientRect()} entrees={entrees} onFermer={() => setFlottant(null)} />);
@@ -632,7 +682,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
           )}
           {etat.groupes.length > 0 && (
             <>
-              <button onClick={actions.toutDeplier} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Tout déplier">⊞</button>
+              {!distant.actif && <button onClick={actions.toutDeplier} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Tout déplier">⊞</button>}
               <button onClick={actions.toutReplier} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Tout replier">⊟</button>
             </>
           )}
@@ -654,7 +704,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
                                  onFermer={() => setFlottant(null)} />,
             )} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Colonnes">☰ Colonnes</button>
           )}
-          {opts && <button onClick={menuExport} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Exporter">⬇ Exporter</button>}
+          {opts && <button onClick={menuExport} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Exporter" disabled={exportEnCours}>{exportEnCours ? 'Export…' : '⬇ Exporter'}</button>}
         </div>
       </div>
 
@@ -820,6 +870,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
             {defilementVirtuel && debutVirtuel > 0 && <tr style={{ height: debutVirtuel * hauteurLigne }} />}
             {elementsRendus.map((el, i) => (el.type === 'groupe'
               ? rendreGroupe(el.noeud, el.replie, debutVirtuel + i)
+              : el.type === 'info' ? rendreInfo(el, debutVirtuel + i)
               : rendreLigne(el.ligne, debutVirtuel + i)))}
             {defilementVirtuel && finVirtuel < elementsPage.length && <tr style={{ height: (elementsPage.length - finVirtuel) * hauteurLigne }} />}
             {ligneEditee?.nouvelle && edition?.positionNouvelle === 'fin' && rendreNouvelle()}
@@ -833,14 +884,14 @@ export default function Grille<T>(props: GrilleProps<T>) {
                   return (
                     <td key={c.champ} className="px-2.5 py-2 bg-surface border-t border-line whitespace-nowrap money text-[11.5px]"
                         style={{ textAlign: alignement(c), ...styleFige(c, 'var(--surface)') }}>
-                      {rs.map((r, i) => <div key={i}>{valeurResume(r, triees)}</div>)}
+                      {rs.map((r, i) => <div key={i}>{valeurResume(r, triees, distant.actif ? distant.resumes : undefined)}</div>)}
                     </td>
                   );
                 })}
                 {aCommandes && <td className="bg-surface border-t border-line" style={{ position: 'sticky', right: 0 }} />}
               </tr>
             </tfoot>
-          ) : props.pied && triees.length > 0 ? (
+          ) : props.pied && nbResultat > 0 ? (
             <tfoot className="sticky bottom-0 z-[3]">
               <tr className="font-bold">
                 {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-surface border-t border-line" />}
@@ -855,10 +906,13 @@ export default function Grille<T>(props: GrilleProps<T>) {
             </tfoot>
           ) : null}
         </table>
-        {!chargement && elementsPage.length === 0 && !ligneEditee?.nouvelle && (
-          <div className="py-10 text-center text-[12px] text-ink-muted">{erreur ?? messageVide}</div>
+        {!chargement && !distant.chargement && elementsPage.length === 0 && !ligneEditee?.nouvelle && (
+          <div className="py-10 text-center text-[12px] text-ink-muted">{erreur ?? distant.erreur ?? messageVide}</div>
         )}
-        {chargement && (
+        {distant.erreur && elementsPage.length > 0 && (
+          <div className="px-3 py-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>{distant.erreur}</div>
+        )}
+        {(chargement || distant.chargement) && (
           <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--surface) 60%, transparent)' }}>
             <span className="text-[12px] font-bold text-ink-label bg-surface border border-line-soft rounded-md px-3 py-2 shadow-soft">Chargement…</span>
           </div>
@@ -883,7 +937,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
             {taillesPage.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
           <span className="ms-auto">
-            Page {page + 1} sur {pages} ({triees.length} ligne{triees.length > 1 ? 's' : ''}{triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''})
+            Page {page + 1} sur {pages} ({nbResultat} ligne{nbResultat > 1 ? 's' : ''}{!distant.actif && triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''})
           </span>
           <div className="flex gap-0.5">
             {[['«', 0], ['‹', page - 1]].map(([s, p]) => (
@@ -901,7 +955,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
       )}
       {!pagine && (
         <div className="px-3 py-1.5 border-t border-line-soft text-[11.5px] text-ink-muted">
-          {triees.length} ligne{triees.length > 1 ? 's' : ''}{triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''}{selectionnees.size ? ` · ${selectionnees.size} sélectionnée(s)` : ''}
+          {nbResultat} ligne{nbResultat > 1 ? 's' : ''}{!distant.actif && triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''}{selectionnees.size ? ` · ${selectionnees.size} sélectionnée(s)` : ''}
         </div>
       )}
 

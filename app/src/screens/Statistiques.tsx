@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react';
-import { useQuery } from '@apollo/client';
+import { ReactNode, useMemo, useState } from 'react';
+import { useApolloClient, useQuery } from '@apollo/client';
 import {
   STAT_VENTES, STAT_VENTES_PAR_FAMILLE, STAT_VENTES_PAR_ARTICLE, STAT_VENTES_PAR_CLIENT,
   BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
@@ -8,13 +8,14 @@ import {
   Client,
   StatVentesResult, StatVenteLigne, StatParFamille, StatArticleVente, StatClient,
   BeneficesResult, BeneficeLigne, StatAchatsResult, StatAchatLigne, StatFournisseur,
-  StatArticleAchat, StatStockResult, StatStockLigne,
+  StatArticleAchat, StatStockLigne,
 } from '../api/types';
 import { fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import { useDebouncedValue } from '../lib/useDebounce';
-import DataGrid, { Column } from '../components/ui/DataGrid';
-import { Money, Tabs, PeriodPicker, PageHeader, SearchInput, Pagination } from '../components/ui/atoms';
+import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
+import { ReponseDistante } from '../components/grille/types';
+import { Money, Tabs, PeriodPicker, PageHeader, SearchInput } from '../components/ui/atoms';
 import LineChart from '../components/charts/LineChart';
 import BarChart from '../components/charts/BarChart';
 import DonutChart from '../components/charts/DonutChart';
@@ -49,8 +50,6 @@ const GROUPEMENTS = [
   { code: 'mois', label: 'Par mois' },
 ] as const;
 type Groupement = (typeof GROUPEMENTS)[number]['code'];
-
-const LIMIT_STOCK = 50;
 
 export default function Statistiques() {
   const { peut } = useDroits();
@@ -397,54 +396,65 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
 
 function SectionStock() {
   const [search, setSearch] = useState('');
-  const [offset, setOffset] = useState(0);
   // La frappe met à jour `search` (affichage immédiat) mais la requête n'utilise
   // que la valeur différée : sinon chaque caractère déclenche un scan agrégé
   // cloud→agent→SQL.
   const recherche = useDebouncedValue(search, 250);
-  const { data, loading, error } = useQuery(STAT_STOCK, {
-    variables: { search: recherche || undefined, limit: LIMIT_STOCK, offset },
-  });
-  const res: StatStockResult | undefined = data?.statStock;
-  const rows = res?.articles ?? [];
+  const client = useApolloClient();
+  // Dernière réponse de premier niveau : totaux affichés dans les indicateurs
+  const [res, setRes] = useState<ReponseDistante<StatStockLigne> | null>(null);
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur
+  const distant = useMemo<DataGridDistant<StatStockLigne>>(() => ({
+    cle: JSON.stringify([recherche]),
+    totaux: [
+      { field: 'stock_value', type: 'sum' }, { field: 'sales_value', type: 'sum' },
+      { field: 'initial_value', type: 'sum' }, { field: 'marge_potentielle', type: 'sum' },
+    ],
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: STAT_STOCK, fetchPolicy: 'network-only',
+        variables: { search: recherche || undefined, grille },
+      });
+      const r = data.statStock as ReponseDistante<StatStockLigne>;
+      if (!grille.groupe || grille.groupe.chemin.length === 0) setRes(r);
+      return r;
+    },
+  }), [client, recherche]);
 
   const columns: Column<StatStockLigne>[] = [
-    { key: 'code', header: 'Code', width: '90px', render: (a) => <span className="money">{a.code_article}</span> },
-    { key: 'des', header: 'Désignation', render: (a) => <b>{(a.designation ?? '').replace(/\s+/g, ' ').trim() || '—'}</b> },
-    { key: 'fam', header: 'Famille', width: '120px', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
-    { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (a) => (
+    { key: 'code', header: 'Code', width: '90px', field: 'code_article', render: (a) => <span className="money">{a.code_article}</span> },
+    { key: 'des', header: 'Désignation', field: 'designation', render: (a) => <b>{(a.designation ?? '').replace(/\s+/g, ' ').trim() || '—'}</b> },
+    { key: 'fam', header: 'Famille', width: '120px', field: 'famille', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '70px', field: 'qte_reale', type: 'number', render: (a) => (
       <span className="money font-medium" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.qte_reale, 2)}</span>
     ) },
-    { key: 'pmp', header: 'PMP', align: 'right', width: '110px', render: (a) => <Money value={a.pmp} /> },
-    { key: 'val', header: 'Valeur stock', align: 'right', width: '130px', render: (a) => <Money value={a.stock_value} /> },
-    { key: 'vente', header: 'Valeur vente', align: 'right', width: '130px', render: (a) => <Money value={a.sales_value} /> },
-    { key: 'marge', header: 'Marge pot.', align: 'right', width: '120px', render: (a) => <MargeCell value={a.marge_potentielle} /> },
+    { key: 'pmp', header: 'PMP', align: 'right', width: '110px', field: 'pmp', render: (a) => <Money value={a.pmp} /> },
+    { key: 'val', header: 'Valeur stock', align: 'right', width: '130px', field: 'stock_value', render: (a) => <Money value={a.stock_value} /> },
+    { key: 'vente', header: 'Valeur vente', align: 'right', width: '130px', field: 'sales_value', render: (a) => <Money value={a.sales_value} /> },
+    { key: 'marge', header: 'Marge pot.', align: 'right', width: '120px', field: 'marge_potentielle', render: (a) => <MargeCell value={a.marge_potentielle} /> },
   ];
 
   return (
     <>
       {res && (
         <div className="grid grid-cols-4 gap-3">
-          <Kpi label="Articles en catalogue" value={String(res.nb_articles ?? 0)} />
-          <Kpi label="Valeur du stock (PMP)" value={`${fmtMoney(res.total_stock_value)} DA`} />
-          <Kpi label="Valeur de vente TTC" value={`${fmtMoney(res.total_sales_value)} DA`} />
-          <Kpi label="Marge potentielle" value={`${fmtMoney(res.marge_potentielle_totale)} DA`}
-               sub={`stock initial : ${fmtMoney(res.total_initial_value)} DA`} />
+          <Kpi label="Articles en catalogue" value={String(res.total ?? 0)} />
+          <Kpi label="Valeur du stock (PMP)" value={`${fmtMoney(totalDistant(res, 'stock_value'))} DA`} />
+          <Kpi label="Valeur de vente TTC" value={`${fmtMoney(totalDistant(res, 'sales_value'))} DA`} />
+          <Kpi label="Marge potentielle" value={`${fmtMoney(totalDistant(res, 'marge_potentielle'))} DA`}
+               sub={`stock initial : ${fmtMoney(totalDistant(res, 'initial_value'))} DA`} />
         </div>
       )}
       <DataGrid titre="Valorisation article par article"
                   actions={<div className="w-64"><SearchInput value={search} placeholder="Code, désignation…"
-                                onChange={(v) => { setSearch(v); setOffset(0); }} /></div>}
+                                onChange={setSearch} /></div>}
                   exportCsv={{ nom: 'valorisation-stock', columns: csvStock }}
-                  columns={columns} rows={rows} rowKey={(a) => a.id} loading={loading} error={error?.message}
-                  footer={{ _label: `${res?.nb_articles ?? 0} article(s)`,
-                            val: <Money value={res?.total_stock_value} />,
-                            vente: <Money value={res?.total_sales_value} />,
-                            marge: <Money value={res?.marge_potentielle_totale} /> }} />
-      
-      {res && res.nb_articles > LIMIT_STOCK && (
-        <Pagination offset={offset} limit={LIMIT_STOCK} total={res.nb_articles} onOffset={setOffset} />
-      )}
+                  columns={columns} rowKey={(a) => a.id}
+                  distant={distant} cleEtat="stat-valorisation-stock"
+                  footer={(r) => ({ _label: `${r?.total ?? 0} article(s)`,
+                            val: <Money value={totalDistant(r, 'stock_value')} />,
+                            vente: <Money value={totalDistant(r, 'sales_value')} />,
+                            marge: <Money value={totalDistant(r, 'marge_potentielle')} /> })} />
     </>
   );
 }

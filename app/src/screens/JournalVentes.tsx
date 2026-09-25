@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { useQuery, useLazyQuery } from '@apollo/client';
+import { useMemo, useState } from 'react';
+import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { JOURNAL_VENTES, JOURNAL_ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte, isoFirstOfMonth, isoToday } from '../lib/format';
-import DataGrid, { Column } from '../components/ui/DataGrid';
+import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildJournalPrint } from '../print/templates';
-import { PeriodPicker, Pagination, SearchInput } from '../components/ui/atoms';
+import { PeriodPicker, SearchInput } from '../components/ui/atoms';
 
 type LigneJournal = Record<string, any> & { id: string };
 
@@ -19,16 +19,26 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
   const [article, setArticle] = useState('');
-  const [offset, setOffset] = useState(0);
-  const LIMIT = 100;
 
   const vente = sens === 'vente';
-  const { data, loading, error } = useQuery(vente ? JOURNAL_VENTES : JOURNAL_ACHATS, {
-    variables: { date_debut: debut, date_fin: fin, code_article: article || undefined, limit: LIMIT, offset },
-  });
-  const res = (vente ? data?.journalVentes : data?.journalAchats) as
-    { lignes: LigneJournal[]; total: number; total_ttc: number; total_marge?: number } | undefined;
-  const lignes = res?.lignes ?? [];
+  const client = useApolloClient();
+  const codeArticle = article || undefined;
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur
+  const distant = useMemo<DataGridDistant<LigneJournal>>(() => ({
+    cle: JSON.stringify([sens, debut, fin, codeArticle]),
+    totaux: vente
+      ? [{ field: 'total_ttc', type: 'sum' }, { field: 'total_marge', type: 'sum' }]
+      : [{ field: 'total_ttc', type: 'sum' }],
+    taillePage: 100,
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: vente ? JOURNAL_VENTES : JOURNAL_ACHATS, fetchPolicy: 'network-only',
+        variables: { date_debut: debut, date_fin: fin, code_article: codeArticle, grille },
+      });
+      return (vente ? data.journalVentes : data.journalAchats) as
+        { data: LigneJournal[]; total: number; resumes?: Record<string, number | null> };
+    },
+  }), [client, sens, vente, debut, fin, codeArticle]);
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
@@ -44,19 +54,19 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   }
 
   const colonnes: Column<LigneJournal>[] = [
-    { key: 'date', header: 'Date', width: '90px', render: (l) => fmtDate(l.date) },
-    { key: 'numero', header: 'Pièce', width: '120px', render: (l) => <span className="money">{l.numero}</span> },
-    { key: 'tiers', header: vente ? 'Client' : 'Fournisseur',
+    { key: 'date', header: 'Date', width: '90px', field: 'date', type: 'date', render: (l) => fmtDate(l.date) },
+    { key: 'numero', header: 'Pièce', width: '120px', field: 'numero', render: (l) => <span className="money">{l.numero}</span> },
+    { key: 'tiers', header: vente ? 'Client' : 'Fournisseur', field: vente ? 'raison' : 'fournisseur',
       render: (l) => <span>{l.raison ?? l.fournisseur ?? l.code_cli ?? l.code_four ?? '—'}</span> },
-    { key: 'code_article', header: 'Code', width: '100px', render: (l) => <span className="money">{l.code_article}</span> },
-    { key: 'designation', header: 'Désignation', render: (l) => <b>{l.designation}</b> },
-    { key: 'n_lot', header: 'Lot', width: '90px', render: (l) => <span className="text-ink-muted money text-[11px]">{l.n_lot ?? '—'}</span> },
-    { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
-    { key: 'prix_ht', header: 'P.U. HT', align: 'right', width: '100px', render: (l) => <span className="money">{fmtMoney(l.prix_ht)}</span> },
-    { key: 'total_ttc', header: 'Total TTC', align: 'right', width: '115px',
+    { key: 'code_article', header: 'Code', width: '100px', field: 'code_article', render: (l) => <span className="money">{l.code_article}</span> },
+    { key: 'designation', header: 'Désignation', field: 'designation', render: (l) => <b>{l.designation}</b> },
+    { key: 'n_lot', header: 'Lot', width: '90px', field: 'n_lot', render: (l) => <span className="text-ink-muted money text-[11px]">{l.n_lot ?? '—'}</span> },
+    { key: 'qte', header: 'Qté', align: 'right', width: '70px', field: 'qte', type: 'number', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
+    { key: 'prix_ht', header: 'P.U. HT', align: 'right', width: '100px', field: 'prix_ht', render: (l) => <span className="money">{fmtMoney(l.prix_ht)}</span> },
+    { key: 'total_ttc', header: 'Total TTC', align: 'right', width: '115px', field: 'total_ttc',
       render: (l) => <span className="money font-semibold">{fmtMoney(l.total_ttc)}</span> },
     ...(vente ? [{
-      key: 'total_marge', header: 'Marge', align: 'right' as const, width: '110px',
+      key: 'total_marge', header: 'Marge', align: 'right' as const, width: '110px', field: 'total_marge',
       render: (l: LigneJournal) => (
         <span className="money" style={{ color: Number(l.total_marge) < 0 ? 'var(--danger)' : 'var(--success)' }}>
           {fmtMoney(l.total_marge)}
@@ -68,23 +78,22 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3 flex-wrap">
-        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); setOffset(0); }} />
-        <SearchInput value={article} onChange={(v) => { setArticle(v); setOffset(0); }} placeholder="Filtrer par code article…" />
+        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        <SearchInput value={article} onChange={setArticle} placeholder="Filtrer par code article…" />
         <button onClick={() => void imprimerJournal()} disabled={printing}
                 className="ml-auto rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {printing ? 'Préparation…' : 'Imprimer le journal'}
         </button>
       </div>
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
-      <DataGrid columns={colonnes} rows={lignes} rowKey={(l, i) => l.id ?? i}
-                loading={loading} error={error?.message}
+      <DataGrid columns={colonnes} rowKey={(l, i) => l.id ?? i}
+                distant={distant} cleEtat={vente ? 'journal-ventes' : 'journal-achats'}
                 emptyMessage="Aucune ligne sur la période."
-                footer={{
-                  _label: `${res?.total ?? 0} ligne(s)`,
-                  total_ttc: <span className="money">{fmtMoney(res?.total_ttc)}</span>,
-                  ...(vente ? { total_marge: <span className="money">{fmtMoney(res?.total_marge)}</span> } : {}),
-                }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
+                footer={(r) => ({
+                  _label: `${r?.total ?? 0} ligne(s)`,
+                  total_ttc: <span className="money">{fmtMoney(totalDistant(r, 'total_ttc'))}</span>,
+                  ...(vente ? { total_marge: <span className="money">{fmtMoney(totalDistant(r, 'total_marge'))}</span> } : {}),
+                })} />
     </div>
   );
 }

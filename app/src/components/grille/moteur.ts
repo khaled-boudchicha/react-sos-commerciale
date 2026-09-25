@@ -210,6 +210,9 @@ export type NoeudGroupe<T> = {
   texte: string;
   lignes: T[];
   enfants: NoeudGroupe<T>[] | null;
+  /** Mode distant : effectif et totaux calculés par le serveur */
+  nombre?: number;
+  resumesDistants?: Record<string, number | null>;
 };
 
 /** Arbre de groupes (multi-niveaux) ; les lignes de chaque groupe gardent l'ordre trié. */
@@ -241,7 +244,9 @@ export function grouper<T>(lignes: T[], colonnes: ColonneGrille<T>[], groupes: s
 
 export type ElementAffiche<T> =
   | { type: 'groupe'; noeud: NoeudGroupe<T>; replie: boolean }
-  | { type: 'ligne'; ligne: T };
+  | { type: 'ligne'; ligne: T }
+  /** Mode distant : « Chargement… » ou « Afficher plus » sous un groupe */
+  | { type: 'info'; cle: string; niveau: number; texte: string; action?: () => void };
 
 export function estReplie(etat: Pick<EtatGrille, 'groupesBascules' | 'tousReplies'>, cle: string): boolean {
   const bascule = etat.groupesBascules.includes(cle);

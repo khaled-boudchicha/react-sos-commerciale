@@ -1,7 +1,7 @@
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useMemo, useRef, useState } from 'react';
 import { ExportColumn } from '../../lib/export';
 import Grille from '../grille/Grille';
-import { ColonneGrille, GrilleProps } from '../grille/types';
+import { ColonneGrille, GrilleProps, ReponseDistante, RequeteDistante, Resume, TypeResume } from '../grille/types';
 
 export type Column<T> = {
   key: string;
@@ -17,16 +17,40 @@ export type Column<T> = {
    * grille paginée côté serveur, on ne trierait que la page affichée.
    */
   sortAccessor?: (row: T) => number | string | null | undefined;
+  /**
+   * Mode distant : nom du champ côté serveur (colonne de sortie de la requête).
+   * Active tri, filtres, recherche et regroupement faits par le serveur.
+   */
+  field?: string;
+  /** Mode distant : type du champ (défaut : montant si aligné à droite, sinon texte) */
+  type?: 'string' | 'number' | 'money' | 'date';
 };
+
+/** Mode distant : la liste est triée, filtrée, paginée et regroupée par le serveur. */
+export type DataGridDistant<T> = {
+  charger: (requete: RequeteDistante) => Promise<ReponseDistante<T>>;
+  /** Changer cette clé recharge la liste (critères de l'écran : période, onglet…) */
+  cle?: string;
+  /** Totaux calculés par le serveur sur tout le résultat filtré (et par groupe), lus dans `footer` */
+  totaux?: { field: string; type: TypeResume }[];
+  taillePage?: number;
+};
+
+type Pied = Partial<Record<string, ReactNode>> & { _label?: ReactNode };
+
+/** Total lu dans une réponse distante (`totaux`) */
+export const totalDistant = (r: ReponseDistante<unknown> | null | undefined, field: string, type: TypeResume = 'sum') =>
+  r?.resumes?.[`${field}:${type}`] ?? null;
 
 type Props<T> = {
   columns: Column<T>[];
-  rows: T[];
+  /** Lignes (mode local) ; ignorées en mode `distant` */
+  rows?: T[];
   rowKey: (row: T, index: number) => string | number;
   loading?: boolean;
   error?: string;
   /** Ligne de totaux (mêmes colonnes, cellules libres) */
-  footer?: Partial<Record<string, ReactNode>> & { _label?: ReactNode };
+  footer?: Pied | ((reponse: ReponseDistante<T> | null) => Pied | undefined);
   onRowClick?: (row: T) => void;
   emptyMessage?: string;
   /** Titre affiché dans la barre au-dessus du tableau. */
@@ -47,23 +71,31 @@ type Props<T> = {
   complet?: boolean;
   /** Mémorise la disposition (colonnes, tri, filtres, groupes) sur ce poste. */
   cleEtat?: string;
+  /** Tri, filtres, recherche, pagination et groupes faits par le serveur (listes paginées). */
+  distant?: DataGridDistant<T>;
   /** Options avancées de la grille (sélection, détail, pagination…). */
   grille?: Partial<GrilleProps<T>>;
 };
 
 /**
  * Tableau standard de l'application, rendu par la grille complète (components/grille) :
- * tri, filtres, recherche, regroupement, colonnes réorganisables / redimensionnables /
- * masquables, export et navigation clavier — sur les colonnes qui ont un `sortAccessor`.
+ * colonnes réorganisables / redimensionnables / masquables, export et navigation clavier.
+ * Tri, filtres, recherche et regroupement :
+ * - mode `distant` (listes paginées) : faits par le serveur, sur les colonnes qui ont un `field` ;
+ * - sinon, en local, sur les colonnes qui ont un `sortAccessor` (ou toutes avec `complet`).
  */
 export default function DataGrid<T>({
-  columns, rows, rowKey, loading, error, footer, onRowClick, emptyMessage, titre, actions, exportCsv, complet, cleEtat, grille,
+  columns, rows: rowsProp, rowKey, loading, error, footer, onRowClick, emptyMessage, titre, actions, exportCsv,
+  complet, cleEtat, distant, grille,
 }: Props<T>) {
+  const rows = useMemo(() => rowsProp ?? [], [rowsProp]);
   const cles = useMemo(() => new Map(rows.map((r, i) => [r, rowKey(r, i)])), [rows, rowKey]);
   const premiere = rows[0];
+  const [reponse, setReponse] = useState<ReponseDistante<T> | null>(null);
 
-  // Accesseur de tri : explicite, sinon (données complètes) le champ homonyme de la ligne
+  // Accesseur de tri local : explicite, sinon (données complètes) le champ homonyme de la ligne
   const accesseurs = useMemo(() => columns.map((c) => {
+    if (distant) return c.field ? (l: T) => (l as Record<string, unknown>)[c.field!] as string | number | null : undefined;
     if (c.sortAccessor) return c.sortAccessor;
     if (!complet || !c.header || premiere === undefined || !(c.key in (premiere as object))) return undefined;
     return (l: T) => {
@@ -72,19 +104,24 @@ export default function DataGrid<T>({
       if (c.align === 'right' && typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v);
       return typeof v === 'number' || typeof v === 'string' ? v : null;
     };
-  }), [columns, complet, premiere]);
+  }), [columns, complet, premiere, distant]);
   const interactive = accesseurs.some(Boolean);
 
   const colonnes = useMemo<ColonneGrille<T>[]>(() => columns.map((c, i) => {
     const tri = accesseurs[i];
     const exportee = exportCsv?.columns.find((e) => e.header === c.header);
     const accesseur = tri ?? exportee?.value;
-    const exemple = premiere !== undefined && tri ? tri(premiere) : undefined;
-    const type = typeof exemple === 'number' ? 'number' as const
-      : typeof exemple === 'string' && /^\d{4}-\d{2}-\d{2}/.test(exemple) ? 'date' as const : 'string' as const;
+    let type: ColonneGrille<T>['type'];
+    if (distant) type = c.type ?? (c.align === 'right' ? 'money' : 'string');
+    else {
+      const exemple = premiere !== undefined && tri ? tri(premiere) : undefined;
+      type = typeof exemple === 'number' ? 'number'
+        : typeof exemple === 'string' && /^\d{4}-\d{2}-\d{2}/.test(exemple) ? 'date' : 'string';
+    }
     const largeur = c.width ? parseInt(c.width, 10) || undefined : undefined;
     return {
-      champ: c.key,
+      // Mode distant : le champ serveur sert de clé (c'est lui qu'on trie / filtre / groupe)
+      champ: distant && c.field ? c.field : c.key,
       titre: c.header,
       largeur,
       flexible: !largeur,
@@ -99,7 +136,7 @@ export default function DataGrid<T>({
       filtreEntete: !!tri,
       masquable: !!c.header,
     };
-  }), [columns, accesseurs, exportCsv, premiere]);
+  }), [columns, accesseurs, exportCsv, premiere, distant]);
 
   const colonnesExport = useMemo<ColonneGrille<T>[] | undefined>(() => exportCsv?.columns.map((e, i) => ({
     champ: `__export${i}`,
@@ -110,9 +147,39 @@ export default function DataGrid<T>({
 
   const exportable = !!exportCsv || (interactive && accesseurs.every((a, i) => a || !columns[i].header));
 
+  // Pied : clés de colonne → clés de la grille (champ serveur en mode distant)
+  const piedBrut = typeof footer === 'function' ? footer(reponse) : footer;
+  const pied = useMemo(() => {
+    if (!piedBrut) return undefined;
+    const sortie: Record<string, ReactNode> = { _label: piedBrut._label };
+    columns.forEach((c, i) => { if (piedBrut[c.key] !== undefined) sortie[colonnes[i].champ] = piedBrut[c.key]; });
+    return sortie;
+  }, [piedBrut, columns, colonnes]);
+
+  // Source distante : les totaux demandés s'ajoutent à chaque requête de liste
+  const distantRef = useRef(distant);
+  distantRef.current = distant;
+  const source = useMemo(() => (distant ? {
+    cle: distant.cle,
+    surReponse: (r: ReponseDistante<T>) => setReponse(r),
+    charger: (req: RequeteDistante) => {
+      const d = distantRef.current!;
+      const feuille = req.groupe && req.groupe.chemin.length >= req.groupe.champs.length;
+      const totaux = feuille ? [] : (d.totaux ?? []).map((t) => ({ champ: t.field, type: t.type }))
+        .filter((t) => !req.resumes.some((r) => r.champ === t.champ && r.type === t.type));
+      return d.charger({ ...req, resumes: [...req.resumes, ...totaux] });
+    },
+  } : undefined), [distant?.cle, !!distant]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mode distant : totaux affichés sur les en-têtes de groupe
+  const resumesGroupe = useMemo<Resume<T>[] | undefined>(() => distant?.totaux?.filter((t) => t.type === 'sum').map((t) => ({
+    colonne: t.field, type: t.type, libelle: columns.find((c) => c.field === t.field)?.header ?? t.field,
+  })), [distant?.totaux, columns]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <Grille<T>
       donnees={rows}
+      source={source}
       cle={(l) => cles.get(l) ?? rowKey(l, rows.indexOf(l))}
       colonnes={colonnes}
       chargement={loading}
@@ -120,12 +187,13 @@ export default function DataGrid<T>({
       titre={titre}
       messageVide={emptyMessage ?? 'Aucun résultat.'}
       barreOutils={actions}
-      pied={footer}
+      pied={pied}
       surClicLigne={onRowClick}
       rechercheGlobale={interactive}
       ligneFiltre={interactive ? 'bascule' : false}
       panneauGroupes={interactive ? 'auto' : false}
-      pagination={false}
+      pagination={distant ? { tailles: [25, 50, 100, 200], taille: distant.taillePage ?? 50 } : false}
+      resumesGroupe={resumesGroupe}
       export={exportable ? { nom: exportCsv?.nom ?? (typeof titre === 'string' ? titre : 'export'), colonnes: colonnesExport } : undefined}
       cleEtat={cleEtat}
       {...grille}

@@ -34,15 +34,16 @@ export function Flottant({ ancre, onFermer, largeur = 240, children }: {
 /** Filtre d'en-tête : cases à cocher sur les valeurs distinctes (avec effectifs), recherche. */
 export function FiltreEntete({ ancre, valeurs, retenues, onAppliquer, onFermer }: {
   ancre: DOMRect;
-  valeurs: { texte: string; nombre: number }[];
+  /** `cle` : valeur transmise au filtre (mode distant) ; défaut : le texte affiché */
+  valeurs: { cle?: string; texte: string; nombre: number }[];
   retenues: string[] | undefined;
   onAppliquer: (valeurs: string[] | null) => void;
   onFermer: () => void;
 }) {
-  const [coches, setCoches] = useState<Set<string>>(() => new Set(retenues ?? valeurs.map((v) => v.texte)));
+  const [coches, setCoches] = useState<Set<string>>(() => new Set(retenues ?? valeurs.map((v) => v.cle ?? v.texte)));
   const [q, setQ] = useState('');
   const visibles = useMemo(() => valeurs.filter((v) => v.texte.toLowerCase().includes(q.toLowerCase())), [valeurs, q]);
-  const tout = visibles.every((v) => coches.has(v.texte));
+  const tout = visibles.every((v) => coches.has(v.cle ?? v.texte));
   return (
     <Flottant ancre={ancre} onFermer={onFermer} largeur={260}>
       <div className="p-2 border-b border-line-soft">
@@ -53,15 +54,16 @@ export function FiltreEntete({ ancre, valeurs, retenues, onAppliquer, onFermer }
         <label className="flex items-center gap-2 px-3 py-1 font-bold text-ink-label hover:bg-line-soft">
           <input type="checkbox" checked={tout} onChange={() => setCoches((s) => {
             const n = new Set(s);
-            visibles.forEach((v) => (tout ? n.delete(v.texte) : n.add(v.texte)));
+            visibles.forEach((v) => (tout ? n.delete(v.cle ?? v.texte) : n.add(v.cle ?? v.texte)));
             return n;
           })} />
           (Tout sélectionner)
         </label>
         {visibles.map((v) => (
-          <label key={v.texte} className="flex items-center gap-2 px-3 py-1 hover:bg-line-soft">
-            <input type="checkbox" checked={coches.has(v.texte)} onChange={() => setCoches((s) => {
-              const n = new Set(s); if (n.has(v.texte)) n.delete(v.texte); else n.add(v.texte); return n;
+          <label key={v.cle ?? v.texte} className="flex items-center gap-2 px-3 py-1 hover:bg-line-soft">
+            <input type="checkbox" checked={coches.has(v.cle ?? v.texte)} onChange={() => setCoches((s) => {
+              const k = v.cle ?? v.texte;
+              const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n;
             })} />
             <span className="flex-1 truncate">{v.texte || '(vide)'}</span>
             <span className="text-ink-muted money text-[10.5px]">{v.nombre}</span>

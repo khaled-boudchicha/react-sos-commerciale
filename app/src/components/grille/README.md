@@ -18,10 +18,39 @@ Composant `Grille<T>` inspiré du DataGrid DevExtreme, sans dépendance externe
 Tous les tableaux de consultation passent par `components/ui/DataGrid` (API `columns` / `rows`),
 qui rend cette grille : colonnes réorganisables, redimensionnables, masquables, export,
 clavier. Tri, filtres (bouton « Filtres »), recherche et regroupement (glisser un en-tête :
-la zone apparaît) s'activent sur les colonnes qui ont un `sortAccessor`, ou sur toutes les
-colonnes homonymes d'un champ avec `complet` — à réserver aux listes chargées en entier
-(sur une liste paginée côté serveur, on ne trierait que la page). Les tableaux de saisie
+la zone apparaît) s'activent : sur les listes paginées, côté serveur (`distant`, colonnes avec
+`field`) ; sur les listes chargées en entier, en local (`sortAccessor`, ou `complet`). Les tableaux de saisie
 (lignes de pièce, inventaire, modales) restent des formulaires dédiés.
+
+## Mode distant (opérations côté serveur)
+
+Pour les listes paginées, `source` (ou `distant` sur `DataGrid`) confie au serveur **tri, filtres
+(ligne, en-tête, recherche), pagination, regroupement et totaux** — comme les « remote operations »
+de DevExtreme. `useSourceDistante.ts` traduit l'état de la grille en `RequeteDistante` :
+
+```ts
+{ skip, take, tri, filtres, filtresEntete, recherche, champsRecherche, types,
+  groupe: { champs, chemin } | null, resumes: [{ champ, type }], sauf? }
+```
+
+- sans groupe : une page de lignes `{ data, total, resumes }` ;
+- avec groupes : les en-têtes du niveau (`groupes: [{ cle, nombre, resumes }]`), puis à
+  l'ouverture d'un groupe ses sous-groupes ou ses lignes, par lots de 100 (« Afficher plus ») ;
+- filtre d'en-tête : les valeurs possibles et leurs effectifs sont un regroupement sur la colonne ;
+- export : tout le résultat filtré est redemandé (plafond 10 000 lignes).
+
+Côté agent, `src/common/grille-distante.ts` applique la requête en SQL sur la requête de base de
+la liste enveloppée en table dérivée (`executerGrille`) : noms de champ contrôlés, valeurs liées.
+Chaque service de liste accepte `grille` (cloud : argument `grille: JSON`).
+
+```tsx
+<DataGrid columns={[{ key: 'client', header: 'Client', field: 'raison', render: … }]}
+          rowKey={(v) => v.id} cleEtat="ventes"
+          distant={{ cle: JSON.stringify([type, debut, fin]),
+                     totaux: [{ field: 'net_a_payer', type: 'sum' }],
+                     charger: (grille) => client.query({ query: VENTES, variables: { type, grille } }).then((r) => r.data.ventes) }}
+          footer={(r) => ({ _label: `${r?.total ?? 0} pièce(s)`, client: totalDistant(r, 'net_a_payer') })} />
+```
 
 ## Exemple minimal
 

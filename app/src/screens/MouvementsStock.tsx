@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@apollo/client';
+import { useApolloClient, useMutation, useQuery } from '@apollo/client';
 import {
   BONS_ENTREE, BONS_SORTIE, TRANSFERTS, BON_STOCK, DELETE_BON_ENTREE, DELETE_BON_SORTIE, COORDONNEES_SOCIETE,
 } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte, isoFirstOfMonth, isoToday } from '../lib/format';
 import { useDebouncedValue } from '../lib/useDebounce';
 import { useDroits, D } from '../lib/droits';
-import DataGrid, { Column } from '../components/ui/DataGrid';
+import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import { PageHeader, Pagination, PeriodPicker, SearchInput, Tabs } from '../components/ui/atoms';
+import { PageHeader, PeriodPicker, SearchInput, Tabs } from '../components/ui/atoms';
 import { useToast } from '../components/ui/Toast';
 import BonStockModal, { SensBon } from '../components/BonStockModal';
 import TransfertStockModal from '../components/TransfertStockModal';
@@ -17,8 +17,6 @@ import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildBonStockPrint } from '../print/templates';
 import type { BonStock, BonStockLigne } from '../print/templates';
-
-const LIMIT = 50;
 
 type Transfert = {
   code: string; date: string; depot_source?: string | null; depot_destination?: string | null;
@@ -47,7 +45,6 @@ export default function MouvementsStock() {
   const [fin, setFin] = useState(isoToday());
   const [search, setSearch] = useState('');
   const recherche = useDebouncedValue(search, 300);
-  const [offset, setOffset] = useState(0);
 
   const [creation, setCreation] = useState<SensBon | 'transfert' | null>(null);
   const [ouvert, setOuvert] = useState<Ouvert | null>(null);
@@ -60,28 +57,47 @@ export default function MouvementsStock() {
   const droitTransfert = droitEntree && droitSortie;
 
   const estBon = onglet !== 'transferts';
-  const varsBons = { date_debut: debut || undefined, date_fin: fin || undefined, search: recherche.trim() || undefined, limit: LIMIT, offset };
-  const qEntree = useQuery(BONS_ENTREE, { variables: varsBons, skip: onglet !== 'entree', fetchPolicy: 'cache-and-network' });
-  const qSortie = useQuery(BONS_SORTIE, { variables: varsBons, skip: onglet !== 'sortie', fetchPolicy: 'cache-and-network' });
-  const qTransferts = useQuery(TRANSFERTS, {
-    variables: { date_debut: debut || undefined, date_fin: fin || undefined },
-    skip: onglet !== 'transferts', fetchPolicy: 'cache-and-network',
-  });
+  const client = useApolloClient();
+  // Incrémenté après création / suppression : recharge la liste affichée
+  const [version, setVersion] = useState(0);
+  const dateDebut = debut || undefined;
+  const dateFin = fin || undefined;
+  const rechercheBons = recherche.trim() || undefined;
 
-  const resBons = (onglet === 'entree' ? qEntree.data?.bonsEntree : qSortie.data?.bonsSortie) as { data: BonStock[]; total: number } | undefined;
-  const bons: BonStock[] = Array.isArray(resBons?.data) ? resBons!.data : [];
-  const transferts: Transfert[] = Array.isArray(qTransferts.data?.transferts) ? qTransferts.data.transferts : [];
-  const qCourante = onglet === 'entree' ? qEntree : onglet === 'sortie' ? qSortie : qTransferts;
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur
+  const distantBons = useMemo<DataGridDistant<BonStock>>(() => ({
+    cle: JSON.stringify([onglet, dateDebut, dateFin, rechercheBons, version]),
+    totaux: [{ field: 'valeur_total', type: 'sum' }],
+    charger: async (grille) => {
+      const entree = onglet === 'entree';
+      const { data } = await client.query({
+        query: entree ? BONS_ENTREE : BONS_SORTIE, fetchPolicy: 'network-only',
+        variables: { date_debut: dateDebut, date_fin: dateFin, search: rechercheBons, grille },
+      });
+      return (entree ? data.bonsEntree : data.bonsSortie) as { data: BonStock[]; total: number; resumes?: Record<string, number | null> };
+    },
+  }), [client, onglet, dateDebut, dateFin, rechercheBons, version]);
+
+  // Avec `grille`, la requête renvoie { data, total, resumes } (et non plus un tableau brut)
+  const distantTransferts = useMemo<DataGridDistant<Transfert>>(() => ({
+    cle: JSON.stringify([dateDebut, dateFin, version]),
+    totaux: [{ field: 'valeur', type: 'sum' }],
+    charger: async (grille) => {
+      const { data } = await client.query({
+        query: TRANSFERTS, fetchPolicy: 'network-only',
+        variables: { date_debut: dateDebut, date_fin: dateFin, grille },
+      });
+      return data.transferts as { data: Transfert[]; total: number; resumes?: Record<string, number | null> };
+    },
+  }), [client, dateDebut, dateFin, version]);
 
   const [delEntree, { loading: l1 }] = useMutation(DELETE_BON_ENTREE);
   const [delSortie, { loading: l2 }] = useMutation(DELETE_BON_SORTIE);
 
   function rafraichir() {
-    // Seule la liste affichée est rechargée ; les autres onglets se rafraîchissent
-    // à leur affichage (cache-and-network) — utile après un transfert qui touche les deux.
-    if (onglet === 'entree') void qEntree.refetch();
-    else if (onglet === 'sortie') void qSortie.refetch();
-    else void qTransferts.refetch();
+    // Recharge la liste affichée ; les autres onglets sont relus à leur affichage
+    // (network-only) — utile après un transfert qui touche les deux.
+    setVersion((v) => v + 1);
   }
 
   async function confirmerSuppression() {
@@ -103,12 +119,12 @@ export default function MouvementsStock() {
   const sensCourant: SensBon = onglet === 'sortie' ? 'sortie' : 'entree';
 
   const colsBons: Column<BonStock>[] = [
-    { key: 'numero', header: 'Numéro', width: '130px', render: (b) => <span className="money font-semibold">{b.numero || `#${b.id}`}</span> },
-    { key: 'date', header: 'Date', width: '95px', render: (b) => fmtDate(b.date) },
-    { key: 'motif', header: 'Motif', render: (b) => <span>{b.motif || <span className="text-ink-muted">—</span>}</span> },
-    { key: 'depot', header: 'Dépôt', width: '140px', render: (b) => <span className="text-ink-muted">{b.depot || '—'}</span> },
+    { key: 'numero', header: 'Numéro', width: '130px', field: 'numero', render: (b) => <span className="money font-semibold">{b.numero || `#${b.id}`}</span> },
+    { key: 'date', header: 'Date', width: '95px', field: 'date', type: 'date', render: (b) => fmtDate(b.date) },
+    { key: 'motif', header: 'Motif', field: 'motif', render: (b) => <span>{b.motif || <span className="text-ink-muted">—</span>}</span> },
+    { key: 'depot', header: 'Dépôt', width: '140px', field: 'depot', render: (b) => <span className="text-ink-muted">{b.depot || '—'}</span> },
     { key: 'nb', header: 'Lignes', align: 'right', width: '70px', render: (b) => <span className="money">{b.lignes?.length ?? '—'}</span> },
-    { key: 'valeur', header: 'Valeur', align: 'right', width: '130px', render: (b) => <span className="money font-semibold">{fmtMoney(b.valeur_total ?? b.total_ht)}</span> },
+    { key: 'valeur', header: 'Valeur', align: 'right', width: '130px', field: 'valeur_total', render: (b) => <span className="money font-semibold">{fmtMoney(b.valeur_total ?? b.total_ht)}</span> },
     ...(peutSupprimer(sensCourant) ? [{ key: 'actions', header: '', align: 'right' as const, width: '50px', render: (b: BonStock) => (
       <button onClick={(e) => { e.stopPropagation(); setSuppression({ sens: sensCourant, id: b.id, libelle: `${sensCourant === 'entree' ? "Bon d'entrée" : 'Bon de sortie'} ${b.numero || b.id}` }); }}
               title="Supprimer" className="px-1.5 py-0.5 rounded-sm border border-line text-[11px]" style={{ color: 'var(--danger)' }}>✕</button>
@@ -116,14 +132,14 @@ export default function MouvementsStock() {
   ];
 
   const colsTransferts: Column<Transfert>[] = [
-    { key: 'code', header: 'Code', width: '130px', render: (t) => <span className="money font-semibold">{t.code}</span> },
-    { key: 'date', header: 'Date', width: '95px', render: (t) => fmtDate(t.date) },
+    { key: 'code', header: 'Code', width: '130px', field: 'code', render: (t) => <span className="money font-semibold">{t.code}</span> },
+    { key: 'date', header: 'Date', width: '95px', field: 'date', type: 'date', render: (t) => fmtDate(t.date) },
     { key: 'trajet', header: 'Source → destination', render: (t) => (
       <span><b>{t.depot_source || '—'}</b> <span className="text-ink-muted">→</span> <b>{t.depot_destination || '—'}</b></span>
     ) },
-    { key: 'obs', header: 'Observation', render: (t) => <span className="text-ink-muted">{t.observation || t.motif || '—'}</span> },
-    { key: 'nb', header: 'Lignes', align: 'right', width: '70px', render: (t) => <span className="money">{t.nb_lignes ?? '—'}</span> },
-    { key: 'valeur', header: 'Valeur', align: 'right', width: '130px', render: (t) => <span className="money font-semibold">{fmtMoney(t.valeur)}</span> },
+    { key: 'obs', header: 'Observation', field: 'observation', render: (t) => <span className="text-ink-muted">{t.observation || t.motif || '—'}</span> },
+    { key: 'nb', header: 'Lignes', align: 'right', width: '70px', field: 'nb_lignes', type: 'number', render: (t) => <span className="money">{t.nb_lignes ?? '—'}</span> },
+    { key: 'valeur', header: 'Valeur', align: 'right', width: '130px', field: 'valeur', render: (t) => <span className="money font-semibold">{fmtMoney(t.valeur)}</span> },
     ...(droitTransfert ? [{ key: 'actions', header: '', align: 'right' as const, width: '50px', render: (t: Transfert) => {
       // Supprimer une moitié du transfert supprime les deux bons côté serveur.
       const cible: Ouvert | null = t.sortie_id ? { sens: 'sortie', id: t.sortie_id } : t.entree_id ? { sens: 'entree', id: t.entree_id } : null;
@@ -159,31 +175,29 @@ export default function MouvementsStock() {
       </PageHeader>
 
       <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={onglet} onChange={(v) => { setOnglet(v); setOffset(0); }} options={ONGLETS} />
-        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); setOffset(0); }} />
-        {estBon && <SearchInput value={search} onChange={(v) => { setSearch(v); setOffset(0); }} placeholder="N°, motif, observation…" />}
+        <Tabs value={onglet} onChange={setOnglet} options={ONGLETS} />
+        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        {estBon && <SearchInput value={search} onChange={setSearch} placeholder="N°, motif, observation…" />}
       </div>
 
       {estBon ? (
-        <>
-          <DataGrid columns={colsBons} rows={bons} rowKey={(b) => b.id}
-                    loading={qCourante.loading} error={qCourante.error?.message}
-                    onRowClick={(b) => setOuvert({ sens: sensCourant, id: b.id })}
-                    emptyMessage="Aucun bon sur la période."
-                    footer={{ _label: `${resBons?.total ?? 0} bon(s)`,
-                              valeur: <span className="money">{fmtMoney(bons.reduce((s, b) => s + Number(b.valeur_total ?? b.total_ht ?? 0), 0))}</span> }} />
-          {resBons && resBons.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={resBons.total} onOffset={setOffset} />}
-        </>
+        // Une grille par sens (disposition mémorisée séparément)
+        <DataGrid key={onglet} columns={colsBons} rowKey={(b) => b.id}
+                  distant={distantBons} cleEtat={`mouvements-stock-${onglet}`}
+                  onRowClick={(b) => setOuvert({ sens: sensCourant, id: b.id })}
+                  emptyMessage="Aucun bon sur la période."
+                  footer={(r) => ({ _label: `${r?.total ?? 0} bon(s)`,
+                                    valeur: <span className="money">{fmtMoney(totalDistant(r, 'valeur_total'))}</span> })} />
       ) : (
-        <DataGrid columns={colsTransferts} rows={transferts} rowKey={(t) => t.code}
-                  loading={qCourante.loading} error={qCourante.error?.message}
+        <DataGrid columns={colsTransferts} rowKey={(t) => t.code}
+                  distant={distantTransferts} cleEtat="mouvements-stock-transferts"
                   onRowClick={(t) => {
                     if (t.sortie_id) setOuvert({ sens: 'sortie', id: t.sortie_id, transfert: t });
                     else if (t.entree_id) setOuvert({ sens: 'entree', id: t.entree_id, transfert: t });
                   }}
                   emptyMessage="Aucun transfert sur la période."
-                  footer={{ _label: `${transferts.length} transfert(s)`,
-                            valeur: <span className="money">{fmtMoney(transferts.reduce((s, t) => s + Number(t.valeur ?? 0), 0))}</span> }} />
+                  footer={(r) => ({ _label: `${r?.total ?? 0} transfert(s)`,
+                                    valeur: <span className="money">{fmtMoney(totalDistant(r, 'valeur'))}</span> })} />
       )}
 
       {(creation === 'entree' || creation === 'sortie') && (

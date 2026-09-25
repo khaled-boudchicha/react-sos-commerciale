@@ -118,7 +118,7 @@ export type MouvementTresorie = {
   cle: string; id: number; date: string; montant: number; debit: number; credit: number;
   solde_cumul: number; compte?: string | null; compte_id?: number | null;
   mode_payement?: string | null; banque?: string | null; code_tier?: string | null;
-  tier?: string | null; categorie?: string | null; user?: string | null;
+  tier?: string | null; raison?: string | null; categorie?: string | null; user?: string | null;
   objet?: string | null; observation?: string | null;
 };
 

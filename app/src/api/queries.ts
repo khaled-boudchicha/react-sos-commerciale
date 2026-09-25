@@ -3,44 +3,44 @@ import { gql } from '@apollo/client';
 // Toutes les queries proxy renvoient du JSON flat (formes : src/api/types.ts).
 
 export const VENTES = gql`
-  query Ventes($type_doc: String, $code_cli: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int) {
-    ventes(type_doc: $type_doc, code_cli: $code_cli, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset)
+  query Ventes($type_doc: String, $code_cli: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int, $grille: JSON) {
+    ventes(type_doc: $type_doc, code_cli: $code_cli, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const ACHATS = gql`
-  query Achats($type_doc: String, $code_four: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int) {
-    achats(type_doc: $type_doc, code_four: $code_four, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset)
+  query Achats($type_doc: String, $code_four: String, $date_debut: String, $date_fin: String, $non_reglees: Boolean, $user_id: Int, $limit: Int, $offset: Int, $grille: JSON) {
+    achats(type_doc: $type_doc, code_four: $code_four, date_debut: $date_debut, date_fin: $date_fin, non_reglees: $non_reglees, user_id: $user_id, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const ARTICLES = gql`
-  query Articles($search: String, $famille: String, $stock_alerte: Boolean, $marge_negative: Boolean, $limit: Int, $offset: Int) {
-    articles(search: $search, famille: $famille, stock_alerte: $stock_alerte, marge_negative: $marge_negative, limit: $limit, offset: $offset)
+  query Articles($search: String, $famille: String, $stock_alerte: Boolean, $marge_negative: Boolean, $limit: Int, $offset: Int, $grille: JSON) {
+    articles(search: $search, famille: $famille, stock_alerte: $stock_alerte, marge_negative: $marge_negative, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const CLIENTS = gql`
-  query Clients($search: String, $limit: Int, $offset: Int) {
-    clients(search: $search, limit: $limit, offset: $offset)
+  query Clients($search: String, $limit: Int, $offset: Int, $grille: JSON) {
+    clients(search: $search, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const FOURNISSEURS = gql`
-  query Fournisseurs($search: String, $limit: Int, $offset: Int) {
-    fournisseurs(search: $search, limit: $limit, offset: $offset)
+  query Fournisseurs($search: String, $limit: Int, $offset: Int, $grille: JSON) {
+    fournisseurs(search: $search, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const DEBITEURS = gql`
-  query Debiteurs($search: String, $limit: Int, $offset: Int) {
-    debiteurs(search: $search, limit: $limit, offset: $offset)
+  query Debiteurs($search: String, $limit: Int, $offset: Int, $grille: JSON) {
+    debiteurs(search: $search, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 export const TRESORIE_COMPLETE = gql`
-  query TresorieComplete($compte_id: Int, $date_debut: String, $date_fin: String, $limit: Int, $offset: Int) {
-    tresorieComplete(compte_id: $compte_id, date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset)
+  query TresorieComplete($compte_id: Int, $date_debut: String, $date_fin: String, $limit: Int, $offset: Int, $grille: JSON) {
+    tresorieComplete(compte_id: $compte_id, date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
@@ -144,8 +144,8 @@ export const BARCODES_ARTICLE = gql`
 // ─── Inventaires ────────────────────────────────────────────────────────────
 
 export const INVENTAIRES = gql`
-  query Inventaires($date_debut: String, $date_fin: String, $statut: String, $limit: Int, $offset: Int) {
-    inventaires(date_debut: $date_debut, date_fin: $date_fin, statut: $statut, limit: $limit, offset: $offset)
+  query Inventaires($date_debut: String, $date_fin: String, $statut: String, $limit: Int, $offset: Int, $grille: JSON) {
+    inventaires(date_debut: $date_debut, date_fin: $date_fin, statut: $statut, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const INVENTAIRE = gql`query Inventaire($id: Int!) { inventaire(id: $id) }`;
@@ -212,29 +212,29 @@ export const SET_NUMEROTATION = gql`
 // ─── Journaux & états globaux ───────────────────────────────────────────────
 
 export const JOURNAL_VENTES = gql`
-  query JournalVentes($date_debut: String, $date_fin: String, $code_cli: String, $code_article: String, $limit: Int, $offset: Int) {
-    journalVentes(date_debut: $date_debut, date_fin: $date_fin, code_cli: $code_cli, code_article: $code_article, limit: $limit, offset: $offset)
+  query JournalVentes($date_debut: String, $date_fin: String, $code_cli: String, $code_article: String, $limit: Int, $offset: Int, $grille: JSON) {
+    journalVentes(date_debut: $date_debut, date_fin: $date_fin, code_cli: $code_cli, code_article: $code_article, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const JOURNAL_ACHATS = gql`
-  query JournalAchats($date_debut: String, $date_fin: String, $code_four: String, $code_article: String, $limit: Int, $offset: Int) {
-    journalAchats(date_debut: $date_debut, date_fin: $date_fin, code_four: $code_four, code_article: $code_article, limit: $limit, offset: $offset)
+  query JournalAchats($date_debut: String, $date_fin: String, $code_four: String, $code_article: String, $limit: Int, $offset: Int, $grille: JSON) {
+    journalAchats(date_debut: $date_debut, date_fin: $date_fin, code_four: $code_four, code_article: $code_article, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const ETAT_CLIENTS = gql`
-  query EtatClients($search: String, $famille: String, $sans_zeros: Boolean, $limit: Int, $offset: Int) {
-    etatClients(search: $search, famille: $famille, sans_zeros: $sans_zeros, limit: $limit, offset: $offset)
+  query EtatClients($search: String, $famille: String, $sans_zeros: Boolean, $limit: Int, $offset: Int, $grille: JSON) {
+    etatClients(search: $search, famille: $famille, sans_zeros: $sans_zeros, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const ETAT_FOURNISSEURS = gql`
-  query EtatFournisseurs($search: String, $famille: String, $sans_zeros: Boolean, $limit: Int, $offset: Int) {
-    etatFournisseurs(search: $search, famille: $famille, sans_zeros: $sans_zeros, limit: $limit, offset: $offset)
+  query EtatFournisseurs($search: String, $famille: String, $sans_zeros: Boolean, $limit: Int, $offset: Int, $grille: JSON) {
+    etatFournisseurs(search: $search, famille: $famille, sans_zeros: $sans_zeros, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
 // ─── Charges (catalogue des types de charges) ───────────────────────────────
 
-export const CHARGES = gql`query Charges($limit: Int, $offset: Int) { charges(limit: $limit, offset: $offset) }`;
+export const CHARGES = gql`query Charges($limit: Int, $offset: Int, $grille: JSON) { charges(limit: $limit, offset: $offset, grille: $grille) }`;
 export const CREATE_CHARGE = gql`mutation CreateCharge($input: JSON!) { createCharge(input: $input) }`;
 export const UPDATE_CHARGE = gql`mutation UpdateCharge($id: Int!, $input: JSON!) { updateCharge(id: $id, input: $input) }`;
 export const DELETE_CHARGE = gql`mutation DeleteCharge($id: Int!) { deleteCharge(id: $id) }`;
@@ -277,8 +277,8 @@ export const STAT_ACHATS_PAR_ARTICLE = gql`
 `;
 
 export const STAT_STOCK = gql`
-  query StatStock($search: String, $famille: String, $limit: Int, $offset: Int) {
-    statStock(search: $search, famille: $famille, limit: $limit, offset: $offset)
+  query StatStock($search: String, $famille: String, $limit: Int, $offset: Int, $grille: JSON) {
+    statStock(search: $search, famille: $famille, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 
@@ -321,18 +321,18 @@ export const ANNULER_MOUVEMENT = gql`mutation AnnulerMouvement($cle: String!) { 
 // ─── Stock : bons d'entrée / sortie, transferts ─────────────────────────────
 
 export const BONS_ENTREE = gql`
-  query BonsEntree($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int) {
-    bonsEntree(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset)
+  query BonsEntree($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int, $grille: JSON) {
+    bonsEntree(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const BONS_SORTIE = gql`
-  query BonsSortie($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int) {
-    bonsSortie(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset)
+  query BonsSortie($date_debut: String, $date_fin: String, $depot: String, $search: String, $limit: Int, $offset: Int, $grille: JSON) {
+    bonsSortie(date_debut: $date_debut, date_fin: $date_fin, depot: $depot, search: $search, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const TRANSFERTS = gql`
-  query Transferts($date_debut: String, $date_fin: String, $limit: Int, $offset: Int) {
-    transferts(date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset)
+  query Transferts($date_debut: String, $date_fin: String, $limit: Int, $offset: Int, $grille: JSON) {
+    transferts(date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const BON_STOCK = gql`query BonStock($sens: String!, $id: Int!) { bon(sens: $sens, id: $id) }`;
@@ -353,8 +353,8 @@ export const DELETE_DOSSIER_USER = gql`mutation DeleteDossierUser($id: Int!) { d
 // ─── Recouvrement, État 104, péremption ─────────────────────────────────────
 
 export const RECOUVREMENT = gql`
-  query Recouvrement($nbrjour: Int, $search: String, $inactifs: Boolean, $limit: Int, $offset: Int) {
-    recouvrement(nbrjour: $nbrjour, search: $search, inactifs: $inactifs, limit: $limit, offset: $offset)
+  query Recouvrement($nbrjour: Int, $search: String, $inactifs: Boolean, $limit: Int, $offset: Int, $grille: JSON) {
+    recouvrement(nbrjour: $nbrjour, search: $search, inactifs: $inactifs, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
 export const ETAT_104 = gql`

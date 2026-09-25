@@ -1,13 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
+import { useApolloClient, useQuery, useMutation } from '@apollo/client';
 import { INVENTAIRES, CREATE_INVENTAIRE, DELETE_INVENTAIRE, REFERENTIELS } from '../api/queries';
 import { fmtDate, fmtMoney, isoToday } from '../lib/format';
-import DataGrid, { Column } from '../components/ui/DataGrid';
-import { PageHeader, Pagination, StatusPill } from '../components/ui/atoms';
+import DataGrid, { Column, DataGridDistant } from '../components/ui/DataGrid';
+import { PageHeader, StatusPill } from '../components/ui/atoms';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-
-const LIMIT = 30;
 
 type Inventaire = {
   id: number; code?: string | null; date: string; designation?: string | null;
@@ -17,7 +15,6 @@ type Inventaire = {
 
 export default function Inventaires() {
   const navigate = useNavigate();
-  const [offset, setOffset] = useState(0);
   const [creating, setCreating] = useState(false);
   const [motif, setMotif] = useState('');
   const [depot, setDepot] = useState('');
@@ -25,8 +22,18 @@ export default function Inventaires() {
   const [deleting, setDeleting] = useState<Inventaire | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { data, loading, error: qError, refetch } = useQuery(INVENTAIRES, { variables: { limit: LIMIT, offset } });
-  const res = data?.inventaires as { data: Inventaire[]; total: number } | undefined;
+  // Tri, filtres, recherche, pagination et groupes faits par le serveur ;
+  // `version` est incrémenté après création / suppression pour recharger la liste.
+  const client = useApolloClient();
+  const [version, setVersion] = useState(0);
+  const refetch = () => setVersion((v) => v + 1);
+  const distant = useMemo<DataGridDistant<Inventaire>>(() => ({
+    cle: JSON.stringify([version]),
+    charger: async (grille) => {
+      const { data } = await client.query({ query: INVENTAIRES, fetchPolicy: 'network-only', variables: { grille } });
+      return data.inventaires as { data: Inventaire[]; total: number };
+    },
+  }), [client, version]);
   const { data: refs } = useQuery(REFERENTIELS);
   const depots: any[] = Array.isArray(refs?.depots) ? refs.depots : [];
 
@@ -40,7 +47,7 @@ export default function Inventaires() {
         variables: { input: { designation: motif || `Inventaire ${fmtDate(date)}`, date, depot: depot || undefined } },
       });
       setCreating(false); setMotif(''); setDepot('');
-      void refetch();
+      refetch();
       const id = d?.createInventaire?.id;
       if (id) navigate(`/stock/inventaires/${id}`);
     } catch (e: any) { setError(e.message ?? 'Erreur.'); }
@@ -48,17 +55,17 @@ export default function Inventaires() {
 
   async function confirmDelete() {
     if (!deleting) return;
-    try { await remove({ variables: { id: deleting.id } }); setDeleting(null); void refetch(); }
+    try { await remove({ variables: { id: deleting.id } }); setDeleting(null); refetch(); }
     catch (e: any) { setDeleting(null); setError(e.message ?? 'Suppression impossible.'); }
   }
 
   const columns: Column<Inventaire>[] = [
-    { key: 'date', header: 'Date', width: '100px', render: (i) => fmtDate(i.date) },
-    { key: 'designation', header: 'Motif', render: (i) => <b>{i.designation || `Inventaire #${i.id}`}</b> },
-    { key: 'nb', header: 'Articles', align: 'right', width: '90px', render: (i) => <span className="money">{i.nb_articles ?? '—'}</span> },
-    { key: 'vth', header: 'Valeur théorique', align: 'right', width: '140px', render: (i) => <span className="money">{fmtMoney(i.valeur_theorique)}</span> },
-    { key: 'vre', header: 'Valeur comptée', align: 'right', width: '140px', render: (i) => <span className="money">{fmtMoney(i.valeur_reale)}</span> },
-    { key: 'ecart', header: 'Écart', align: 'right', width: '130px', render: (i) => (
+    { key: 'date', header: 'Date', width: '100px', field: 'date', type: 'date', render: (i) => fmtDate(i.date) },
+    { key: 'designation', header: 'Motif', field: 'designation', render: (i) => <b>{i.designation || `Inventaire #${i.id}`}</b> },
+    { key: 'nb', header: 'Articles', align: 'right', width: '90px', field: 'nb_articles', type: 'number', render: (i) => <span className="money">{i.nb_articles ?? '—'}</span> },
+    { key: 'vth', header: 'Valeur théorique', align: 'right', width: '140px', field: 'valeur_theorique', render: (i) => <span className="money">{fmtMoney(i.valeur_theorique)}</span> },
+    { key: 'vre', header: 'Valeur comptée', align: 'right', width: '140px', field: 'valeur_reale', render: (i) => <span className="money">{fmtMoney(i.valeur_reale)}</span> },
+    { key: 'ecart', header: 'Écart', align: 'right', width: '130px', field: 'ecart_valeur', render: (i) => (
       <span className="money font-semibold" style={{ color: Number(i.ecart_valeur) < 0 ? 'var(--danger)' : Number(i.ecart_valeur) > 0 ? 'var(--success)' : undefined }}>
         {fmtMoney(i.ecart_valeur)}
       </span>
@@ -132,12 +139,11 @@ export default function Inventaires() {
           onConfirm={confirmDelete} onCancel={() => setDeleting(null)} />
       )}
 
-      <DataGrid columns={columns} rows={res?.data ?? []} rowKey={(i) => i.id}
-                loading={loading} error={qError?.message}
+      <DataGrid columns={columns} rowKey={(i) => i.id}
+                distant={distant} cleEtat="inventaires"
                 onRowClick={(i) => navigate(`/stock/inventaires/${i.id}`)}
                 emptyMessage="Aucun inventaire."
-                footer={{ _label: `${res?.total ?? 0} inventaire(s)` }} />
-      {res && res.total > LIMIT && <Pagination offset={offset} limit={LIMIT} total={res.total} onOffset={setOffset} />}
+                footer={(r) => ({ _label: `${r?.total ?? 0} inventaire(s)` })} />
     </div>
   );
 }
