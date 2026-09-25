@@ -11,6 +11,7 @@ connectée à `sos-cloud-server` → agent PC → MariaDB. Portage moderne du de
 2. [docs/02-ARCHITECTURE-ET-NAVIGATION.md](docs/02-ARCHITECTURE-ET-NAVIGATION.md) — stack, flux session, mapping menus Delphi → sidebar, patterns d'écran
 3. [docs/03-API-GRAPHQL-ET-MANQUES-SERVEURS.md](docs/03-API-GRAPHQL-ET-MANQUES-SERVEURS.md) — inventaire API existante + manques P1/P2/P3
 4. [docs/04-TODO.md](docs/04-TODO.md) — plan de travail par phases
+5. [docs/07-DEPLOIEMENT.md](docs/07-DEPLOIEMENT.md) — guide de déploiement (ordre cloud → agents → apps, recette, retour arrière)
 
 ## Design
 - [design/tokens.css](design/tokens.css) — design tokens (variables CSS, clair/sombre)
