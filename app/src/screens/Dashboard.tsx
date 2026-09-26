@@ -6,7 +6,7 @@ import { StatVentesResult, DebiteursResult, StatParFamille } from '../api/types'
 import { fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 import { D, useDroits } from '../lib/droits';
 
-type SoldeCaisse = { banque: string; solde: number; total_entrees: number; total_sorties: number };
+type SoldeCompte = { compte: string | null; compte_id: number | null; solde: number; total_entrees: number; total_sorties: number };
 
 export default function Dashboard() {
   const { peut, comptesAutorises } = useDroits();
@@ -22,8 +22,8 @@ export default function Dashboard() {
   });
 
   const stat: StatVentesResult | undefined = data?.statVentes;
-  // Droit PrevilegeBank : total limité aux comptes autorisés
-  const soldes: SoldeCaisse[] = comptesAutorises(Array.isArray(data?.soldesCaisse) ? data.soldesCaisse : [], (c: SoldeCaisse) => c.banque);
+  // Même calcul que l'écran Trésorerie (validé contre Delphi) ; droit PrevilegeBank : comptes autorisés
+  const soldes: SoldeCompte[] = comptesAutorises(Array.isArray(data?.soldesComptes) ? data.soldesComptes : [], (c: SoldeCompte) => c.compte);
   const totalCaisse = soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0);
   const deb: DebiteursResult | undefined = data?.debiteurs;
   const alertes: unknown[] = Array.isArray(data?.alertesStock) ? data.alertesStock : [];
