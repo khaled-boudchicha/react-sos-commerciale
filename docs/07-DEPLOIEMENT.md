@@ -22,6 +22,30 @@ Procédure pas à pas pour mettre en production les évolutions des dépôts :
 (MariaDB des pharmacies) ne changent de structure. Les nouvelles fonctions utilisent des colonnes
 déjà présentes (Delphi). Un retour arrière ne demande donc aucune opération sur les données.
 
+## Mettre en service un nouveau client (procédure courante)
+
+1. **Dans l'app d'administration** (Clients → « + ») : nom, identifiant (proposé), téléphone,
+   abonnement (annuel par défaut). Le mot de passe est généré si le champ est vide.
+2. **Fiche d'accès** (affichée après la création) : identifiant, mot de passe — affiché une seule
+   fois — et liens de téléchargement ; « Partager » l'envoie par WhatsApp / SMS.
+3. **Sur le PC de la base** : installer l'agent (`…/mises-a-jour/agent/softly-agent-setup.exe`),
+   se connecter avec l'identifiant et le mot de passe du client. L'agent est enregistré et rattaché
+   au compte ; il apparaît dans Agents (en ligne). Renseigner la base locale si demandé.
+4. **Sur le PC portable** : application PC (`…/gestion-commerciale/gestion-commerciale-setup.exe`) ;
+   **sur le téléphone** : application mobile (`…/mobile/druxamed.apk`). Connexion avec les mêmes
+   identifiants, puis choix du dossier et de l'utilisateur de la gestion commerciale.
+5. **Employés** : fiche du client → « Ajouter un compte (employé) sur cet agent ». Chaque personne a
+   son compte ; un compte rattaché à plusieurs agents bascule entre eux (« Changer d'agent »).
+6. **Renouvellement** : fiche du client → « Renouveler l'abonnement » (la nouvelle période suit
+   l'échéance en cours, sans perte de jours ; les comptes de ses agents sont alignés).
+   **Impayé** : « Bloquer » (déconnexion immédiate de tous ses appareils) ou « Suspendre l'abonnement ».
+
+Page publique : https://api.druxamed.com/mises-a-jour/ (modèle : `sos-cloud-server/deploy/telechargements/index.html`).
+Appareils : illimités par défaut (quota modifiable par client, 0 = illimité).
+Contrôle de bout en bout après une mise à jour du cloud (crée puis supprime un client d'essai, désactive
+quelques secondes l'agent de démo) : `scripts/essai-parcours-client.mjs` du dépôt cloud, exécuté dans
+le conteneur avec `AGENT=serveur-demo-vps001`.
+
 ## 0. Ordre et compatibilité
 
 Déployer **dans cet ordre** ; chaque étape reste compatible avec les versions encore en place :
