@@ -6,6 +6,7 @@ import { MY_AGENTS } from '../api/auth';
 import { useSession } from '../store/session';
 import CommandPalette from './CommandPalette';
 import DossierSwitcher from './DossierSwitcher';
+import AgentSwitcher from './AgentSwitcher';
 import { useSessionKeepAlive } from '../api/useSessionKeepAlive';
 import { useDroitsSync } from '../api/useDroitsSync';
 import { D, useDroits } from '../lib/droits';
@@ -48,6 +49,7 @@ export default function AppShell() {
   useDroitsSync();
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const [changerDossier, setChangerDossier] = useState(false);
+  const [changerAgent, setChangerAgent] = useState(false);
 
   // Renouvellement du JWT + veille sur le blocage de compte / l'abonnement
   useSessionKeepAlive();
@@ -66,6 +68,8 @@ export default function AppShell() {
 
   // Statut agent temps quasi-réel : polling myAgents (pas de subscriptions côté cloud)
   const { data } = useQuery(MY_AGENTS, { pollInterval: 20_000, fetchPolicy: 'network-only' });
+  // Bascule proposée seulement si le compte a plusieurs agents
+  const plusieursAgents = Array.isArray(data?.myAgents) && data.myAgents.length > 1;
   const live = (data?.myAgents as { agentId: string; isOnline: boolean }[] | undefined)
     ?.find((a) => a.agentId === agent?.agentId);
   const online = live?.isOnline ?? agent?.isOnline ?? false;
@@ -108,7 +112,12 @@ export default function AppShell() {
             📁 <b className="text-ink">{dossier}</b>
             <div className="text-[10px] text-ink-muted">{dossierUser?.username as string} · changer</div>
           </button>
-          <button onClick={logout} className="mt-2 w-full text-left px-2.5 py-1.5 rounded-sm text-ink-muted hover:bg-line-soft">
+          {plusieursAgents && (
+            <button onClick={() => setChangerAgent(true)} className="mt-2 w-full text-left px-2.5 py-1.5 rounded-sm text-ink-label font-semibold hover:bg-line-soft">
+              🖥 Changer d&apos;agent
+            </button>
+          )}
+          <button onClick={logout} className="mt-1 w-full text-left px-2.5 py-1.5 rounded-sm text-ink-muted hover:bg-line-soft">
             Changer d'utilisateur
           </button>
         </div>
@@ -132,11 +141,16 @@ export default function AppShell() {
             {accessError === 'SUBSCRIPTION_EXPIRED' && 'Abonnement expiré — contactez SOFTLY pour renouveler.'}
             {accessError === 'SUBSCRIPTION_SUSPENDED' && 'Abonnement suspendu — contactez SOFTLY.'}
             {accessError === 'ACCOUNT_BLOCKED' && 'Compte bloqué — contactez SOFTLY.'}
+            {accessError === 'AGENT_NOT_ALLOWED' && (
+              <>Cet agent n&apos;est plus rattaché à votre compte.{' '}
+                <button onClick={logout} className="underline font-bold">Se reconnecter</button></>
+            )}
           </div>
         )}
 
         <CommandPalette open={paletteOuverte} onClose={() => setPaletteOuverte(false)} />
         {changerDossier && <DossierSwitcher onClose={() => setChangerDossier(false)} />}
+        {changerAgent && <AgentSwitcher onClose={() => setChangerAgent(false)} />}
 
         <main className="flex-1 p-5 overflow-auto">
           <ErrorBoundary resetKey={location.pathname}>

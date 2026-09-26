@@ -4,7 +4,7 @@ import { onError } from '@apollo/client/link/error';
 import { useSession } from '../store/session';
 
 // Codes poussés par le cloud dans extensions.code (pattern errorLink du mobile)
-const ACCESS_CODES = new Set(['ACCOUNT_BLOCKED', 'SUBSCRIPTION_SUSPENDED', 'SUBSCRIPTION_EXPIRED']);
+const ACCESS_CODES = new Set(['ACCOUNT_BLOCKED', 'SUBSCRIPTION_SUSPENDED', 'SUBSCRIPTION_EXPIRED', 'AGENT_NOT_ALLOWED']);
 
 const httpLink = createHttpLink({
   // uri lu dynamiquement : le sélecteur de serveur peut changer sans recréer le client

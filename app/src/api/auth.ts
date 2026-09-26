@@ -36,6 +36,13 @@ export const MY_AGENTS = gql`
   }
 `;
 
+/** Bascule vers un autre agent rattaché au compte (nouveau jeton, même compte). */
+export const SWITCH_AGENT = gql`
+  mutation SwitchAgent($newAgentId: String!) {
+    switchAgentMobile(newAgentId: $newAgentId) { success access_token statut message }
+  }
+`;
+
 export const DOSSIERS = gql`
   query Dossiers { dossiers }
 `;
