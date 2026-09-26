@@ -40,6 +40,12 @@ déjà présentes (Delphi). Un retour arrière ne demande donc aucune opération
    l'échéance en cours, sans perte de jours ; les comptes de ses agents sont alignés).
    **Impayé** : « Bloquer » (déconnexion immédiate de tous ses appareils) ou « Suspendre l'abonnement ».
 
+**Agent de démo** (VPS, service `sos-agent`, `/opt/sos-agent`, copie de `dist/`, sans git) : mise à jour =
+sauvegarde de `dist`, `rsync` du `dist` compilé, `systemctl restart sos-agent`. Il tourne à l'heure
+d'Alger (`/etc/systemd/system/sos-agent.service.d/fuseau.conf` : `TZ=Africa/Algiers`) : le serveur est à
+l'heure de Berlin, et les dates Delphi (sans fuseau) s'affichaient à la veille. Chez un client, le
+fuseau du PC de l'agent doit être celui de la pharmacie (Alger).
+
 Page publique : https://api.druxamed.com/mises-a-jour/ (modèle : `sos-cloud-server/deploy/telechargements/index.html`).
 Appareils : illimités par défaut (quota modifiable par client, 0 = illimité).
 Contrôle de bout en bout après une mise à jour du cloud (crée puis supprime un client d'essai, désactive
