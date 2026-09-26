@@ -24,7 +24,7 @@ export function buildEtatClientPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="Relevé client"
-                 numero={client.code_cli} date={fmtDate(new Date().toISOString())} />
+                 refLabel="Client" numero={client.code_cli} date={fmtDate(new Date().toISOString())} />
 
       {/* Cartouche client + synthèse financière */}
       <div className="avoid-break" style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>

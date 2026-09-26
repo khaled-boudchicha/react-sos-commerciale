@@ -19,7 +19,7 @@ export function buildDebiteursPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="État des créances"
-                 numero={`${totaux.total_clients} clients`} date={fmtDate(new Date().toISOString())} />
+                 refLabel={null} numero={`${totaux.total_clients} clients`} date={fmtDate(new Date().toISOString())} />
 
       {/* Ventilation par ancienneté */}
       <div className="avoid-break" style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>

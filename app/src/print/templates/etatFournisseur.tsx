@@ -27,7 +27,7 @@ export function buildEtatFournisseurPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="Relevé fournisseur"
-                 numero={fournisseur.code_four} date={fmtDate(new Date().toISOString())} />
+                 refLabel="Fournisseur" numero={fournisseur.code_four} date={fmtDate(new Date().toISOString())} />
 
       <div className="avoid-break" style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: '9px 13px', flex: 1 }}>

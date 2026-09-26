@@ -18,7 +18,7 @@ export function buildStockPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="État du stock"
-                 numero={filtre || `${articles.length} articles`} date={fmtDate(new Date().toISOString())} />
+                 refLabel={null} numero={filtre || `${articles.length} articles`} date={fmtDate(new Date().toISOString())} />
 
       <table className="lines" style={{ marginTop: 12 }}>
         <thead>

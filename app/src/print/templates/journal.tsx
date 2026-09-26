@@ -29,7 +29,7 @@ export function buildJournalPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel={titre}
-                 numero={`${lignes.length} ligne(s)`} date={periode || fmtDate(new Date().toISOString())} />
+                 refLabel={null} numero={`${lignes.length} ligne(s)`} date={periode || fmtDate(new Date().toISOString())} />
 
       <table className="lines" style={{ marginTop: 12 }}>
         <thead>

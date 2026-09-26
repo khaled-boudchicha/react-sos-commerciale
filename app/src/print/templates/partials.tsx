@@ -64,8 +64,9 @@ table.lines td { padding: 5.5px 8px; border-bottom: 1px solid ${LINE}; vertical-
 // ─── Blocs partagés ──────────────────────────────────────────────────────────
 
 /** En-tête société + cartouche type/numéro/date du document. */
-export function DocHeader({ societe, docLabel, numero, date }: {
-  societe: Societe; docLabel: string; numero: string; date: string;
+/** `refLabel` : libellé devant `numero` (défaut « <docLabel> N° » ; `null` = `numero` seul, pour les états). */
+export function DocHeader({ societe, docLabel, numero, date, refLabel }: {
+  societe: Societe; docLabel: string; numero: string; date: string; refLabel?: string | null;
 }) {
   const s = societe || {};
   return (
@@ -81,7 +82,7 @@ export function DocHeader({ societe, docLabel, numero, date }: {
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: 17, fontWeight: 800, color: BRAND }}>{docLabel}</div>
-        <div className="mono doc-ref" style={{ fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>{`${docLabel} N° ${numero}`}</div>
+        <div className="mono doc-ref" style={{ fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>{refLabel === undefined ? `${docLabel} N° ${numero}` : refLabel === null ? numero : `${refLabel} : ${numero}`}</div>
         <div style={{ fontSize: 10.5, color: MUTED, marginTop: 3 }}>Date : {date}</div>
       </div>
     </div>

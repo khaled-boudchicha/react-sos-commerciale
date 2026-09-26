@@ -29,7 +29,7 @@ export function buildInventairePrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel={titre}
-                 numero={sousTitre} date={inv.date ? fmtDate(inv.date) : fmtDate(new Date().toISOString())} />
+                 refLabel={null} numero={sousTitre} date={inv.date ? fmtDate(inv.date) : fmtDate(new Date().toISOString())} />
 
       <table className="lines" style={{ marginTop: 12 }}>
         <thead>

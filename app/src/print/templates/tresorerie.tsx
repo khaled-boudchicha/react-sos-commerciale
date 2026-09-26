@@ -14,7 +14,7 @@ export function buildTresoreriePrint(
 
   const body = (
     <div>
-      <DocHeader societe={societe} docLabel="État de trésorerie" numero={compte} date={fmtDate(new Date().toISOString())} />
+      <DocHeader societe={societe} docLabel="État de trésorerie" refLabel="Compte" numero={compte} date={fmtDate(new Date().toISOString())} />
 
       <div className="avoid-break" style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: '9px 13px', flex: 1 }}>

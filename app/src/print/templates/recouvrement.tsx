@@ -21,7 +21,7 @@ export function buildRecouvrementPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="État de recouvrement"
-                 numero={`${rows.length} clients`} date={fmtDate(new Date().toISOString())} />
+                 refLabel={null} numero={`${rows.length} clients`} date={fmtDate(new Date().toISOString())} />
       <div style={{ fontSize: 11, marginTop: 8, color: MUTED }}>{critere}</div>
 
       <div className="avoid-break" style={{ display: 'flex', gap: 8, marginTop: 10, marginBottom: 10 }}>

@@ -20,7 +20,7 @@ export function buildFacturesNonRegleesPrint(
   const body = (
     <div>
       <DocHeader societe={societe} docLabel="Situation des impayés"
-                 numero={codeCli} date={fmtDate(new Date().toISOString())} />
+                 refLabel="Client" numero={codeCli} date={fmtDate(new Date().toISOString())} />
       <TiersBlock label="Client" nom={nom || codeCli} societe={societe} />
 
       <table className="lines" style={{ marginTop: 4 }}>

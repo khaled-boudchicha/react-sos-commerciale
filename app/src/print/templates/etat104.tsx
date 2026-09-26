@@ -21,7 +21,7 @@ export function buildEtat104Print(
 ): PrintDocument {
   const body = (
     <div>
-      <DocHeader societe={societe} docLabel="État 104" numero={`${fmtDate(debut)} → ${fmtDate(fin)}`} date={fmtDate(new Date().toISOString())} />
+      <DocHeader societe={societe} docLabel="État 104" refLabel="Période" numero={`${fmtDate(debut)} → ${fmtDate(fin)}`} date={fmtDate(new Date().toISOString())} />
       <div style={{ fontSize: 10.5, marginTop: 8, color: MUTED }}>
         Chiffre d’affaires par client — factures de vente{inclureBl ? ' et bons de livraison non facturés' : ''}, déduction faite des avoirs.
       </div>

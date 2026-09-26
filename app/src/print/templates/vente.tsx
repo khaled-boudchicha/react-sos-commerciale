@@ -7,6 +7,10 @@ import { BASE_CSS, DocHeader, TiersBlock, TotalsBlock, SignFooter, Societe, MUTE
 /** Modèle d'impression — pièce de VENTE (FA / BL / BCT / BC / FP / avoir / retour). */
 export function buildVentePrint(vente: Vente, societe: Societe): PrintDocument {
   const lignes: LigneVente[] = vente.lignes ?? [];
+  // Montant de TVA : Total_Taxe de la pièce (la colonne Delphi « TVA » de l'entête vaut 0),
+  // sinon somme des TVA des lignes
+  const montantTva = Number((vente as { total_taxe?: number | null }).total_taxe)
+    || lignes.reduce((t, l) => t + (Number(l.total_ttc ?? 0) - Number((l as { total_ht?: number | null }).total_ht ?? 0)), 0);
 
   const body = (
     <div>
@@ -44,7 +48,7 @@ export function buildVentePrint(vente: Vente, societe: Societe): PrintDocument {
       <TotalsBlock
         rows={[
           { label: 'Total HT', value: fmtMoney(vente.total_ht) },
-          ...(vente.tva != null ? [{ label: 'TVA', value: fmtMoney(vente.tva) }] : []),
+          { label: 'TVA', value: fmtMoney(montantTva) },
           // (total_taxe = TVA des lignes : l'ancienne ligne « Timbre / Taxes » imprimait la TVA une 2e fois)
           ...(Number(vente.timbre) > 0 ? [{ label: 'Droit de timbre', value: fmtMoney(vente.timbre) }] : []),
           ...(Number(vente.remise) > 0 ? [{ label: 'Remise', value: fmtMoney(vente.remise) }] : []),

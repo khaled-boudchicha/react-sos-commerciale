@@ -8,6 +8,10 @@ type AchatPrint = Record<string, any>;
 /** Modèle d'impression — pièce d'ACHAT (FA / BR / BC / DO / avoir / retour). */
 export function buildAchatPrint(achat: AchatPrint, societe: Societe): PrintDocument {
   const lignes: Record<string, any>[] = Array.isArray(achat.lignes) ? achat.lignes : [];
+  // Montant de TVA : Total_Taxe de la pièce (la colonne Delphi « TVA » de l'entête vaut 0),
+  // sinon somme des TVA des lignes
+  const montantTva = Number((achat as { total_taxe?: number | null }).total_taxe)
+    || lignes.reduce((t, l) => t + (Number(l.total_ttc ?? 0) - Number((l as { total_ht?: number | null }).total_ht ?? 0)), 0);
 
   const body = (
     <div>
@@ -46,7 +50,7 @@ export function buildAchatPrint(achat: AchatPrint, societe: Societe): PrintDocum
       <TotalsBlock
         rows={[
           { label: 'Total HT', value: fmtMoney(achat.total_ht) },
-          ...(achat.tva != null ? [{ label: 'TVA', value: fmtMoney(achat.tva) }] : []),
+          { label: 'TVA', value: fmtMoney(montantTva) },
           ...(Number(achat.remise) > 0 ? [{ label: 'Remise', value: fmtMoney(achat.remise) }] : []),
         ]}
         final={{ label: 'Net à payer', value: `${fmtMoney(achat.net_a_payer)} DA` }}
