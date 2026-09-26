@@ -40,6 +40,14 @@ déjà présentes (Delphi). Un retour arrière ne demande donc aucune opération
    l'échéance en cours, sans perte de jours ; les comptes de ses agents sont alignés).
    **Impayé** : « Bloquer » (déconnexion immédiate de tous ses appareils) ou « Suspendre l'abonnement ».
 
+**Mises à jour de l'agent** : depuis le tray **1.2**, le tray (et l'agent qu'il embarque) se met à jour
+seul — vérification toutes les 6 h sur `…/mises-a-jour/agent/latest.yml`, installation silencieuse la nuit
+(1 h – 5 h) ou « Mettre à jour maintenant » dans son menu. Publier une version : `npm version x.y.z` dans
+`agent_tray`, `npm run bundle:agent && npm run build && npx electron-builder --win`, déposer l'installeur et
+son `.blockmap`, **puis** `latest.yml`, et recopier l'installeur en `softly-agent-setup.exe`. Les postes en
+1.0 / 1.1 passent une seule fois à la main en 1.2.x. La version de chaque agent est visible dans l'app
+d'administration (écran Agents).
+
 **Agent de démo** (VPS, service `sos-agent`, `/opt/sos-agent`, copie de `dist/`, sans git) : mise à jour =
 sauvegarde de `dist`, `rsync` du `dist` compilé, `systemctl restart sos-agent`. Il tourne à l'heure
 d'Alger (`/etc/systemd/system/sos-agent.service.d/fuseau.conf` : `TZ=Africa/Algiers`) : le serveur est à
