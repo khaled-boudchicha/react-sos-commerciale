@@ -69,6 +69,16 @@ Déployer **dans cet ordre** ; chaque étape reste compatible avec les versions 
 
 ## 2. Cloud (VPS)
 
+> **Configuration réelle (26/09/2026)** : accès `ssh -p 1986 root@druxamed.com`, dossier
+> `/opt/sos-cloud-server`. **Apache** est le frontal (80/443, plusieurs sites) et proxifie
+> `api.druxamed.com` vers `127.0.0.1:3001` ; un **Caddy dédié au gRPC** publie le port 50051
+> (`docker-compose.grpc.yml` + `Caddyfile.grpc`). `update.sh` réutilise le fichier compose du
+> conteneur en service (ne jamais relancer avec `docker-compose.prod.yml` sur ce serveur : Caddy y
+> réclame 80/443 et l'API tombe en 503). Mises à jour servies par Apache :
+> `https://api.druxamed.com/mises-a-jour/gestion-commerciale/` (app) et `…/mises-a-jour/agent/`.
+> Attention à fail2ban : pas d'essais SSH avec des utilisateurs au hasard (bannissement de l'IP
+> sur tous les ports).
+
 ```bash
 ssh <vps>
 cd sos-cloud-server
