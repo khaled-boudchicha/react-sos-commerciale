@@ -61,6 +61,24 @@
 
   /* Focus */
   --focus-ring: 0 0 0 2px var(--brand-300);
+
+  /* ── Module comptoir (docs maquette « Vente au comptoir ») ──
+     Contraste ≥ 4,5:1 : texte secondaire et fonds pleins sous texte blanc assombris. */
+  --text-secondary: #5B6A86;
+  --surface-sunken: #FBFCFE;
+  --pos-cash:        #15803D;   /* unique action d'encaissement */
+  --pos-ok-soft:     #ECFDF3;
+  --pos-ok-line:     #A7E3BD;
+  --pos-ok-text:     #166534;
+  --pos-return:      #C2410C;   /* mode retour, jamais ailleurs */
+  --pos-return-deep: #9A3412;
+  --pos-return-soft: #FFF4EC;
+  --pos-return-line: #F3B58C;
+  --pos-alert:       #B91C1C;   /* stock insuffisant, annuler */
+  --pos-alert-soft:  #FEF2F2;
+  --pos-alert-line:  #F2B8B8;
+  --pos-amber:       #B45309;   /* remise, reste dû */
+  --pos-overlay:     rgb(8 20 40 / .5);
 }
 
 [data-theme="dark"] {
@@ -73,4 +91,13 @@
   --text-label:    #B7C3D9;
   --text:          #E9EEF7;
   --shadow-soft: none; --shadow-card: none; --shadow-lifted: 0 12px 32px rgb(0 0 0 / .5);
+  --text-secondary: #9AABC6;
+  --surface-sunken: #0E1627;
+  --pos-ok-soft:     #0F2A1C;
+  --pos-ok-line:     #1F5A36;
+  --pos-ok-text:     #86EFAC;
+  --pos-return-soft: #2A1709;
+  --pos-return-line: #7C3514;
+  --pos-alert-soft:  #2A1010;
+  --pos-alert-line:  #6B1F1F;
 }

@@ -9,6 +9,7 @@ import { PageHeader } from '../components/ui/atoms';
 import {
   supporteImpressionDirecte, listerImprimantes, getImprimanteTicket, setImprimanteTicket, PrinterInfo,
 } from '../print/engine/silentPrint';
+import { getCachet, lireImage, setCachet } from '../print/engine/cachet';
 
 export function applyTheme(theme: 'light' | 'dark') {
   document.documentElement.dataset.theme = theme;
@@ -22,10 +23,9 @@ export async function loadTheme() {
 }
 
 export default function Parametres() {
-  const { cloudUrl, setCloudUrl, agent, dossier } = useSession();
+  const { agent, dossier } = useSession();
   const { peut } = useDroits();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [url, setUrl] = useState(cloudUrl);
   const { data, refetch } = useQuery(COORDONNEES_SOCIETE);
   const coord = (data?.coordonneesSociete ?? {}) as Record<string, unknown>;
   const [editCoord, setEditCoord] = useState(false);
@@ -85,14 +85,6 @@ export default function Parametres() {
         <div className="text-[12px] text-ink-label flex flex-col gap-1.5">
           <div>Agent : <b>{agent?.label ?? agent?.agentId}</b></div>
           <div>Dossier : <b>{dossier}</b></div>
-          <label className="mt-2 text-[11px] font-bold">
-            Serveur cloud (GraphQL)
-            <div className="flex gap-2 mt-1">
-              <input className="flex-1 border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" value={url}
-                     onChange={(e) => setUrl(e.target.value)} />
-              <button onClick={() => setCloudUrl(url)} className="px-4 rounded-md bg-brand-700 text-white font-bold">Appliquer</button>
-            </div>
-          </label>
         </div>
       </section>
 
@@ -118,6 +110,7 @@ export default function Parametres() {
             L'impression directe (silencieuse) est disponible uniquement dans l'application installée.
           </div>
         )}
+        <CachetReglage />
       </section>
 
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
@@ -132,7 +125,7 @@ export default function Parametres() {
         </div>
         {erreur && <div className="text-[12px] mb-2" style={{ color: 'var(--danger)' }}>{erreur}</div>}
         <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
-          {['raison_sociale', 'adresse', 'telephone', 'email', 'nif', 'nis', 'rc', 'art'].map((k) => (
+          {['raison_sociale', 'adresse', 'wilaya', 'telephone', 'email', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => (
             <div key={k} className="flex justify-between border-b border-line-soft py-1">
               <span className="text-ink-muted uppercase text-[10px] font-bold tracking-wide">{k.replace('_', ' ')}</span>
               <span className="font-semibold">{String(coord[k] ?? '—')}</span>
@@ -277,5 +270,45 @@ function SectionMisesAJour() {
         )}
       </div>
     </section>
+  );
+}
+
+/** Image du cachet (tampon) utilisée par les modèles d'impression « avec cachet ». */
+function CachetReglage() {
+  const [cachet, setCachetState] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<string | null>(null);
+  useEffect(() => { void getCachet().then(setCachetState); }, []);
+
+  async function choisir(f: File | undefined) {
+    if (!f) return;
+    setErreur(null);
+    try {
+      const uri = await lireImage(f);
+      await setCachet(uri);
+      setCachetState(uri);
+    } catch (e: any) { setErreur(e.message ?? String(e)); }
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t border-line-soft flex items-center gap-4">
+      <div className="w-[94px] h-[86px] rounded-md border border-dashed border-line flex items-center justify-center bg-bg overflow-hidden flex-none">
+        {cachet ? <img src={cachet} alt="Cachet" className="max-w-full max-h-full object-contain" /> : <span className="text-[10.5px] text-ink-muted">Aucun cachet</span>}
+      </div>
+      <div className="flex flex-col gap-1.5 text-[12px]">
+        <span className="text-[11px] font-bold text-ink-label">Cachet de la société</span>
+        <span className="text-[11px] text-ink-muted">Image PNG ou JPEG (fond transparent de préférence), imprimée par les modèles « avec cachet ».</span>
+        <div className="flex gap-2">
+          <label className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label cursor-pointer hover:border-brand-300">
+            {cachet ? 'Remplacer…' : 'Choisir une image…'}
+            <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => void choisir(e.target.files?.[0])} />
+          </label>
+          {cachet && (
+            <button onClick={() => { void setCachet(null); setCachetState(null); }}
+                    className="rounded-md px-3 py-1.5 font-bold text-[12px]" style={{ color: 'var(--danger)' }}>Retirer</button>
+          )}
+        </div>
+        {erreur && <span style={{ color: 'var(--danger)' }}>{erreur}</span>}
+      </div>
+    </div>
   );
 }

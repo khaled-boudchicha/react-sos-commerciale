@@ -184,10 +184,11 @@ export function restreintAuxSiennes(droits: Droits | null | undefined, sens: 've
 
 /**
  * Comptes de trésorerie accessibles (colonne Delphi PrevilegeBank = noms de
- * comptes). Liste vide ou « tout » → aucun filtrage.
+ * comptes). « * » → tous ; liste vide → AUCUN compte (Main.pas : accès seulement si
+ * « * » ou le nom du compte figure dans la liste). Appliqué aussi côté agent.
  */
 export function comptesAutorises<T>(droits: Droits | null | undefined, comptes: T[], nom: (c: T) => string | null | undefined): T[] {
-  if (!droits || droits.admin || droits.bank === '*' || droits.bank.length === 0) return comptes;
+  if (!droits || droits.admin || droits.bank === '*' || droits.bank.some((n) => n.trim() === '*')) return comptes;
   const ok = new Set(droits.bank.map((n) => n.trim().toLowerCase()));
   return comptes.filter((c) => ok.has(String(nom(c) ?? '').trim().toLowerCase()));
 }

@@ -34,6 +34,8 @@ const csvMouvements: ExportColumn<MouvementTresorie>[] = [
 
 export default function Tresorerie() {
   const [compteId, setCompteId] = useState<number | null>(null);
+  // Vue groupée : un mouvement par règlement (comme SQLTresorieGroupe du desktop)
+  const [groupe, setGroupe] = useState(false);
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
 
@@ -70,19 +72,19 @@ export default function Tresorerie() {
   // Dernière réponse de premier niveau (totaux du bandeau, restreints aux filtres de la grille)
   const [res, setRes] = useState<ReponseDistante<MouvementTresorie> | null>(null);
   const distant = useMemo<DataGridDistant<MouvementTresorie>>(() => ({
-    cle: JSON.stringify([compteId, debut, fin, enAttente, version]),
+    cle: JSON.stringify([compteId, debut, fin, groupe, enAttente, version]),
     totaux: [{ field: 'debit', type: 'sum' }, { field: 'credit', type: 'sum' }, { field: 'montant', type: 'sum' }],
     charger: async (grille) => {
       if (enAttente) return { data: [], total: 0 };
       const { data } = await client.query({
         query: TRESORIE_COMPLETE, fetchPolicy: 'network-only',
-        variables: { compte_id: compteId ?? undefined, date_debut: debut, date_fin: fin, grille },
+        variables: { compte_id: compteId ?? undefined, date_debut: debut, date_fin: fin, groupe, grille },
       });
       const r = data.tresorieComplete as ReponseDistante<MouvementTresorie>;
       if (estRacine(grille)) setRes(r);
       return r;
     },
-  }), [client, compteId, debut, fin, enAttente, version]);
+  }), [client, compteId, debut, fin, groupe, enAttente, version]);
 
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
@@ -153,6 +155,11 @@ export default function Tresorerie() {
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Trésorerie">
         <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        <button onClick={() => setGroupe((g) => !g)} aria-pressed={groupe}
+                title="Un mouvement par règlement (uuid, tiers et date)"
+                className={`rounded-md px-3 py-2 font-bold text-[12px] border ${groupe ? 'border-brand-700 text-brand-700' : 'border-line text-ink-label'}`}>
+          {groupe ? 'Vue détaillée' : 'Vue groupée'}
+        </button>
         <button onClick={() => void printEtat()} disabled={printing}
                 className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
           {printing ? 'Préparation…' : "Imprimer l'état"}

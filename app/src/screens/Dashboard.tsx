@@ -44,7 +44,7 @@ export default function Dashboard() {
         {voitMarge && (
           <div className="text-[12px] opacity-80">
             Marge brute : <span className="money">{fmtMoney(stat?.total_marge)} DA</span>
-            {stat != null && <> · marge nette {fmtMoney(stat.pct_marge_global, 1)} %</>}
+            {stat != null && <> · taux de marge {fmtMoney(stat.pct_marge_global, 1)} %</>}
           </div>
         )}
         {error && <div className="text-[11px] opacity-90 mt-1">Erreur : {error.message}</div>}

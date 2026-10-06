@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
+import { gql, useMutation, useQuery } from '@apollo/client';
 import { ARRETE_CAISSE, CLOTURER_CAISSE, SOLDES_COMPTES, COORDONNEES_SOCIETE } from '../api/queries';
 import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
@@ -8,9 +8,11 @@ import { useToast } from './ui/Toast';
 import ConfirmDialog from './ui/ConfirmDialog';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
-import { buildArreteCaissePrint } from '../print/templates';
+import { buildArreteCaissePrint, buildRecuTransfertPrint } from '../print/templates';
 import type { ArreteCaisseData } from '../print/templates';
-import { useDroits } from '../lib/droits';
+import { D, useDroits } from '../lib/droits';
+
+const TRANSFERT_COMPTE = gql`mutation TransfertCompte($input: JSON!) { transfertCompte(input: $input) }`;
 
 /**
  * Arrêté de caisse d'une journée : solde d'ouverture, entrées/sorties par mode,
@@ -49,6 +51,36 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [cloturer, { loading: closing }] = useMutation(CLOTURER_CAISSE);
+  // Transfert des espèces comptées vers une autre caisse, après clôture (reçu imprimé)
+  const [transferer, { loading: transfert }] = useMutation(TRANSFERT_COMPTE);
+  const peutTransfert = droitsComptes.peut('autre', D.autre.transfertComptes);
+  const [destination, setDestination] = useState('');
+  const [transfertFait, setTransfertFait] = useState(false);
+  const [confirmTransfert, setConfirmTransfert] = useState(false);
+  const destinations = comptes.filter((c) => String(c.compte_id) !== compteId);
+  const cibleTransfert = destinations.find((c) => String(c.compte_id) === destination) ?? null;
+
+  async function doTransfert() {
+    if (!compte || !cibleTransfert || compteSaisi == null) return;
+    try {
+      await transferer({ variables: { input: {
+        date, montant: compteSaisi, observation: observation || undefined,
+        compte_source: compte.compte, compte_source_id: compte.compte_id,
+        compte_destination: cibleTransfert.compte, compte_destination_id: cibleTransfert.compte_id,
+      } } });
+      setConfirmTransfert(false);
+      setTransfertFait(true);
+      toast.success(`Transfert de ${fmtMoney(compteSaisi)} DA enregistré.`);
+      setPrintDoc(buildRecuTransfertPrint({
+        source: compte.compte, destination: cibleTransfert.compte, montant: compteSaisi, date,
+        utilisateur: user?.name || user?.username, observation,
+        societe: (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+      }));
+    } catch (e: any) {
+      setError(e?.message ?? 'Transfert impossible.');
+      setConfirmTransfert(false);
+    }
+  }
 
   const compteSaisi = montantCompte.trim() === '' ? null : parseFloat(montantCompte);
   const ecart = arrete && compteSaisi != null && Number.isFinite(compteSaisi)
@@ -133,14 +165,17 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
           {arrete && (
             <>
               <div className="grid grid-cols-4 gap-2.5">
-                <Kpi label="Solde d'ouverture" value={arrete.solde_ouverture} />
-                <Kpi label="Entrées" value={arrete.total_entrees} color="var(--success)" />
-                <Kpi label="Sorties" value={arrete.total_sorties} color="var(--danger)" />
-                <Kpi label="Solde théorique" value={arrete.solde_theorique} strong />
+                {/* Totaux en espèces seulement : c'est ce que l'on compte physiquement */}
+                <Kpi label="Ouverture espèces" value={arrete.solde_ouverture} />
+                <Kpi label="Entrées espèces" value={arrete.total_entrees} color="var(--success)" />
+                <Kpi label="Sorties espèces" value={arrete.total_sorties} color="var(--danger)" />
+                <Kpi label="Espèces théoriques" value={arrete.solde_theorique} strong />
               </div>
 
               <div className="border border-line-soft rounded-md overflow-hidden">
-                <div className="px-3 py-2 bg-bg text-[10px] font-bold uppercase tracking-wider text-ink-muted">Par mode de paiement</div>
+                <div className="px-3 py-2 bg-bg text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                  Par mode de paiement <span className="normal-case font-normal">(chèques et virements : pour information, hors comptage)</span>
+                </div>
                 <table className="w-full text-[12px]">
                   <tbody>
                     {arrete.par_mode.length === 0 && (
@@ -225,6 +260,24 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
             </button>
           )}
         </div>
+
+        {cloture && peutTransfert && destinations.length > 0 && !transfertFait && (
+          <div className="mt-4 border border-line-soft rounded-md p-3 flex flex-col gap-2">
+            <div className="text-[12px] font-bold">Transférer les espèces comptées vers une autre caisse</div>
+            <div className="flex gap-2 items-center">
+              <select value={destination} onChange={(e) => setDestination(e.target.value)}
+                      className="flex-1 border border-line rounded-sm px-3 py-2 bg-surface text-ink text-[12px]">
+                <option value="">— Caisse de destination —</option>
+                {destinations.map((c) => <option key={c.compte_id} value={String(c.compte_id)}>{c.compte}</option>)}
+              </select>
+              <button onClick={() => setConfirmTransfert(true)}
+                      disabled={!cibleTransfert || compteSaisi == null || transfert}
+                      className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">
+                Transférer {compteSaisi != null ? fmtMoney(compteSaisi) : ''}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {confirm && ecart != null && (
@@ -233,6 +286,12 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
             Un {ecart > 0 ? 'encaissement' : 'décaissement'} « Écart de caisse » sera enregistré sur {compte?.compte ?? 'ce compte'} pour régulariser le solde.</>}
           confirmLabel="Clôturer" danger loading={closing}
           onConfirm={() => void doCloture()} onCancel={() => setConfirm(false)} />
+      )}
+      {confirmTransfert && cibleTransfert && compte && compteSaisi != null && (
+        <ConfirmDialog title="Transférer les espèces ?"
+          message={<>Transférer <b className="money">{fmtMoney(compteSaisi)} DA</b> de <b>{compte.compte}</b> vers <b>{cibleTransfert.compte}</b>. Un reçu sera imprimé.</>}
+          confirmLabel="Transférer" loading={transfert}
+          onConfirm={() => void doTransfert()} onCancel={() => setConfirmTransfert(false)} />
       )}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
     </div>

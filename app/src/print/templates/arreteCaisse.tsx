@@ -38,10 +38,10 @@ export function buildArreteCaissePrint(
 
       <div className="avoid-break" style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>
         {[
-          { label: 'Solde d\'ouverture', v: arrete.solde_ouverture },
-          { label: 'Entrées', v: arrete.total_entrees, color: '#16A34A' },
-          { label: 'Sorties', v: arrete.total_sorties, color: '#DC2626' },
-          { label: 'Solde théorique', v: arrete.solde_theorique, strong: true },
+          { label: 'Ouverture espèces', v: arrete.solde_ouverture },
+          { label: 'Entrées espèces', v: arrete.total_entrees, color: '#16A34A' },
+          { label: 'Sorties espèces', v: arrete.total_sorties, color: '#DC2626' },
+          { label: 'Espèces théoriques', v: arrete.solde_theorique, strong: true },
         ].map((k) => (
           <div key={k.label} style={{ border: `1px solid ${LINE}`, borderRadius: 8, padding: '9px 13px', flex: 1, textAlign: 'right' }}>
             <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: MUTED, letterSpacing: '.5px', textAlign: 'left' }}>{k.label}</div>

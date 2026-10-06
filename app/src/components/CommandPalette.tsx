@@ -20,6 +20,7 @@ type Item = {
 type Droit = (d: ReturnType<typeof useDroits>) => boolean;
 const STATIQUES: { groupe: string; titre: string; sous?: string; to: string; si?: Droit }[] = [
   { groupe: 'Aller à', titre: 'Tableau de bord', to: '/' },
+  { groupe: 'Aller à', titre: 'Vente au comptoir', sous: 'Caisse / POS (tickets, retours)', to: '/comptoir', si: (d) => d.peutDoc('vente', 'BCT', 'creer') || d.peutDoc('vente', 'BRT', 'creer') },
   { groupe: 'Aller à', titre: 'Ventes', sous: 'Documents de vente', to: '/ventes', si: (d) => d.aModule('vente') },
   { groupe: 'Aller à', titre: 'Achats', sous: "Documents d'achat", to: '/achats', si: (d) => d.aModule('achat') },
   { groupe: 'Aller à', titre: 'Stock', sous: 'Articles & stock', to: '/stock', si: (d) => d.peut('stock', D.stock.article) },
@@ -89,12 +90,12 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
 
     const clients: Item[] = ((cData?.clients?.data ?? []) as Client[]).map((c) => ({
       id: `c${c.id}`, groupe: 'Clients', titre: c.nom || c.code, sous: c.code,
-      droite: c.ancien_credit != null ? `${fmtMoney(c.ancien_credit)} DA` : undefined,
+      droite: c.credit != null ? `${fmtMoney(c.credit)} DA` : undefined,
       action: go(`/tiers/client/${encodeURIComponent(c.code)}`),
     }));
     const fournisseurs: Item[] = ((fData?.fournisseurs?.data ?? []) as Fournisseur[]).map((f) => ({
       id: `f${f.id}`, groupe: 'Fournisseurs', titre: f.nom || f.code, sous: f.code,
-      droite: f.ancien_credit != null ? `${fmtMoney(f.ancien_credit)} DA` : undefined,
+      droite: f.credit_initial != null ? `${fmtMoney(f.credit_initial)} DA` : undefined,
       action: go(`/tiers/fournisseur/${encodeURIComponent(f.code)}`),
     }));
     const articles: Item[] = ((aData?.articles?.data ?? []) as Article[]).map((a) => ({

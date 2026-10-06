@@ -25,7 +25,7 @@ export default function ClientSearch({ value, onSelect }: {
       <div className="flex items-center justify-between border border-line rounded-sm px-3 py-2 bg-surface text-[12.5px]">
         <span><b>{value.nom}</b> <span className="money text-[10.5px] text-ink-muted">{value.code}</span></span>
         <span className="flex items-center gap-3">
-          <span className="text-[11px] text-ink-muted">Solde : <span className="money" style={{ color: Number(value.ancien_credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(value.ancien_credit)}</span></span>
+          <span className="text-[11px] text-ink-muted">Solde : <span className="money" style={{ color: Number(value.credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(value.credit)}</span></span>
           <button onClick={() => onSelect(null)} className="text-ink-muted font-bold">✕</button>
         </span>
       </div>
@@ -45,8 +45,8 @@ export default function ClientSearch({ value, onSelect }: {
             <button key={c.id} onClick={() => { onSelect(c); setTerm(''); setOpen(false); }}
                     className="w-full text-left px-3 py-2 flex justify-between items-center border-b border-line-soft last:border-b-0 hover:bg-brand-50">
               <span><b className="text-[12.5px]">{c.nom}</b> <span className="money text-[10.5px] text-ink-muted">{c.code}</span></span>
-              <span className="money text-[11px]" style={{ color: Number(c.ancien_credit) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
-                {fmtMoney(c.ancien_credit)}
+              <span className="money text-[11px]" style={{ color: Number(c.credit) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                {fmtMoney(c.credit)}
               </span>
             </button>
           ))}

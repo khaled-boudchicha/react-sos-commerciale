@@ -56,6 +56,15 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const largeur = (c: ColonneGrille<T>) => etat.largeurs[c.champ] ?? largeurDefaut(c);
   // Mode distant : le serveur trie, filtre, pagine, regroupe et totalise
   const distant = useSourceDistante(props.source, colonnes, etat, resumes, resumesGroupe);
+  // Autre source (onglet, autre liste) : on repart à la première page, sinon la page
+  // de l'onglet précédent (ex. 6 des BL) donne « Aucun résultat » sur un petit ensemble.
+  const cleSource = props.source?.cle ?? '';
+  const cleSourcePrec = useRef(cleSource);
+  useEffect(() => {
+    if (cleSourcePrec.current === cleSource) return;
+    cleSourcePrec.current = cleSource;
+    actions.page(0);
+  }, [cleSource, actions]);
   const sourceDonnees = distant.actif ? distant.lignes : donnees;
 
   // ─── Édition (lot : changements en attente fusionnés à l'affichage) ─────────

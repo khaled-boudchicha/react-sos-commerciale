@@ -7,7 +7,7 @@ import { initialiserMisesAJour } from './updater';
 const store = new Store({ name: 'gestion-commerciale' });
 
 // Seules ces clés sont accessibles depuis le renderer (pas d'accès arbitraire au store).
-const STORE_KEYS = new Set(['session', 'deviceId', 'theme', 'gc.imprimanteTicket']);
+const STORE_KEYS = new Set(['session', 'deviceId', 'theme', 'gc.imprimanteTicket', 'gc.cachet']);
 // Clés sensibles (jeton JWT) chiffrées au repos via le trousseau de l'OS (safeStorage).
 const SECRET_KEYS = new Set(['session']);
 type Chiffre = { __enc: string };

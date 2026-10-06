@@ -15,7 +15,8 @@ import ReglementsPiece, { TYPES_AVEC_REGLEMENT, TYPES_RETOUR } from '../componen
 import LiensPiece from '../components/document/LiensPiece';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
-import { buildVentePrint, buildTicketPrint } from '../print/templates';
+import { buildTicketPrint } from '../print/templates';
+import ImprimerPieceDialog from '../components/document/ImprimerPieceDialog';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
 
@@ -30,6 +31,7 @@ export default function VenteDetail() {
   const [confirm, setConfirm] = useState(false);
   const [retour, setRetour] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [choixImpression, setChoixImpression] = useState(false);
   const [delError, setDelError] = useState<string | null>(null);
   // cache-and-network : la pièce peut avoir changé (modification, règlement, retour…)
   const { data, loading, error, refetch } = useQuery(VENTE, { variables: { id: Number(id) }, fetchPolicy: 'cache-and-network' });
@@ -94,7 +96,7 @@ export default function VenteDetail() {
           </button>
         )}
         {v && peutImprimer && (
-          <button onClick={() => setPrintDoc(buildVentePrint(v, societe))} className={btn}>Imprimer A4</button>
+          <button onClick={() => setChoixImpression(true)} className={btn}>Imprimer…</button>
         )}
         {v && peutImprimer && v.type === 4 && (
           <button onClick={() => setPrintDoc(buildTicketPrint(v, societe))} className={btn}>Ticket 80mm</button>
@@ -116,6 +118,11 @@ export default function VenteDetail() {
       {retour && v && (
         <RetourModal sens="vente" onClose={() => setRetour(false)}
                      source={{ id: v.id, numero: v.numero, type_doc: v.type_doc, code, lignes }} />
+      )}
+      {choixImpression && v && (
+        <ImprimerPieceDialog vente={v} code={code} societe={societe}
+                             onApercu={(doc) => { setChoixImpression(false); setPrintDoc(doc); }}
+                             onClose={() => setChoixImpression(false)} />
       )}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}

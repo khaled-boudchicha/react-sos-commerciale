@@ -101,7 +101,10 @@ export type ArticlesResult = { data: Article[]; total: number };
 export type Client = {
   id: number; code: string; nom: string; prenom?: string | null;
   telephone?: string | null; ville?: string | null; email?: string | null;
+  /** Crédit initial (AncienCredit) — ce n'est PAS le solde. */
   ancien_credit?: number | null; plafond_credit?: number | null;
+  /** Solde réel du client (calculé par l'agent, formule du desktop). */
+  credit?: number | null;
   remise?: number | null; actif?: boolean | null;
 };
 
@@ -110,6 +113,8 @@ export type ClientsResult = { data: Client[]; total: number };
 export type Fournisseur = {
   id: number; code: string; nom: string; telephone?: string | null;
   ville?: string | null; ancien_credit?: number | null;
+  /** Solde actuel du fournisseur (colonne Credit). */
+  credit_initial?: number | null;
 };
 
 export type FournisseursResult = { data: Fournisseur[]; total: number };

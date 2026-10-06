@@ -22,3 +22,8 @@ export { buildRecouvrementPrint } from './recouvrement';
 export type { RecouvrementLigne, RecouvrementTotaux } from './recouvrement';
 export { buildEtat104Print } from './etat104';
 export type { Etat104Ligne, Etat104Totaux } from './etat104';
+export { buildVenteModelePrint, MODELES_VENTE, modelesPour } from './venteModeles';
+export type { ModeleVenteId, ModeleVente, OptionsImpression } from './venteModeles';
+export { buildTicketVentesPrint } from './ticketVentes';
+export type { TicketVentesLigne } from './ticketVentes';
+export { buildRecuTransfertPrint } from './recuTransfert';

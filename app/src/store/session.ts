@@ -74,6 +74,9 @@ export const useSession = create<SessionState>((set, get) => ({
   logout: () => {
     set({ token: null, agent: null, dossier: null, dossierUser: null, accessError: null });
     void window.gc?.store.delete(PERSIST_KEY);
+    // Le cache GraphQL garde les données du compte précédent : on le vide (import différé
+    // pour éviter un cycle store ↔ client).
+    void import('../api/client').then((m) => m.apollo.clearStore()).catch(() => undefined);
   },
   hydrate: async () => {
     const saved = (await window.gc?.store.get(PERSIST_KEY)) as Partial<SessionState> | undefined;

@@ -22,8 +22,10 @@ const NAV: { group: string | null; items: NavItem[] }[] = [
   {
     group: 'Activité',
     items: [
+      { to: '/comptoir', label: 'Vente au comptoir', visible: (d) => d.peutDoc('vente', 'BCT', 'creer') || d.peutDoc('vente', 'BRT', 'creer') },
       { to: '/ventes', label: 'Ventes', visible: (d) => d.aModule('vente') },
       { to: '/achats', label: 'Achats', visible: (d) => d.aModule('achat') },
+      { to: '/echeances', label: 'Échéances', visible: (d) => d.aModule('vente') },
       { to: '/stock', label: 'Stock', visible: (d) => d.peut('stock', D.stock.article) },
       { to: '/stock/mouvements', label: 'Mouvements de stock', visible: (d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) },
       { to: '/tiers', label: 'Tiers', visible: (d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs]) },
@@ -73,6 +75,20 @@ export default function AppShell() {
   const live = (data?.myAgents as { agentId: string; isOnline: boolean }[] | undefined)
     ?.find((a) => a.agentId === agent?.agentId);
   const online = live?.isOnline ?? agent?.isOnline ?? false;
+
+  // Caisse plein écran (maquette « Vente au comptoir ») : ni barre latérale ni en-tête ;
+  // le renouvellement de session et les alertes de compte restent actifs.
+  if (location.pathname === '/comptoir') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        {accessError && <BandeauAcces code={accessError} onLogout={logout} />}
+        <CommandPalette open={paletteOuverte} onClose={() => setPaletteOuverte(false)} />
+        <div className="flex-1 min-h-0">
+          <ErrorBoundary resetKey={location.pathname}><Outlet /></ErrorBoundary>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen">
@@ -136,17 +152,7 @@ export default function AppShell() {
           </div>
         </header>
 
-        {accessError && (
-          <div className="px-4 py-2 text-[12px] font-semibold text-white" style={{ background: 'var(--danger)' }}>
-            {accessError === 'SUBSCRIPTION_EXPIRED' && 'Abonnement expiré — contactez SOFTLY pour renouveler.'}
-            {accessError === 'SUBSCRIPTION_SUSPENDED' && 'Abonnement suspendu — contactez SOFTLY.'}
-            {accessError === 'ACCOUNT_BLOCKED' && 'Compte bloqué — contactez SOFTLY.'}
-            {accessError === 'AGENT_NOT_ALLOWED' && (
-              <>Cet agent n&apos;est plus rattaché à votre compte.{' '}
-                <button onClick={logout} className="underline font-bold">Se reconnecter</button></>
-            )}
-          </div>
-        )}
+        {accessError && <BandeauAcces code={accessError} onLogout={logout} />}
 
         <CommandPalette open={paletteOuverte} onClose={() => setPaletteOuverte(false)} />
         {changerDossier && <DossierSwitcher onClose={() => setChangerDossier(false)} />}
@@ -158,6 +164,21 @@ export default function AppShell() {
           </ErrorBoundary>
         </main>
       </div>
+    </div>
+  );
+}
+
+/** Bandeau d'erreur d'accès poussé par le serveur (compte bloqué, abonnement, agent). */
+function BandeauAcces({ code, onLogout }: { code: string; onLogout: () => void }) {
+  return (
+    <div className="px-4 py-2 text-[12px] font-semibold text-white" style={{ background: 'var(--danger)' }}>
+      {code === 'SUBSCRIPTION_EXPIRED' && 'Abonnement expiré — contactez SOFTLY pour renouveler.'}
+      {code === 'SUBSCRIPTION_SUSPENDED' && 'Abonnement suspendu — contactez SOFTLY.'}
+      {code === 'ACCOUNT_BLOCKED' && 'Compte bloqué — contactez SOFTLY.'}
+      {code === 'AGENT_NOT_ALLOWED' && (
+        <>Cet agent n&apos;est plus rattaché à votre compte.{' '}
+          <button onClick={onLogout} className="underline font-bold">Se reconnecter</button></>
+      )}
     </div>
   );
 }

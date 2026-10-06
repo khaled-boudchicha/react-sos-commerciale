@@ -1,8 +1,11 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { useApolloClient, useQuery } from '@apollo/client';
+import PrintPreview from '../print/engine/PrintPreview';
+import { PrintDocument } from '../print/engine/types';
+import { buildTicketVentesPrint } from '../print/templates';
 import {
-  STAT_VENTES, STAT_VENTES_PAR_FAMILLE, STAT_VENTES_PAR_ARTICLE, STAT_VENTES_PAR_CLIENT,
-  BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
+  STAT_VENTES, STAT_VENTES_PAR_FAMILLE, STAT_VENTES_PAR_UTILISATEUR, STAT_VENTES_PAR_ARTICLE, STAT_VENTES_PAR_CLIENT,
+  COORDONNEES_SOCIETE, BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
 } from '../api/queries';
 import {
   Client,
@@ -48,6 +51,7 @@ type Section = (typeof SECTIONS)[number]['code'];
 const GROUPEMENTS = [
   { code: 'jour', label: 'Par jour' },
   { code: 'mois', label: 'Par mois' },
+  { code: 'annee', label: 'Par année' },
 ] as const;
 type Groupement = (typeof GROUPEMENTS)[number]['code'];
 
@@ -83,7 +87,27 @@ const VUES_VENTES = [
   { code: 'article', label: 'Par article' },
   { code: 'client', label: 'Par client' },
   { code: 'famille', label: 'Par famille' },
+  { code: 'utilisateur', label: 'Par utilisateur' },
 ] as const;
+
+/** « Mes ventes » : CA et marge par vendeur (les retours sont déduits), totaux = CA de la période. */
+function VueParUtilisateur({ debut, fin }: { debut: string; fin: string }) {
+  const { data, loading, error } = useQuery(STAT_VENTES_PAR_UTILISATEUR, { variables: { date_debut: debut, date_fin: fin } });
+  const lignes: any[] = data?.statVentesParUtilisateur?.lignes ?? [];
+  const cols: Column<any>[] = [
+    { key: 'user', header: 'Vendeur', render: (l) => <b>{String(l.utilisateur)}</b> },
+    { key: 'pieces', header: 'Pièces', align: 'right', width: '90px', render: (l) => <span className="money">{l.nb_pieces}</span> },
+    { key: 'ht', header: 'CA HT', align: 'right', render: (l) => <Money value={l.total_ht} />, sortAccessor: (l) => Number(l.total_ht) },
+    { key: 'ttc', header: 'CA TTC', align: 'right', render: (l) => <Money value={l.total_ttc} />, sortAccessor: (l) => Number(l.total_ttc) },
+    { key: 'marge', header: 'Marge', align: 'right', render: (l) => <Money value={l.total_marge} />, sortAccessor: (l) => Number(l.total_marge) },
+    { key: 'pct', header: '%', align: 'right', width: '70px', render: (l) => <Pct value={l.pct_marge} />, sortAccessor: (l) => Number(l.pct_marge) },
+  ];
+  return (
+    <DataGrid titre="Mes ventes — par vendeur" columns={cols} rows={lignes} rowKey={(l) => String(l.utilisateur)}
+              loading={loading} error={error?.message}
+              footer={{ _label: 'Totaux', ttc: <Money value={somme(lignes, 'total_ttc')} /> }} />
+  );
+}
 
 function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const [vue, setVue] = useState<(typeof VUES_VENTES)[number]['code']>('periode');
@@ -108,6 +132,20 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const clients: StatClient[] = Array.isArray(cli.data?.statVentesParClient) ? cli.data.statVentesParClient : [];
   const famillesTout: StatParFamille[] = Array.isArray(fam.data?.statVentesParFamille) ? fam.data.statVentesParFamille : [];
   const familles = filtreFam ? famillesTout.filter((f) => f.famille === famille) : famillesTout;
+  // Ticket caisse « Articles vendus » / « Familles vendues » (même période et filtres que l'écran)
+  const [ticket, setTicket] = useState<PrintDocument | null>(null);
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
+  function imprimerTicket(v: 'article' | 'famille') {
+    const estArticle = v === 'article';
+    setTicket(buildTicketVentesPrint({
+      titre: estArticle ? 'ARTICLES VENDUS' : 'FAMILLES VENDUES',
+      debut, fin,
+      lignes: estArticle
+        ? articles.map((a) => ({ libelle: a.designation, qte: Number(a.qte), total_ttc: Number(a.total_ttc) }))
+        : familles.map((f) => ({ libelle: f.famille || '(sans famille)', qte: Number(f.qte), total_ttc: Number(f.total_ttc) })),
+      societe: (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
+    }));
+  }
   const optionsFamille = famillesTout.map((f) => f.famille).filter(Boolean).sort();
 
   const colPeriode: Column<StatVenteLigne>[] = [
@@ -147,12 +185,14 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
 
   return (
     <>
+      {ticket && <PrintPreview doc={ticket} onClose={() => setTicket(null)} />}
       {res && (
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="CA TTC" value={`${fmtMoney(res.total_ttc)} DA`} />
-          <Kpi label="Marge brute" value={`${fmtMoney(res.total_marge)} DA`} />
+          <Kpi label="Marge brute" value={`${fmtMoney(res.total_marge)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} % du CA HT`} />
           <Kpi label="Charges période" value={`${fmtMoney(res.total_charges)} DA`} />
-          <Kpi label="Marge nette" value={`${fmtMoney(res.marge_nette_total)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} %`} />
+          <Kpi label="Marge nette" value={`${fmtMoney(res.marge_nette_total)} DA`}
+               sub={`${fmtMoney(Number(res.total_ht) > 0 ? (Number(res.marge_nette_total) / Number(res.total_ht)) * 100 : 0, 1)} % du CA HT`} />
         </div>
       )}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -160,6 +200,12 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
         <div className="flex items-center gap-3 flex-wrap">
           {vue === 'article' && (
             <div className="w-64"><ClientSearch value={clientFiltre} onSelect={setClientFiltre} /></div>
+          )}
+          {(vue === 'article' || vue === 'famille') && (
+            <button onClick={() => imprimerTicket(vue)}
+                    className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+              Imprimer le ticket
+            </button>
           )}
           {(vue === 'article' || vue === 'client') && (
             <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
@@ -202,6 +248,8 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
                     footer={{ _label: 'Totaux', ht: <Money value={somme(clients, 'total_ht')} />, ttc: <Money value={somme(clients, 'total_ttc')} />, marge: <Money value={somme(clients, 'total_marge')} /> }} />
         
       )}
+
+      {vue === 'utilisateur' && <VueParUtilisateur debut={debut} fin={fin} />}
 
       {vue === 'famille' && (
         <div className="flex flex-col gap-3.5">
@@ -365,8 +413,8 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
     { key: 'remise', header: 'Remises', align: 'right', render: (l) => <Money value={l.remise} />, sortAccessor: (l) => Number(l.remise) },
     { key: 'net', header: 'Après remises', align: 'right', render: (l) => <MargeCell value={l.benefice_avec_remise} />, sortAccessor: (l) => Number(l.benefice_avec_remise) },
     { key: 'pct', header: '%', align: 'right', width: '70px', render: (l) => (
-      <Pct value={Number(l.total_ht) > 0 ? (Number(l.benefice_brut) / Number(l.total_ht)) * 100 : 0} />
-    ), sortAccessor: (l) => (Number(l.total_ht) > 0 ? (Number(l.benefice_brut) / Number(l.total_ht)) * 100 : 0) },
+      <Pct value={Number(l.total_ht) > 0 ? (Number(l.benefice_avec_remise) / Number(l.total_ht)) * 100 : 0} />
+    ), sortAccessor: (l) => (Number(l.total_ht) > 0 ? (Number(l.benefice_avec_remise) / Number(l.total_ht)) * 100 : 0) },
   ];
 
   return (
@@ -375,13 +423,14 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="CA HT" value={`${fmtMoney(res.total_ht)} DA`} />
           <Kpi label="Coût de revient" value={`${fmtMoney(res.total_revien)} DA`} />
-          <Kpi label="Bénéfice brut" value={`${fmtMoney(res.total_benefice)} DA`} />
-          <Kpi label="Taux de marge" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice / CA HT" />
+          {/* total_benefice = bénéfice APRÈS remises (beneficeAvecRemise), comme la marge Delphi */}
+          <Kpi label="Bénéfice après remises" value={`${fmtMoney(res.total_benefice)} DA`} />
+          <Kpi label="Taux de marge" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice après remises / CA HT" />
         </div>
       )}
-      <Carte titre="Évolution du bénéfice brut"
+      <Carte titre="Évolution du bénéfice après remises"
              actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
-        <LineChart data={lignes.map((l) => ({ label: l.periode, value: Number(l.benefice_brut ?? 0) }))}
+        <LineChart data={lignes.map((l) => ({ label: l.periode, value: Number(l.benefice_avec_remise ?? 0) }))}
                    format={(v) => fmtMoney(v, 0)} couleur="#0D9488" />
       </Carte>
       <DataGrid titre="Bénéfices par période"

@@ -12,7 +12,9 @@ src/print/
 ├── templates/
 │   ├── index.ts           ← ré-exporte tous les buildXxxPrint
 │   ├── partials.tsx       ← blocs partagés (DocHeader, TiersBlock, TotalsBlock…) + BASE_CSS
-│   ├── vente.tsx          ← pièce de vente A4 (FA/BL/BCT/BC/devis-proforma/avoir/retour)
+│   ├── vente.tsx          ← pièce de vente A4, mise en page moderne (tous types)
+│   ├── venteModeles.tsx   ← modèles du desktop (.fr3) : facture ± timbre, BL (lot, sans prix,
+│   │                         facture de route), bon de comptoir A4/A5, avoir — option cachet
 │   ├── ticket.tsx         ← ticket de caisse 80 mm (vente comptoir)
 │   ├── achat.tsx          ← pièce d'achat A4 (FA/BR/BC/DO/avoir/retour)
 │   ├── etatClient.tsx     ← état / relevé client (chronologie + solde cumulé)
@@ -28,7 +30,7 @@ src/print/
 
 | Document | Fonction | Écran / bouton |
 |---|---|---|
-| Pièce de vente (facture, BL, devis…) | `buildVentePrint` | Fiche vente → « Imprimer A4 » |
+| Pièce de vente (facture, BL, devis…) | `buildVenteModelePrint` / `buildVentePrint` | Fiche vente → « Imprimer… » (choix du modèle, cachet ; dernier modèle retenu par type) |
 | Ticket 80 mm | `buildTicketPrint` | Fiche vente (type comptoir) → « Ticket 80mm » |
 | Pièce d'achat | `buildAchatPrint` | Fiche achat → « Imprimer » |
 | Relevé client | `buildEtatClientPrint` | Fiche client → « Imprimer le relevé » |

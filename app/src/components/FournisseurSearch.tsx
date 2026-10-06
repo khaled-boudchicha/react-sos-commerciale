@@ -25,7 +25,7 @@ export default function FournisseurSearch({ value, onSelect }: {
       <div className="flex items-center justify-between border border-line rounded-sm px-3 py-2 bg-surface text-[12.5px]">
         <span><b>{value.nom}</b> <span className="money text-[10.5px] text-ink-muted">{value.code}</span></span>
         <span className="flex items-center gap-3">
-          <span className="text-[11px] text-ink-muted">Solde : <span className="money">{fmtMoney(value.ancien_credit)}</span></span>
+          <span className="text-[11px] text-ink-muted">Solde : <span className="money">{fmtMoney(value.credit_initial)}</span></span>
           <button onClick={() => onSelect(null)} className="text-ink-muted font-bold">✕</button>
         </span>
       </div>
@@ -45,7 +45,7 @@ export default function FournisseurSearch({ value, onSelect }: {
             <button key={f.id} onClick={() => { onSelect(f); setTerm(''); setOpen(false); }}
                     className="w-full text-left px-3 py-2 flex justify-between items-center border-b border-line-soft last:border-b-0 hover:bg-brand-50">
               <span><b className="text-[12.5px]">{f.nom}</b> <span className="money text-[10.5px] text-ink-muted">{f.code}</span></span>
-              <span className="money text-[11px] text-ink-muted">{fmtMoney(f.ancien_credit)}</span>
+              <span className="money text-[11px] text-ink-muted">{fmtMoney(f.credit_initial)}</span>
             </button>
           ))}
         </div>

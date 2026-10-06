@@ -31,7 +31,7 @@ const csvClients: ExportColumn<Client>[] = [
   { header: 'Téléphone', value: (c) => c.telephone ?? '' },
   { header: 'Ville', value: (c) => c.ville ?? '' },
   { header: 'Plafond crédit', value: (c) => c.plafond_credit, numeric: true },
-  { header: 'Solde', value: (c) => c.ancien_credit, numeric: true },
+  { header: 'Solde', value: (c) => c.credit, numeric: true },
 ];
 
 const csvFournisseurs: ExportColumn<Fournisseur>[] = [
@@ -39,7 +39,7 @@ const csvFournisseurs: ExportColumn<Fournisseur>[] = [
   { header: 'Nom', value: (f) => f.nom ?? '' },
   { header: 'Téléphone', value: (f) => f.telephone ?? '' },
   { header: 'Ville', value: (f) => f.ville ?? '' },
-  { header: 'Solde', value: (f) => f.ancien_credit, numeric: true },
+  { header: 'Solde', value: (f) => f.credit_initial, numeric: true },
 ];
 
 const csvDebiteurs: ExportColumn<Debiteur>[] = [
@@ -119,8 +119,8 @@ function ClientsGrid({ search }: { search: string }) {
     { key: 'tel', header: 'Téléphone', width: '120px', field: 'telephone', render: (c) => <span className="text-ink-muted">{c.telephone ?? '—'}</span> },
     { key: 'ville', header: 'Ville', width: '110px', field: 'ville', render: (c) => <span className="text-ink-muted">{c.ville ?? '—'}</span> },
     { key: 'plafond', header: 'Plafond crédit', align: 'right', width: '120px', render: (c) => <Money value={c.plafond_credit} /> },
-    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'ancien_credit', render: (c) => (
-      <span className="money font-semibold" style={{ color: Number(c.ancien_credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(c.ancien_credit)}</span>
+    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'credit', render: (c) => (
+      <span className="money font-semibold" style={{ color: Number(c.credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(c.credit)}</span>
     ) },
     { key: 'actions', header: '', align: 'right', width: '70px', render: (c) => crud.rowActions(c as Client & { id: number }) },
   ];
@@ -173,7 +173,7 @@ function FournisseursGrid({ search }: { search: string }) {
     { key: 'nom', header: 'Nom', field: 'nom', render: (f) => <b>{f.nom}</b> },
     { key: 'tel', header: 'Téléphone', width: '120px', field: 'telephone', render: (f) => <span className="text-ink-muted">{f.telephone ?? '—'}</span> },
     { key: 'ville', header: 'Ville', width: '110px', field: 'ville', render: (f) => <span className="text-ink-muted">{f.ville ?? '—'}</span> },
-    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'ancien_credit', render: (f) => <Money value={f.ancien_credit} /> },
+    { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'credit_initial', render: (f) => <Money value={f.credit_initial} /> },
     { key: 'actions', header: '', align: 'right', width: '70px', render: (f) => crud.rowActions(f as Fournisseur & { id: number }) },
   ];
   return (

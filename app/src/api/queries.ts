@@ -39,8 +39,8 @@ export const DEBITEURS = gql`
 `;
 
 export const TRESORIE_COMPLETE = gql`
-  query TresorieComplete($compte_id: Int, $date_debut: String, $date_fin: String, $limit: Int, $offset: Int, $grille: JSON) {
-    tresorieComplete(compte_id: $compte_id, date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset, grille: $grille)
+  query TresorieComplete($compte_id: Int, $date_debut: String, $date_fin: String, $limit: Int, $offset: Int, $grille: JSON, $groupe: Boolean) {
+    tresorieComplete(compte_id: $compte_id, date_debut: $date_debut, date_fin: $date_fin, limit: $limit, offset: $offset, grille: $grille, groupe: $groupe)
   }
 `;
 
@@ -51,6 +51,12 @@ export const SOLDES_COMPTES = gql`
 export const STAT_VENTES = gql`
   query StatVentes($date_debut: String, $date_fin: String, $groupement: String) {
     statVentes(date_debut: $date_debut, date_fin: $date_fin, groupement: $groupement)
+  }
+`;
+
+export const STAT_VENTES_PAR_UTILISATEUR = gql`
+  query StatVentesParUtilisateur($date_debut: String, $date_fin: String) {
+    statVentesParUtilisateur(date_debut: $date_debut, date_fin: $date_fin)
   }
 `;
 
@@ -372,4 +378,17 @@ export const FICHE_STOCK = gql`
 `;
 export const RECALCULER_STOCK_ARTICLE = gql`
   mutation RecalculerStockArticle($article_id: Int!) { recalculerStockArticle(article_id: $article_id) }
+`;
+
+// ─── Échéances clients (pièces dues à une date de règlement) ───────────────
+export const ECHEANCES = gql`
+  query Echeances($statut: String, $code_cli: String, $search: String, $limit: Int, $offset: Int) {
+    echeances(statut: $statut, code_cli: $code_cli, search: $search, limit: $limit, offset: $offset)
+  }
+`;
+
+export const MARQUER_ECHEANCE_PAYEE = gql`
+  mutation MarquerEcheancePayee($input: JSON!) {
+    marquerEcheancePayee(input: $input)
+  }
 `;

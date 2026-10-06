@@ -51,9 +51,12 @@ describe('comptesAutorises (PrevilegeBank)', () => {
   it('filtre par nom (casse et espaces ignorés)', () => {
     expect(comptesAutorises({ ...yahia, bank: [' caisse magasin '] }, comptes, (c) => c.compte)).toEqual([{ compte: 'Caisse Magasin' }]);
   });
-  it('liste vide, « * » ou admin → pas de filtre', () => {
-    expect(comptesAutorises(vide, comptes, (c) => c.compte)).toHaveLength(2);
+  it('liste vide → aucun compte (comme Main.pas)', () => {
+    expect(comptesAutorises(vide, comptes, (c) => c.compte)).toHaveLength(0);
+  });
+  it('« * » (seul ou dans la liste) ou admin → pas de filtre', () => {
     expect(comptesAutorises({ ...vide, bank: '*' }, comptes, (c) => c.compte)).toHaveLength(2);
+    expect(comptesAutorises({ ...vide, bank: ['CPA', '*'] }, comptes, (c) => c.compte)).toHaveLength(2);
     expect(comptesAutorises(TOUS_DROITS, comptes, (c) => c.compte)).toHaveLength(2);
   });
 });

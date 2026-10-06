@@ -6,6 +6,7 @@ import Dashboard from './screens/Dashboard';
 import Ventes from './screens/Ventes';
 import VenteDetail from './screens/VenteDetail';
 import VenteEditor from './screens/VenteEditor';
+import Comptoir from './screens/comptoir/Comptoir';
 import Achats from './screens/Achats';
 import AchatDetail from './screens/AchatDetail';
 import AchatEditor from './screens/AchatEditor';
@@ -14,6 +15,7 @@ import ArticleDetail from './screens/ArticleDetail';
 import Inventaires from './screens/Inventaires';
 import InventaireDetail from './screens/InventaireDetail';
 import Tiers from './screens/Tiers';
+import Echeances from './screens/Echeances';
 import ClientDetail from './screens/ClientDetail';
 import FournisseurDetail from './screens/FournisseurDetail';
 import Tresorerie from './screens/Tresorerie';
@@ -50,6 +52,7 @@ export default function App() {
           <Route index element={<Dashboard />} />
           <Route path="ventes" element={<G si={(d) => d.aModule('vente')}><Ventes /></G>} />
           <Route path="ventes/nouvelle" element={<G si={(d) => d.aModule('vente')}><VenteEditor /></G>} />
+          <Route path="comptoir" element={<G si={(d) => d.peutDoc('vente', 'BCT', 'creer') || d.peutDoc('vente', 'BRT', 'creer')}><Comptoir /></G>} />
           <Route path="ventes/:id" element={<G si={(d) => d.aModule('vente')}><VenteDetail /></G>} />
           <Route path="achats" element={<G si={(d) => d.aModule('achat')}><Achats /></G>} />
           <Route path="achats/nouvelle" element={<G si={(d) => d.aModule('achat')}><AchatEditor /></G>} />
@@ -59,6 +62,7 @@ export default function App() {
           <Route path="stock/inventaires" element={<G si={(d) => d.peut('stock', D.stock.inventaire)}><Inventaires /></G>} />
           <Route path="stock/mouvements" element={<G si={(d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie])}><MouvementsStock /></G>} />
           <Route path="stock/inventaires/:id" element={<G si={(d) => d.peut('stock', D.stock.inventaire)}><InventaireDetail /></G>} />
+          <Route path="echeances" element={<G si={(d) => d.aModule('vente')}><Echeances /></G>} />
           <Route path="tiers" element={<G si={(d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs])}><Tiers /></G>} />
           <Route path="tiers/client/:code" element={<G si={(d) => d.peut('tiers', D.tiers.clients)}><ClientDetail /></G>} />
           <Route path="tiers/fournisseur/:code" element={<G si={(d) => d.peut('tiers', D.tiers.fournisseurs)}><FournisseurDetail /></G>} />
