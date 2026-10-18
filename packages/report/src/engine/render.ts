@@ -1,5 +1,5 @@
 import {
-  BandDef, BorderDef, DEFAULT_BORDER, DEFAULT_FONT, FontDef, ObjDef, ReportData, ReportDef, StyleDef, TextObj,
+  BandDef, BorderDef, DEFAULT_BORDER, DEFAULT_FONT, FontDef, HighlightRule, ObjDef, ReportData, ReportDef, StyleDef, TextObj,
   dimensionsPage,
 } from '../model';
 import { Lazy, Scope, comparerValeurs, evaluerCondition, evaluerExpression, resoudreTexte } from '../expr/eval';
@@ -34,6 +34,8 @@ type Resolved = {
   def: ObjDef;
   x: number; y: number; w: number; h: number;
   texte?: string;
+  /** Règle de mise en forme conditionnelle retenue pour cette ligne. */
+  regle?: HighlightRule;
   valeur?: string;
   coche?: boolean;
   /** Dépend de [Page] / [TotalPages] : recalculé à l'émission de chaque page. */
@@ -179,7 +181,9 @@ export function rendreEtat(def: ReportDef, data: ReportData, opts: RenderOptions
       if (!evaluerCondition(o.visible, scope)) continue;
       const r: Resolved = { def: o, x: o.x, y: o.y, w: o.w, h: o.h, dynamique: false, scope };
       if (o.type === 'text') {
-        const police = policeDe(o, styles);
+        const regle = o.highlight?.find((h) => h.when?.trim() && evaluerCondition(h.when, scope));
+        if (regle) r.regle = regle;
+        const police = { ...policeDe(o, styles), ...(regle?.font ?? {}) };
         const res = resoudreTexte(o.text, scope, o.format);
         res.erreurs.forEach((e) => avertir(`${b.name} › ${o.name} : ${e}`));
         let texte = res.texte;
@@ -481,14 +485,14 @@ export function rendreEtat(def: ReportDef, data: ReportData, opts: RenderOptions
     if (r.dynamique) sc = r.scope.enfant().definir('page', page).definir('totalpages', total).definir('pagecount', total);
     const pos = `left:${mm(r.x + dx)};top:${mm(r.y)};width:${mm(r.w)};height:${mm(r.h)}`;
     const bord = bordureDe(o, styles);
-    const fond = fondDe(o, styles);
+    const fond = (o.type === 'text' && r.regle?.fill) || fondDe(o, styles);
     const cote = (actif: boolean, nom: string) => (actif ? `border-${nom}:${mm(bord.width)} ${bord.style} ${bord.color};` : '');
     const cadre = `${fond ? `background:${fond};` : ''}${cote(bord.top, 'top')}${cote(bord.right, 'right')}${cote(bord.bottom, 'bottom')}${cote(bord.left, 'left')}${bord.radius ? `border-radius:${mm(bord.radius)};` : ''}`;
     const rot: number = o.rotation ?? 0;
 
     switch (o.type) {
       case 'text': {
-        const police = policeDe(o, styles);
+        const police = { ...policeDe(o, styles), ...(r.regle?.font ?? {}) };
         const texte = r.dynamique ? resoudreTexte(o.text, sc, o.format).texte : (r.texte ?? '');
         const va = o.valign === 'middle' ? 'center' : o.valign === 'bottom' ? 'flex-end' : 'flex-start';
         const interieur = `<div class="rpt-t" style="justify-content:${va}">${fragmentTexte(o, police, texte, alignDe(o, styles))}</div>`;

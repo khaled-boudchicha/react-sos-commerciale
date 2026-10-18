@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useApolloClient, useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { TRESORIE_COMPLETE, SOLDES_COMPTES, COORDONNEES_SOCIETE, ANNULER_MOUVEMENT } from '../api/queries';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildTresoreriePrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeTresorerie } from '../impression/demandes';
 import MouvementCaisseModal, { MouvementKind } from '../components/MouvementCaisseModal';
 import ArreteCaisseModal from '../components/ArreteCaisseModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
@@ -86,7 +86,7 @@ export default function Tresorerie() {
     },
   }), [client, compteId, debut, fin, groupe, enAttente, version]);
 
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [fetchAll, { loading: printing }] = useLazyQuery(TRESORIE_COMPLETE, { fetchPolicy: 'network-only' });
   const [fetchExport, { loading: exporting }] = useLazyQuery(TRESORIE_COMPLETE, { fetchPolicy: 'network-only' });
@@ -109,7 +109,7 @@ export default function Tresorerie() {
     const compte = compteId != null
       ? (soldes.find((c) => c.compte_id === compteId)?.compte ?? `Compte ${compteId}`)
       : 'Tous les comptes';
-    setPrintDoc(buildTresoreriePrint(
+    setPrintDoc(demandeTresorerie(
       { res: full, compte, debut, fin },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -213,7 +213,7 @@ export default function Tresorerie() {
         <MouvementCaisseModal kind={mouvement} onClose={() => setMouvement(null)}
                               onDone={() => { void refetchMvts(); void refetchSoldes(); }} />
       )}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
       <div className="flex gap-3 flex-wrap">
         {!restreint && <CompteCard label="Tous les comptes" solde={soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0)}

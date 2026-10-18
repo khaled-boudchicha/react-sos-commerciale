@@ -3,9 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { ETAT_CLIENT, FACTURES_NON_REGLEES, COORDONNEES_SOCIETE, SET_CREDIT_INITIAL_CLIENT } from '../api/queries';
 import { useToast } from '../components/ui/Toast';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildEtatClientPrint, buildFacturesNonRegleesPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeEtatClient, demandeImpayes } from '../impression/demandes';
 import { fmtDate, fmtMoney, isoToday } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Money, PageHeader, StatusPill, Tabs, PeriodPicker } from '../components/ui/atoms';
@@ -40,7 +40,7 @@ export default function ClientDetail() {
 
   const [showRegler, setShowRegler] = useState(false);
   const [showCredit, setShowCredit] = useState(false);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const toast = useToast();
   const { peut } = useDroits();
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
@@ -102,7 +102,7 @@ export default function ClientDetail() {
           {Number(client.credit) <= 0
             ? <StatusPill tone="ok">À jour</StatusPill>
             : <StatusPill tone="warn">Nous doit</StatusPill>}
-          <button onClick={() => setPrintDoc(buildEtatClientPrint({ client, lignes, debut, fin }, societe))}
+          <button onClick={() => setPrintDoc(demandeEtatClient({ client, lignes, debut, fin }, societe))}
                   className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
             Imprimer le relevé
           </button>
@@ -126,7 +126,7 @@ export default function ClientDetail() {
                             onDone={() => { setShowCredit(false); void refetch(); void refetchFnr(); toast.success('Crédit initial mis à jour.'); }} />
       )}
 
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
       {showRegler && client && (
         <ReglerTiersModal kind="client" codeTiers={client.code_cli} nom={client.nom_client || client.code_cli}
@@ -147,7 +147,7 @@ export default function ClientDetail() {
       )}
       {vue === 'impayees' && impayees.length > 0 && client && (
         <div>
-          <button onClick={() => setPrintDoc(buildFacturesNonRegleesPrint({ codeCli: client.code_cli, nom: client.nom_client, factures: impayees }, societe))}
+          <button onClick={() => setPrintDoc(demandeImpayes({ codeCli: client.code_cli, nom: client.nom_client, factures: impayees }, societe))}
                   className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
             Imprimer la situation des impayés
           </button>

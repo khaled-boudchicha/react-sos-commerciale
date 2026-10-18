@@ -7,9 +7,9 @@ import { fmtDate, isoFirstOfMonth, isoToday, fmtMoney } from '../lib/format';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
 import Journal from './JournalVentes';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildBordereauPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeBordereau } from '../impression/demandes';
 import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader } from '../components/ui/atoms';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
@@ -49,14 +49,14 @@ export default function Ventes() {
   }), [client, type, debut, fin, userId]);
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const [fetchAll, { loading: bordereauEnCours }] = useLazyQuery(VENTES, { fetchPolicy: 'network-only' });
   const typeLabel = TYPES_VENTE.find((t) => t.code === type)?.label ?? type;
 
   async function imprimerBordereau() {
     const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 } });
     const docs: Vente[] = all?.ventes?.data ?? [];
-    setPrintDoc(buildBordereauPrint(
+    setPrintDoc(demandeBordereau(
       {
         titre: `Bordereau des ventes — ${typeLabel}`, tiersLabel: 'Client',
         debut, fin,
@@ -119,7 +119,7 @@ export default function Ventes() {
         </button>
         )}
       </PageHeader>
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       {grouper && <GrouperBLModal onClose={() => setGrouper(false)} />}
       {peutJournal && (
         <Tabs value={vue} onChange={setVue}

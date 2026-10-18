@@ -10,9 +10,9 @@ import { useCrud } from '../forms/useCrud';
 import { D, useDroits } from '../lib/droits';
 import RecouvrementPanel from '../components/RecouvrementPanel';
 import { CLIENT_SECTIONS, FOURNISSEUR_SECTIONS } from '../forms/schemas';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildDebiteursPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeCreances } from '../impression/demandes';
 import { ClientsResult, Client, FournisseursResult, Fournisseur, DebiteursResult, Debiteur } from '../api/types';
 import { fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
@@ -196,7 +196,7 @@ function FournisseursGrid({ search }: { search: string }) {
 
 function DebiteursGrid({ search }: { search: string }) {
   const navigate = useNavigate();
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const client = useApolloClient();
   // Totaux et ventilation par ancienneté de la dernière réponse (restreints aux filtres de la grille)
   const [res, setRes] = useState<DebiteursResult | null>(null);
@@ -221,7 +221,7 @@ function DebiteursGrid({ search }: { search: string }) {
     const { data: all } = await fetchAll({ variables: { search: search || undefined, limit: 1000, offset: 0 } });
     const full: DebiteursResult | undefined = all?.debiteurs;
     if (!full) return;
-    setPrintDoc(buildDebiteursPrint(
+    setPrintDoc(demandeCreances(
       { rows: full.data ?? [], totaux: full },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -263,7 +263,7 @@ function DebiteursGrid({ search }: { search: string }) {
           <ExportBtn onClick={() => void exporter()} loading={exporting} />
         </div>
       )}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={columns} rowKey={(d) => String(d.code_cli)}
                 distant={distant} cleEtat="tiers-debiteurs"
                 onRowClick={(d) => d.code_cli && navigate(`/tiers/client/${encodeURIComponent(String(d.code_cli))}`)}

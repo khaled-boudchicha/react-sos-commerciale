@@ -5,9 +5,9 @@ import { ETAT_FOURNISSEUR, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { PageHeader, StatusPill, PeriodPicker, Tabs } from '../components/ui/atoms';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildEtatFournisseurPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeEtatFournisseur } from '../impression/demandes';
 import type { EtatFournisseurSolde, EtatFournisseurLigne } from '../print/templates/etatFournisseur';
 import ReglerTiersModal from '../components/ReglerTiersModal';
 import AvancesPanel from '../components/AvancesPanel';
@@ -21,7 +21,7 @@ export default function FournisseurDetail() {
   const { code } = useParams();
   const [debut, setDebut] = useState('');
   const [fin, setFin] = useState('');
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const [showRegler, setShowRegler] = useState(false);
   const [vue, setVue] = useState<(typeof VUES)[number]['code']>('releve');
 
@@ -70,7 +70,7 @@ export default function FournisseurDetail() {
           {Number(fournisseur.credit) <= 0
             ? <StatusPill tone="ok">À jour</StatusPill>
             : <StatusPill tone="warn">À payer</StatusPill>}
-          <button onClick={() => setPrintDoc(buildEtatFournisseurPrint({ fournisseur, lignes, debut, fin }, societe))}
+          <button onClick={() => setPrintDoc(demandeEtatFournisseur({ fournisseur, lignes, debut, fin }, societe))}
                   className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
             Imprimer le relevé
           </button>
@@ -88,7 +88,7 @@ export default function FournisseurDetail() {
                           onDone={() => { void refetch(); }} />
       )}
 
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
       <div className="flex items-center gap-3 flex-wrap">
         <Tabs value={vue} onChange={setVue} options={VUES} />

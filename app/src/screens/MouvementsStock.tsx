@@ -13,9 +13,9 @@ import { PageHeader, PeriodPicker, SearchInput, Tabs } from '../components/ui/at
 import { useToast } from '../components/ui/Toast';
 import BonStockModal, { SensBon } from '../components/BonStockModal';
 import TransfertStockModal from '../components/TransfertStockModal';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildBonStockPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeBonStock } from '../impression/demandes';
 import type { BonStock, BonStockLigne } from '../print/templates';
 
 type Transfert = {
@@ -249,7 +249,7 @@ function BonDetailModal({ ouvert, onClose, onSupprimer }: {
   const { data, loading, error } = useQuery(BON_STOCK, { variables: { sens: ouvert.sens, id: ouvert.id }, fetchPolicy: 'network-only' });
   const bon: BonStock | undefined = data?.bon ?? undefined;
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const label = ouvert.sens === 'entree' ? "Bon d'entrée" : 'Bon de sortie';
   const lignes = bon?.lignes ?? [];
   const t = ouvert.transfert;
@@ -298,13 +298,13 @@ function BonDetailModal({ ouvert, onClose, onSupprimer }: {
           )}
           <button onClick={onClose} className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px]">Fermer</button>
           <button disabled={!bon}
-                  onClick={() => bon && setPrintDoc(buildBonStockPrint({ bon, sens: ouvert.sens }, (socData?.coordonneesSociete ?? {}) as Record<string, unknown>))}
+                  onClick={() => bon && setPrintDoc(demandeBonStock({ bon, sens: ouvert.sens }, (socData?.coordonneesSociete ?? {}) as Record<string, unknown>))}
                   className="px-5 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-60">
             Imprimer
           </button>
         </div>
       </div>
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
     </div>
   );
 }

@@ -104,6 +104,9 @@ type ObjBase = {
   rotation?: 0 | 90 | 180 | 270;
 };
 
+/** Mise en forme conditionnelle : la première règle dont la condition est vraie s'applique (police et fond). */
+export type HighlightRule = { when: string; font?: Partial<FontDef>; fill?: string };
+
 export type TextObj = ObjBase & {
   type: 'text';
   text: string;
@@ -119,6 +122,8 @@ export type TextObj = ObjBase & {
   format?: FormatDef;
   /** N'imprime pas une valeur identique à la ligne précédente. */
   hideDuplicates?: boolean;
+  /** Règles de mise en forme conditionnelle, évaluées pour chaque ligne imprimée. */
+  highlight?: HighlightRule[];
 };
 
 export type ImageObj = ObjBase & {

@@ -3,9 +3,9 @@ import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { JOURNAL_VENTES, JOURNAL_ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte, isoFirstOfMonth, isoToday } from '../lib/format';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildJournalPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeJournal } from '../impression/demandes';
 import { PeriodPicker, SearchInput } from '../components/ui/atoms';
 
 type LigneJournal = Record<string, any> & { id: string };
@@ -41,13 +41,13 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   }), [client, sens, vente, debut, fin, codeArticle]);
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const [fetchAll, { loading: printing }] = useLazyQuery(vente ? JOURNAL_VENTES : JOURNAL_ACHATS, { fetchPolicy: 'network-only' });
 
   async function imprimerJournal() {
     const { data: all } = await fetchAll({ variables: { date_debut: debut, date_fin: fin, code_article: article || undefined, limit: 5000, offset: 0 } });
     const full = (vente ? all?.journalVentes : all?.journalAchats) as { lignes: LigneJournal[] } | undefined;
-    setPrintDoc(buildJournalPrint(
+    setPrintDoc(demandeJournal(
       { sens, lignes: full?.lignes ?? [], debut, fin },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -85,7 +85,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
           {printing ? 'Préparation…' : 'Imprimer le journal'}
         </button>
       </div>
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={colonnes} rowKey={(l, i) => l.id ?? i}
                 distant={distant} cleEtat={vente ? 'journal-ventes' : 'journal-achats'}
                 emptyMessage="Aucune ligne sur la période."

@@ -11,10 +11,10 @@ import Icon, { Kbd, NomIcone } from '../../components/ui/Icon';
 import { useToast } from '../../components/ui/Toast';
 import { LigneDoc } from '../../components/document/lignesDocument';
 import { lignesPourServeur } from '../../components/document/prefillPiece';
-import PrintPreview from '../../print/engine/PrintPreview';
-import { PrintDocument } from '../../print/engine/types';
+import ImprimerDocument from '../../impression/ImprimerDocument';
+import { documentDeDemande } from '../../impression';
+import { demandeTicket, type DemandeImpression } from '../../impression/demandes';
 import { getImprimanteTicket, imprimerSilencieux, supporteImpressionDirecte } from '../../print/engine/silentPrint';
-import { buildTicketPrint } from '../../print/templates';
 import type { TicketExtras } from '../../print/templates/ticket';
 import { D, useDroits } from '../../lib/droits';
 import { fmtMoney, fmtQte, isoToday } from '../../lib/format';
@@ -59,7 +59,7 @@ export default function Comptoir() {
   const tot = useMemo(() => totauxTicket(ticket), [ticket]);
   const [selection, setSelection] = useState<number | null>(null);
   const [dialogue, setDialogue] = useState<Dialogue>(null);
-  const [apercu, setApercu] = useState<PrintDocument | null>(null);
+  const [apercu, setApercu] = useState<DemandeImpression | null>(null);
   const [dernier, setDernier] = useState<{ id: number; numero: string; net: number; extras: TicketExtras } | null>(null);
   const [imprimante, setImprimante] = useState<string | undefined>();
   useEffect(() => { void getImprimanteTicket().then(setImprimante); }, []);
@@ -219,13 +219,13 @@ export default function Comptoir() {
         apollo.query({ query: VENTE, variables: { id }, fetchPolicy: 'network-only' }),
         apollo.query({ query: COORDONNEES_SOCIETE, fetchPolicy: 'network-only' }),
       ]);
-      const doc = buildTicketPrint(v.vente as Vente, (s?.coordonneesSociete ?? {}) as Record<string, unknown>, extras);
+      const demande = demandeTicket(v.vente as Vente, (s?.coordonneesSociete ?? {}) as Record<string, unknown>, extras);
       if (supporteImpressionDirecte()) {
-        const r = await imprimerSilencieux(doc);
+        const r = await imprimerSilencieux(await documentDeDemande(demande));
         // Vente enregistrée : en cas d'échec on ouvre l'aperçu (réessayer, choisir l'imprimante)
-        if (!r.success) { toast.error(`Impression impossible : ${r.reason ?? 'imprimante indisponible'}`); setApercu(doc); }
+        if (!r.success) { toast.error(`Impression impossible : ${r.reason ?? 'imprimante indisponible'}`); setApercu(demande); }
       } else {
-        setApercu(doc);
+        setApercu(demande);
       }
     } catch (e: any) {
       toast.error(`Impression du ticket échouée : ${e.message ?? e}`);
@@ -502,7 +502,7 @@ export default function Comptoir() {
       {dialogue === 'caisse' && (
         <ArreteCaisseModal onClose={() => setDialogue(null)} onDone={() => { setDialogue(null); void refetchJour(); }} />
       )}
-      {apercu && <PrintPreview doc={apercu} onClose={() => setApercu(null)} />}
+      {apercu && <ImprimerDocument demande={apercu} onClose={() => setApercu(null)} />}
     </div>
   );
 }

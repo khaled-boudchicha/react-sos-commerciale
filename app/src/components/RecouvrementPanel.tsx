@@ -7,9 +7,10 @@ import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column, DataGridDistant, totalDistant } from './ui/DataGrid';
 import { ReponseDistante } from './grille/types';
 import { Bucket, ExportBtn } from './ui/atoms';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildRecouvrementPrint, RecouvrementLigne } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeRecouvrement } from '../impression/demandes';
+import type { RecouvrementLigne } from '../print/templates';
 
 const CSV: ExportColumn<RecouvrementLigne>[] = [
   { header: 'Code', value: (r) => r.code_cli },
@@ -36,7 +37,7 @@ export default function RecouvrementPanel({ search }: { search: string }) {
   const navigate = useNavigate();
   const [nbrjour, setNbrjour] = useState(30);
   const [inactifs, setInactifs] = useState(false);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const vars = { nbrjour, inactifs, search: search || undefined };
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [toutCharger, { loading: chargement }] = useLazyQuery(RECOUVREMENT, { fetchPolicy: 'network-only' });
@@ -95,7 +96,7 @@ export default function RecouvrementPanel({ search }: { search: string }) {
           <button disabled={chargement}
                   onClick={async () => {
                     const all = await complet(); if (!all) return;
-                    setPrintDoc(buildRecouvrementPrint({ rows: all.data, totaux: all.totaux, nbrjour, inactifs },
+                    setPrintDoc(demandeRecouvrement({ rows: all.data, totaux: all.totaux, nbrjour, inactifs },
                       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>));
                   }}
                   className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
@@ -118,7 +119,7 @@ export default function RecouvrementPanel({ search }: { search: string }) {
           ].map((k) => <Bucket key={k.l} label={k.l} value={k.v} tone={k.c} sub={k.s} />)}
         </div>
       )}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={columns} rowKey={(r) => r.code_cli}
                 distant={distant} cleEtat="recouvrement"
                 footer={(r) => ({

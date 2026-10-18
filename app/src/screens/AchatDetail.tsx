@@ -13,9 +13,9 @@ import TransformerMenu from '../components/document/TransformerMenu';
 import RetourModal from '../components/document/RetourModal';
 import ReglementsPiece, { TYPES_AVEC_REGLEMENT, TYPES_RETOUR } from '../components/document/ReglementsPiece';
 import LiensPiece from '../components/document/LiensPiece';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildAchatPrint } from '../print/templates/achat';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeAchat } from '../impression/demandes';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
 
@@ -35,7 +35,7 @@ export default function AchatDetail() {
   const moiId = useSession((s) => s.dossierUser?.id);
   const [confirm, setConfirm] = useState(false);
   const [retour, setRetour] = useState(false);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const [delError, setDelError] = useState<string | null>(null);
   const { data, loading, error, refetch } = useQuery(ACHAT, { variables: { id: Number(id) }, fetchPolicy: 'cache-and-network' });
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
@@ -95,7 +95,7 @@ export default function AchatDetail() {
           </button>
         )}
         {a && (
-          <button onClick={() => setPrintDoc(buildAchatPrint(a, societe))} className={btn}>Imprimer</button>
+          <button onClick={() => setPrintDoc(demandeAchat(a, societe))} className={btn}>Imprimer</button>
         )}
         {a && peutDoc('achat', code, 'creer') && (
           <button onClick={() => navigate(`/achats/nouvelle?type=${code}&from=${a.id}`)}
@@ -117,7 +117,7 @@ export default function AchatDetail() {
       )}
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
       {delError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{delError}</div>}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       {confirm && a && (
         <ConfirmDialog
           title="Supprimer cette pièce ?"

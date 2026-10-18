@@ -1,8 +1,8 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { useApolloClient, useQuery } from '@apollo/client';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildTicketVentesPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeTicketVentes } from '../impression/demandes';
 import {
   STAT_VENTES, STAT_VENTES_PAR_FAMILLE, STAT_VENTES_PAR_UTILISATEUR, STAT_VENTES_PAR_ARTICLE, STAT_VENTES_PAR_CLIENT,
   COORDONNEES_SOCIETE, BENEFICES, STAT_ACHATS, STAT_ACHATS_PAR_FOURNISSEUR, STAT_ACHATS_PAR_ARTICLE, STAT_STOCK,
@@ -133,11 +133,11 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
   const famillesTout: StatParFamille[] = Array.isArray(fam.data?.statVentesParFamille) ? fam.data.statVentesParFamille : [];
   const familles = filtreFam ? famillesTout.filter((f) => f.famille === famille) : famillesTout;
   // Ticket caisse « Articles vendus » / « Familles vendues » (même période et filtres que l'écran)
-  const [ticket, setTicket] = useState<PrintDocument | null>(null);
+  const [ticket, setTicket] = useState<DemandeImpression | null>(null);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   function imprimerTicket(v: 'article' | 'famille') {
     const estArticle = v === 'article';
-    setTicket(buildTicketVentesPrint({
+    setTicket(demandeTicketVentes({
       titre: estArticle ? 'ARTICLES VENDUS' : 'FAMILLES VENDUES',
       debut, fin,
       lignes: estArticle
@@ -185,7 +185,7 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
 
   return (
     <>
-      {ticket && <PrintPreview doc={ticket} onClose={() => setTicket(null)} />}
+      {ticket && <ImprimerDocument demande={ticket} onClose={() => setTicket(null)} />}
       {res && (
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="CA TTC" value={`${fmtMoney(res.total_ttc)} DA`} />

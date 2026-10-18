@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { ReportData, ReportDef } from '../model';
 import { rendreEtat } from '../engine/render';
 import { PX_PAR_MM } from '../engine/measure';
@@ -19,7 +19,7 @@ const NIVEAUX = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3];
  * Pages exactes (mm), zoom ajustable, miniatures, navigation clavier, paramètres de l'état,
  * impression système / directe, export PDF et HTML, accès au designer.
  */
-function ReportPreviewInterne({ def, data, params: paramsInitiaux, titre, onClose, onEdit }: {
+function ReportPreviewInterne({ def, data, params: paramsInitiaux, titre, onClose, onEdit, extra }: {
   def: ReportDef;
   data: ReportData;
   params?: Record<string, string>;
@@ -27,6 +27,8 @@ function ReportPreviewInterne({ def, data, params: paramsInitiaux, titre, onClos
   onClose: () => void;
   /** Affiche « Modifier le modèle » (ouvre le designer). */
   onEdit?: () => void;
+  /** Contenu supplémentaire de la barre d'outils (ex. sélecteur de modèle), après le titre. */
+  extra?: ReactNode;
 }) {
   const toast = useToast();
   const nom = titre || def.name;
@@ -158,6 +160,7 @@ function ReportPreviewInterne({ def, data, params: paramsInitiaux, titre, onClos
           <div className="font-extrabold text-[13px] text-ink truncate max-w-[280px]">{nom}</div>
           <div className="text-[11px] text-ink-muted">{resultat.pageCount} page{resultat.pageCount > 1 ? 's' : ''} · {resultat.lignes} ligne{resultat.lignes > 1 ? 's' : ''}</div>
         </div>
+        {extra}
 
         <div className="flex items-center gap-0.5 border-l border-line-soft pl-2">
           <button className={BTN_ICONE} onClick={() => aller(1)} disabled={courante <= 1} title="Première page (Ctrl+Début)"><Ic n="first" /></button>

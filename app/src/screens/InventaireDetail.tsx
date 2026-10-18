@@ -5,9 +5,9 @@ import { INVENTAIRE, UPDATE_LIGNE_INVENTAIRE, CLOTURER_INVENTAIRE, COORDONNEES_S
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import { PageHeader, StatusPill } from '../components/ui/atoms';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildInventairePrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeInventaire } from '../impression/demandes';
 
 type LigneInv = {
   id: number; code_article: string; designation: string; unite?: string | null;
@@ -40,11 +40,11 @@ export default function InventaireDetail() {
   const [updateLigne] = useMutation(UPDATE_LIGNE_INVENTAIRE);
   const [cloturer, { loading: cloturing }] = useMutation(CLOTURER_INVENTAIRE);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
 
   function imprimer(vierge: boolean) {
     if (!inv) return;
-    setPrintDoc(buildInventairePrint(
+    setPrintDoc(demandeInventaire(
       { inv, lignes: inv.lignes ?? [], vierge },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -110,7 +110,7 @@ export default function InventaireDetail() {
           </button>
         )}
       </PageHeader>
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error}</div>}
       {qError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{qError.message}</div>}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   BAND_LABELS, BandDef, BandType, BarcodeObj, BorderDef, DEFAULT_BORDER, DEFAULT_FONT, FONT_FAMILIES, FormatDef, ImageObj,
-  LineObj, ObjDef, PAGE_SIZES, PageSizeName, ParamDef, ReportDef, ShapeObj, StyleDef, TextObj, CheckboxObj, creerPage,
+  HighlightRule, LineObj, ObjDef, PAGE_SIZES, PageSizeName, ParamDef, ReportDef, ShapeObj, StyleDef, TextObj, CheckboxObj, creerPage,
 } from '../../model';
 import { kindDe, listerTypes } from '../../registre';
 import { validerExpression } from '../../expr/parser';
@@ -112,6 +112,26 @@ function ProprietesObjets({ D, objets, ouvrirExpression }: { D: DesignerApi; obj
             <Interrupteur label="S’agrandit selon le texte" value={t0.canGrow} onChange={(v) => maj({ canGrow: v })} aide="La hauteur de l'objet et de la bande s'étend" />
             <Interrupteur label="Se réduit selon le texte" value={t0.canShrink} onChange={(v) => maj({ canShrink: v })} />
             <Interrupteur label="Masquer les doublons" value={t0.hideDuplicates} onChange={(v) => maj({ hideDuplicates: v })} aide="N'imprime pas une valeur identique à la ligne précédente" />
+          </Section>
+          <Section titre="Mise en forme conditionnelle" ouvert={(t0.highlight?.length ?? 0) > 0}
+                   actions={<BoutonIcone icone="plus" titre="Ajouter une règle" onClick={() => maj({ highlight: [...(t0.highlight ?? []), { when: '', font: { color: '#DC2626', bold: true } }] })} />}>
+            {(t0.highlight ?? []).length === 0 && <p className="text-[11px] text-ink-muted">Change la couleur, le gras ou le fond selon la valeur : <code>Lignes.reste &gt; 0</code>.</p>}
+            {(t0.highlight ?? []).map((h, i) => {
+              const majRegle = (p: Partial<HighlightRule>) => maj({ highlight: (t0.highlight ?? []).map((x, k) => (k === i ? { ...x, ...p } : x)) });
+              return (
+                <div key={i} className="rounded-md border border-line-soft p-2 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <div className="flex-1 min-w-0"><Texte mono value={h.when} placeholder="Lignes.reste > 0" onChange={(v) => majRegle({ when: v })} /></div>
+                    <BoutonIcone icone="trash" titre="Supprimer la règle" onClick={() => maj({ highlight: (t0.highlight ?? []).filter((_, k) => k !== i) })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Ligne large label="Texte"><Couleur value={h.font?.color} onChange={(v) => majRegle({ font: { ...h.font, color: v } })} vide="Inchangé" /></Ligne>
+                    <Ligne large label="Fond"><Couleur value={h.fill} onChange={(v) => majRegle({ fill: v })} vide="Inchangé" /></Ligne>
+                  </div>
+                  <Interrupteur label="Gras" value={h.font?.bold} onChange={(v) => majRegle({ font: { ...h.font, bold: v } })} />
+                </div>
+              );
+            })}
           </Section>
           <Section titre="Style nommé" ouvert={false}>
             <Choix value={t0.style ?? ''} onChange={(v) => maj({ style: v || undefined })} options={[{ value: '', label: '(aucun)' }, ...def.styles.map((s) => ({ value: s.name, label: s.name }))]} />

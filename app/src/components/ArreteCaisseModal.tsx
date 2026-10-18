@@ -6,9 +6,9 @@ import { fmtMoney, isoToday } from '../lib/format';
 import { useSession } from '../store/session';
 import { useToast } from './ui/Toast';
 import ConfirmDialog from './ui/ConfirmDialog';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildArreteCaissePrint, buildRecuTransfertPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeArreteCaisse, demandeRecuTransfert } from '../impression/demandes';
 import type { ArreteCaisseData } from '../print/templates';
 import { D, useDroits } from '../lib/droits';
 
@@ -40,7 +40,7 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
   const [confirm, setConfirm] = useState(false);
   const [cloture, setCloture] = useState<ArreteCaisseData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
 
   const { data, loading, error: qError } = useQuery(ARRETE_CAISSE, {
     variables: { compte_id: compteId ? Number(compteId) : undefined, compte: compte?.compte ?? user?.compte ?? undefined, date },
@@ -71,7 +71,7 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
       setConfirmTransfert(false);
       setTransfertFait(true);
       toast.success(`Transfert de ${fmtMoney(compteSaisi)} DA enregistré.`);
-      setPrintDoc(buildRecuTransfertPrint({
+      setPrintDoc(demandeRecuTransfert({
         source: compte.compte, destination: cibleTransfert.compte, montant: compteSaisi, date,
         utilisateur: user?.name || user?.username, observation,
         societe: (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
@@ -117,7 +117,7 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
 
   function imprimer() {
     if (!arrete) return;
-    setPrintDoc(buildArreteCaissePrint(
+    setPrintDoc(demandeArreteCaisse(
       { arrete, montantCompte: compteSaisi, utilisateur: user?.name || user?.username },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -293,7 +293,7 @@ export default function ArreteCaisseModal({ onClose, onDone }: { onClose: () => 
           confirmLabel="Transférer" loading={transfert}
           onConfirm={() => void doTransfert()} onCancel={() => setConfirmTransfert(false)} />
       )}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
     </div>
   );
 }

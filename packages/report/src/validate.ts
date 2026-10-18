@@ -57,7 +57,10 @@ export function verifierModele(def: ReportDef): Probleme[] {
     for (const o of b.objects) {
       const ctx = `${nom} › ${o.name}`;
       expr(o.visible, `${ctx} › visibilité`, b.id, o.id);
-      if (o.type === 'text') modele(o.text, ctx, b.id, o.id);
+      if (o.type === 'text') {
+        modele(o.text, ctx, b.id, o.id);
+        (o.highlight ?? []).forEach((h) => expr(h.when, `${ctx} › mise en forme conditionnelle`, b.id, o.id));
+      }
       if (o.type === 'barcode') modele(o.value, ctx, b.id, o.id);
       if (o.type === 'image') expr(o.expr, ctx, b.id, o.id);
       if (o.type === 'checkbox') expr(o.checked, ctx, b.id, o.id);

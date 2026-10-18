@@ -5,9 +5,10 @@ import { fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column } from './ui/DataGrid';
 import { ExportBtn } from './ui/atoms';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildEtat104Print, Etat104Ligne } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeEtat104 } from '../impression/demandes';
+import type { Etat104Ligne } from '../print/templates';
 
 const CSV: ExportColumn<Etat104Ligne>[] = [
   { header: 'Code', value: (r) => r.code_cli },
@@ -27,7 +28,7 @@ export default function Etat104Panel() {
   const anneeCourante = new Date().getFullYear();
   const [annee, setAnnee] = useState(anneeCourante);
   const [inclureBl, setInclureBl] = useState(false);
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const { data, loading, error } = useQuery(ETAT_104, { variables: { annee, inclure_bl: inclureBl } });
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const res = data?.etat104;
@@ -62,7 +63,7 @@ export default function Etat104Panel() {
         </label>
         <div className="ml-auto flex gap-2">
           <button disabled={!res}
-                  onClick={() => res && setPrintDoc(buildEtat104Print(
+                  onClick={() => res && setPrintDoc(demandeEtat104(
                     { rows, totaux: res.totaux, debut: res.debut, fin: res.fin, inclureBl },
                     (socData?.coordonneesSociete ?? {}) as Record<string, unknown>))}
                   className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
@@ -77,7 +78,7 @@ export default function Etat104Panel() {
           {t.incomplets} client(s) sans NIF : complétez leur fiche avant de déposer la déclaration.
         </div>
       )}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={columns} rows={rows} rowKey={(r) => r.code_cli || r.raison} loading={loading} error={error?.message}
                 emptyMessage={inclureBl ? 'Aucune vente sur l’exercice.' : 'Aucune facture sur l’exercice — cochez « Inclure les bons de livraison » si vous facturez sur BL.'}
                 footer={t ? { _label: `${t.nb_clients} client(s)`, ht: <span className="money">{fmtMoney(t.montant_ht)}</span>,

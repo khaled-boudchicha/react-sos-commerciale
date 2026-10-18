@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReportData, ReportDef } from '../model';
-import { chargerModele } from '../store';
+import { ModeleInfo, chargerModele, definirModeleParDefaut, listerModeles } from '../store';
 import { useToast } from './toast';
 import ReportPreview from './ReportPreview';
 import ReportDesigner from './ReportDesigner';
@@ -22,12 +22,15 @@ function ImpressionModeleInterne({ modeleRef, data, titre, onClose }: {
   const [ref, setRef] = useState(modeleRef);
   const [def, setDef] = useState<ReportDef | null>(null);
   const [edition, setEdition] = useState(false);
+  const [modeles, setModeles] = useState<ModeleInfo[]>([]);
 
   useEffect(() => {
     let vivant = true;
     chargerModele(ref).then((d) => { if (vivant) setDef(d); }).catch((e) => { toast.error((e as Error).message); onClose(); });
     return () => { vivant = false; };
   }, [ref]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { if (def) void listerModeles(def.kind).then(setModeles); }, [def?.kind, edition]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!def) return null;
   if (edition) {
@@ -37,7 +40,18 @@ function ImpressionModeleInterne({ modeleRef, data, titre, onClose }: {
                       onClose={() => { setEdition(false); setDef(null); /* recharge le modèle enregistré */ void chargerModele(ref).then(setDef).catch(() => onClose()); }} />
     );
   }
-  return <ReportPreview def={def} data={data} titre={titre} onClose={onClose} onEdit={() => setEdition(true)} />;
+  const selecteur = modeles.length > 1 ? (
+    <label className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-muted">
+      Modèle
+      <select value={modeles.some((m) => m.ref === ref) ? ref : ''} aria-label="Modèle d’impression"
+              onChange={(e) => { const r = e.target.value; if (!r) return; definirModeleParDefaut(def.kind, r); setRef(r); }}
+              className="h-8 max-w-[260px] rounded-md border border-line bg-surface text-ink text-[12px] font-bold px-2">
+        {!modeles.some((m) => m.ref === ref) && <option value="">{def.name}</option>}
+        {modeles.map((m) => <option key={m.ref} value={m.ref}>{m.name}{m.source === 'integre' ? '' : ' (perso)'}</option>)}
+      </select>
+    </label>
+  ) : null;
+  return <ReportPreview def={def} data={data} titre={titre} onClose={onClose} onEdit={() => setEdition(true)} extra={selecteur} />;
 }
 
 export default function ImpressionModele(props: Parameters<typeof ImpressionModeleInterne>[0]) {

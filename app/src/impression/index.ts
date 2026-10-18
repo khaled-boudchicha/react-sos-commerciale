@@ -1,4 +1,6 @@
-import { configurerReport, enregistrerFonction, type StockageModeles } from '@softly/report';
+import { chargerModele, configurerReport, enregistrerFonction, listerModeles, modeleParDefaut, rendreEtat, versDocumentImprimable, type StockageModeles } from '@softly/report';
+import type { PrintDocument } from '../print/engine/types';
+import type { DemandeImpression } from './demandes';
 import { arreteLaSomme } from '../lib/enLettres';
 import { imprimerSilencieux, supporteImpressionDirecte } from '../print/engine/silentPrint';
 import { declarerTypesMetier } from './types';
@@ -36,3 +38,20 @@ export function initialiserImpression(): void {
 }
 
 export { donneesVente, donneesAchat, donneesArticles } from './types';
+
+/**
+ * Rend une demande d'impression en document imprimable `{ title, html, css }` (impression directe sans aperçu,
+ * ex. ticket de caisse envoyé à l'imprimante thermique). Même choix de modèle que `ImprimerDocument`.
+ */
+export async function documentDeDemande(d: DemandeImpression): Promise<PrintDocument> {
+  const liste = await listerModeles(d.kind);
+  const refs = new Set(liste.map((m) => m.ref));
+  const impose = d.modele ? (d.modele.includes(':') ? d.modele : `integre:${d.modele}`) : null;
+  const defaut = modeleParDefaut(d.kind);
+  const ref = impose && refs.has(impose) ? impose : defaut && refs.has(defaut) ? defaut : liste[0]?.ref;
+  if (!ref) throw new Error(`Aucun modèle d'impression pour « ${d.kind} ».`);
+  const def = await chargerModele(ref);
+  return versDocumentImprimable(rendreEtat(def, d.data), d.titre);
+}
+
+export type { DemandeImpression } from './demandes';

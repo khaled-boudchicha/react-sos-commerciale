@@ -1,6 +1,6 @@
 {
   "name": "gestion-commerciale-desktop",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "SOFTLY Gestion Commerciale — application desktop (Windows/macOS/Linux)",
   "main": "dist-electron/main.js",
   "scripts": {

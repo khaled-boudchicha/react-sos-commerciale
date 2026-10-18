@@ -128,6 +128,13 @@ Dans les textes : `Total : [Facture.total_ttc] DA`. Opérateurs `+ - * / % & = <
 `src/data/functions.ts`). Variables système : `Page`, `TotalPages`, `Date`, `Now`, `Row`. Aucune évaluation
 dynamique (`eval` / `Function`) : compatible avec une CSP stricte. Fonctions métier : `enregistrerFonction`.
 
+## Mise en forme conditionnelle
+
+Chaque texte accepte des règles `highlight: [{ when: 'Lignes.reste > 0', font: { color: '#DC2626', bold: true }, fill: '#FEE2E2' }]` :
+la première règle dont la condition est vraie s'applique à la ligne imprimée (éditable dans le designer, section
+« Mise en forme conditionnelle » ; les conditions sont vérifiées par `verifierModele`). L'aperçu propose aussi un
+sélecteur de modèle (`ImpressionModele`) et `ReportPreview` accepte un contenu de barre d'outils (`extra`).
+
 ## Impression fidèle (pagination)
 
 - Le moteur **découpe lui-même** les pages : chaque page est un bloc `.rpt-page` à sa taille finale en mm, avec

@@ -15,10 +15,12 @@ import ReglementsPiece, { TYPES_AVEC_REGLEMENT, TYPES_RETOUR } from '../componen
 import LiensPiece from '../components/document/LiensPiece';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
-import { buildTicketPrint } from '../print/templates';
 import ImprimerPieceDialog from '../components/document/ImprimerPieceDialog';
 import { ImpressionModele } from '@softly/report';
 import { donneesVente } from '../impression';
+import { demandeTicket } from '../impression/demandes';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
 
@@ -33,6 +35,7 @@ export default function VenteDetail() {
   const [confirm, setConfirm] = useState(false);
   const [retour, setRetour] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [demande, setDemande] = useState<DemandeImpression | null>(null);
   const [choixImpression, setChoixImpression] = useState(false);
   const [modelePerso, setModelePerso] = useState<string | null>(null);
   const [delError, setDelError] = useState<string | null>(null);
@@ -102,7 +105,7 @@ export default function VenteDetail() {
           <button onClick={() => setChoixImpression(true)} className={btn}>Imprimer…</button>
         )}
         {v && peutImprimer && v.type === 4 && (
-          <button onClick={() => setPrintDoc(buildTicketPrint(v, societe))} className={btn}>Ticket 80mm</button>
+          <button onClick={() => setDemande(demandeTicket(v, societe))} className={btn}>Ticket 80mm</button>
         )}
         {v && peutDoc('vente', code, 'creer') && (
           <button onClick={() => navigate(`/ventes/nouvelle?type=${code}&from=${v.id}`)}
@@ -129,6 +132,7 @@ export default function VenteDetail() {
                              onClose={() => setChoixImpression(false)} />
       )}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {demande && <ImprimerDocument demande={demande} onClose={() => setDemande(null)} />}
       {modelePerso && v && <ImpressionModele modeleRef={modelePerso} data={donneesVente(v, societe)} titre={`${v.type_doc} ${v.numero}`} onClose={() => setModelePerso(null)} />}
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
       {delError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{delError}</div>}

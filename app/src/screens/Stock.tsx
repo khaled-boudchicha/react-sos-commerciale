@@ -9,9 +9,9 @@ import { useCrud } from '../forms/useCrud';
 import PeremptionPanel from '../components/PeremptionPanel';
 import { D, useDroits } from '../lib/droits';
 import { buildArticleSections } from '../forms/schemas';
-import PrintPreview from '../print/engine/PrintPreview';
-import { PrintDocument } from '../print/engine/types';
-import { buildStockPrint } from '../print/templates';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeStock } from '../impression/demandes';
 import { ArticlesResult, Article } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column, DataGridDistant } from '../components/ui/DataGrid';
@@ -71,7 +71,7 @@ export default function Stock() {
     peutSupprimer: peut('stock', D.stock.supprimerArticle),
   });
 
-  const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [fetchAll, { loading: printing }] = useLazyQuery(ARTICLES, { fetchPolicy: 'network-only' });
 
@@ -87,7 +87,7 @@ export default function Stock() {
     const full: ArticlesResult | undefined = all?.articles;
     if (!full) return;
     const filtre = vue === 'alerte' ? 'Articles en alerte' : vue === 'marge' ? 'Marges négatives' : (search || undefined);
-    setPrintDoc(buildStockPrint(
+    setPrintDoc(demandeStock(
       { articles: full.data ?? [], filtre },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
@@ -154,7 +154,7 @@ export default function Stock() {
         )}
       </PageHeader>
       {crud.modals}
-      {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <Tabs value={vue} onChange={setVue}
             options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
       {vue === 'peremption' ? <PeremptionPanel /> : (

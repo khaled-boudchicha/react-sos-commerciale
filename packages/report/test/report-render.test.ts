@@ -98,6 +98,26 @@ describe('pagination', () => {
   });
 });
 
+describe('mise en forme conditionnelle', () => {
+  it('applique la première règle vraie (couleur, gras, fond) ligne par ligne', () => {
+    const e = modeleFacture();
+    const cell = e.bands[3].objects[1] as TextObj;
+    cell.highlight = [{ when: 'Lignes.qte > 5', font: { color: '#DC2626', bold: true }, fill: '#FEE2E2' }];
+    const r = rendreEtat(e, { Societe: {}, Vente: { numero: '1' }, Lignes: [{ designation: 'a', qte: 1, prix: 10 }, { designation: 'b', qte: 9, prix: 10 }] }, { mesureur });
+    const html = r.pages[0];
+    // 2 cellules « qte × prix » : seule la 2e est en rouge sur fond rose
+    expect((html.match(/color:#DC2626/g) ?? []).length).toBe(1);
+    expect((html.match(/background:#FEE2E2/g) ?? []).length).toBe(1);
+    expect(html.indexOf('color:#DC2626')).toBeGreaterThan(html.indexOf('>b<'));
+  });
+  it('une condition invalide est signalée par la vérification du modèle', async () => {
+    const { verifierModele } = await import('../src/validate');
+    const e = modeleFacture();
+    (e.bands[3].objects[0] as TextObj).highlight = [{ when: 'Lignes.qte >>> 1' }];
+    expect(verifierModele(e).some((p) => /mise en forme conditionnelle/.test(p.message))).toBe(true);
+  });
+});
+
 describe('groupes et maître-détail', () => {
   function modeleGroupes(): ReportDef {
     const e = creerEtat('vente', 'Groupes');
