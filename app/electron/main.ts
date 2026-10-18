@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell, IpcMainInvokeEvent } f
 import * as path from 'path';
 import Store from 'electron-store';
 import { initialiserMisesAJour } from './updater';
+import { enregistrerModeles } from './modeles';
 
 // Persistance locale (session, préférences).
 const store = new Store({ name: 'gestion-commerciale' });
@@ -128,6 +129,7 @@ ipcMain.handle('print:silent', async (e, html: string, opts: { deviceName?: stri
 app.whenReady().then(() => {
   createWindow();
   initialiserMisesAJour(() => win, expediteurValide);
+  enregistrerModeles(() => win, expediteurValide);
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

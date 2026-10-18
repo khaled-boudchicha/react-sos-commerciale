@@ -2,7 +2,8 @@
  *  source unique des tokens (règle : zéro hex hors tokens.css). */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // le paquet @softly/report est compilé avec les utilitaires de l'application (noms de jetons communs)
+  content: ['./index.html', './src/**/*.{ts,tsx}', '../packages/report/src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

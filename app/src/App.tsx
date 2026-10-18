@@ -22,6 +22,7 @@ import Tresorerie from './screens/Tresorerie';
 import Statistiques from './screens/Statistiques';
 import Referentiels from './screens/Referentiels';
 import Parametres from './screens/Parametres';
+import { ModelesPage } from '@softly/report';
 import Diagnostic from './screens/Diagnostic';
 import NotFound from './screens/NotFound';
 import DemoGrille from './screens/DemoGrille';
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="tresorerie" element={<G si={(d) => d.peut('autre', D.autre.tresorerie)}><Tresorerie /></G>} />
           <Route path="statistiques" element={<G si={(d) => d.peut('autre', D.autre.statistiques)}><Statistiques /></G>} />
           <Route path="referentiels" element={<G si={(d) => d.peutUn('tiers', LIBELLES_REFERENTIELS)}><Referentiels /></G>} />
+          <Route path="modeles" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><ModelesPage /></G>} />
           <Route path="parametres" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><Parametres /></G>} />
           <Route path="parametres/utilisateurs" element={<G si={(d) => d.peut('autre', D.autre.droitsAcces)}><Utilisateurs /></G>} />
           <Route path="diagnostic" element={<Diagnostic />} />

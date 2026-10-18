@@ -1,0 +1,25 @@
+/* Thème de @softly/report : les jetons du paquet pointent sur ceux de l'application (clair / sombre inclus).
+   Les utilitaires Tailwind du paquet sont générés par la config Tailwind de l'app (voir tailwind.config.js). */
+.gcr-root {
+  display: contents;
+  --gcr-bg: var(--bg);
+  --gcr-surface: var(--surface);
+  --gcr-surface-sunken: var(--surface-sunken);
+  --gcr-line: var(--line);
+  --gcr-line-soft: var(--line-soft);
+  --gcr-text: var(--text);
+  --gcr-text-label: var(--text-label);
+  --gcr-text-muted: var(--text-muted);
+  --gcr-brand-700: var(--brand-700);
+  --gcr-success: var(--success);
+  --gcr-warning: var(--warning);
+  --gcr-danger: var(--danger);
+  --gcr-r-sm: var(--r-sm);
+  --gcr-r-md: var(--r-md);
+  --gcr-r-lg: var(--r-lg);
+  --gcr-shadow-soft: var(--shadow-soft);
+  --gcr-shadow-card: var(--shadow-card);
+  --gcr-shadow-lifted: var(--shadow-lifted);
+  --gcr-font-ui: var(--font-ui);
+  --gcr-font-mono: var(--font-mono);
+}

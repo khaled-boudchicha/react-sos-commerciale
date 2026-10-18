@@ -5,6 +5,7 @@ import Dialog, { DialogButton } from '../ui/Dialog';
 import { PrintDocument } from '../../print/engine/types';
 import { getCachet } from '../../print/engine/cachet';
 import { buildVenteModelePrint, buildVentePrint, modelesPour, ModeleVenteId, Societe } from '../../print/templates';
+import { type ModeleInfo, listerModeles, modeleParDefaut } from '@softly/report';
 
 const GENERIQUE = 'generique';
 const cleModele = (code: string) => `gc.impression.modele.${code}`;
@@ -14,18 +15,22 @@ const cleModele = (code: string) => `gc.impression.modele.${code}`;
  * `printmodels` du desktop) + option « avec cachet ». Le dernier modèle choisi par type de
  * pièce est retenu sur le poste.
  */
-export default function ImprimerPieceDialog({ vente, code, societe, onApercu, onClose }: {
+export default function ImprimerPieceDialog({ vente, code, societe, onApercu, onModele, onClose }: {
   vente: Vente;
   code: string;
   societe: Societe;
   onApercu: (doc: PrintDocument) => void;
+  /** Modèle personnalisé (.gcr ou intégré du designer) choisi : `integre:<id>` / `fichier:<nom>`. */
+  onModele?: (ref: string) => void;
   onClose: () => void;
 }) {
+  const [perso, setPerso] = useState<ModeleInfo[]>([]);
+  useEffect(() => { if (onModele) void listerModeles('vente').then(setPerso).catch(() => setPerso([])); }, [onModele]);
   const modeles = modelesPour(code);
   const [choix, setChoix] = useState<string>(() => {
     try {
       const m = localStorage.getItem(cleModele(code));
-      if (m && (m === GENERIQUE || modeles.some((x) => x.id === m))) return m;
+      if (m && (m === GENERIQUE || m.startsWith('perso:') || modeles.some((x) => x.id === m))) return m;
     } catch { /* stockage indisponible */ }
     return modeles[0]?.id ?? GENERIQUE;
   });
@@ -35,14 +40,17 @@ export default function ImprimerPieceDialog({ vente, code, societe, onApercu, on
 
   function apercu() {
     try { localStorage.setItem(cleModele(code), choix); } catch { /* ignore */ }
+    if (choix.startsWith('perso:')) { onModele?.(choix.slice('perso:'.length)); return; }
     const doc = choix === GENERIQUE
       ? buildVentePrint(vente, societe)
       : buildVenteModelePrint(vente, societe, choix as ModeleVenteId, { cachet: avecCachet ? cachet : null });
     onApercu(doc);
   }
 
+  const defautPerso = modeleParDefaut('vente');
   const options = [...modeles.map((m) => ({ id: m.id as string, titre: m.titre, sous: 'Modèle du desktop' })),
-    { id: GENERIQUE, titre: 'Modèle moderne A4', sous: 'Mise en page Gestion Commerciale' }];
+    { id: GENERIQUE, titre: 'Modèle moderne A4', sous: 'Mise en page Gestion Commerciale' },
+    ...perso.map((m) => ({ id: `perso:${m.ref}`, titre: m.name, sous: `${m.source === 'integre' ? 'Modèle personnalisable' : 'Mon modèle'}${defautPerso === m.ref ? ' · par défaut' : ''}` }))];
 
   return (
     <Dialog title="Imprimer la pièce" subtitle={`${vente.type_doc} ${vente.numero}`} onClose={onClose} width={480}
@@ -64,7 +72,7 @@ export default function ImprimerPieceDialog({ vente, code, societe, onApercu, on
             </label>
           ))}
         </fieldset>
-        {choix !== GENERIQUE && (
+        {choix !== GENERIQUE && !choix.startsWith('perso:') && (
           <label className="flex items-center gap-2.5 text-[13px] font-semibold" style={cachet ? undefined : { color: 'var(--text-secondary)' }}>
             <input type="checkbox" checked={avecCachet} disabled={!cachet} onChange={(e) => setAvecCachet(e.target.checked)}
                    className="w-[18px] h-[18px]" style={{ accentColor: 'var(--brand-700)' }} />

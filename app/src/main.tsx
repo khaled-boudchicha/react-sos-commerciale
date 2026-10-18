@@ -7,7 +7,11 @@ import App from './App';
 import { ToastProvider } from './components/ui/Toast';
 import { loadTheme } from './screens/Parametres';
 import './styles/index.css';
+import './styles/report-theme.css';
+import { initialiserImpression } from './impression';
+import PontNotifications from './impression/PontNotifications';
 
+initialiserImpression();
 void useSession.getState().hydrate();
 void loadTheme();
 
@@ -18,6 +22,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ApolloProvider client={apollo}>
       <ToastProvider>
+        <PontNotifications />
         <App />
       </ToastProvider>
     </ApolloProvider>

@@ -17,6 +17,8 @@ import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import { buildTicketPrint } from '../print/templates';
 import ImprimerPieceDialog from '../components/document/ImprimerPieceDialog';
+import { ImpressionModele } from '@softly/report';
+import { donneesVente } from '../impression';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
 
@@ -32,6 +34,7 @@ export default function VenteDetail() {
   const [retour, setRetour] = useState(false);
   const [printDoc, setPrintDoc] = useState<PrintDocument | null>(null);
   const [choixImpression, setChoixImpression] = useState(false);
+  const [modelePerso, setModelePerso] = useState<string | null>(null);
   const [delError, setDelError] = useState<string | null>(null);
   // cache-and-network : la pièce peut avoir changé (modification, règlement, retour…)
   const { data, loading, error, refetch } = useQuery(VENTE, { variables: { id: Number(id) }, fetchPolicy: 'cache-and-network' });
@@ -122,9 +125,11 @@ export default function VenteDetail() {
       {choixImpression && v && (
         <ImprimerPieceDialog vente={v} code={code} societe={societe}
                              onApercu={(doc) => { setChoixImpression(false); setPrintDoc(doc); }}
+                             onModele={(ref) => { setChoixImpression(false); setModelePerso(ref); }}
                              onClose={() => setChoixImpression(false)} />
       )}
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
+      {modelePerso && v && <ImpressionModele modeleRef={modelePerso} data={donneesVente(v, societe)} titre={`${v.type_doc} ${v.numero}`} onClose={() => setModelePerso(null)} />}
       {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
       {delError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{delError}</div>}
       {confirm && v && (

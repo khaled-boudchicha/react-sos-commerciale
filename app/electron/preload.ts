@@ -11,6 +11,17 @@ contextBridge.exposeInMainWorld('gc', {
   printSilent: (html: string, opts?: { deviceName?: string; silent?: boolean }) =>
     ipcRenderer.invoke('print:silent', html, opts ?? {}),
   version: () => ipcRenderer.invoke('app:version'),
+  modeles: {
+    dossier: () => ipcRenderer.invoke('modeles:dossier'),
+    liste: () => ipcRenderer.invoke('modeles:liste'),
+    lire: (file: string) => ipcRenderer.invoke('modeles:lire', file),
+    ecrire: (file: string, contenu: string) => ipcRenderer.invoke('modeles:ecrire', file, contenu),
+    supprimer: (file: string) => ipcRenderer.invoke('modeles:supprimer', file),
+    importer: () => ipcRenderer.invoke('modeles:importer'),
+    exporter: (nom: string, contenu: string) => ipcRenderer.invoke('modeles:exporter', nom, contenu),
+    ouvrirDossier: () => ipcRenderer.invoke('modeles:ouvrirDossier'),
+    pdf: (html: string, l: number, h: number, nom: string) => ipcRenderer.invoke('modeles:pdf', html, l, h, nom),
+  },
   majEtat: () => ipcRenderer.invoke('maj:etat'),
   majVerifier: () => ipcRenderer.invoke('maj:verifier'),
   majInstaller: () => ipcRenderer.invoke('maj:installer'),

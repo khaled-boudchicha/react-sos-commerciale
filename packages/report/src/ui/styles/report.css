@@ -1,0 +1,24 @@
+/*
+ * Feuille de style du paquet — TOUT est préfixé `.gcr-root` : rien ne fuit vers l'application hôte.
+ * Les pages d'état elles-mêmes (.rpt-*) ont leur propre CSS, émis par le moteur.
+ */
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind utilities;
+
+.gcr-root { display: contents; }
+
+/* Remise à zéro minimale, à spécificité nulle (:where) : jamais plus forte que les utilitaires ni le CSS des pages */
+:where(.gcr-root) :where(*, ::before, ::after) { box-sizing: border-box; border-width: 0; border-style: solid; border-color: var(--gcr-line); }
+:where(.gcr-root) :where(button, input, select, textarea) { font: inherit; color: inherit; letter-spacing: inherit; margin: 0; }
+:where(.gcr-root) :where(button) { background: transparent; cursor: pointer; padding: 0; text-transform: none; -webkit-appearance: button; }
+:where(.gcr-root) :where(button:disabled) { cursor: default; }
+:where(.gcr-root) :where(h1, h2, h3, h4, p, ul, ol, dl, dd, figure) { margin: 0; }
+:where(.gcr-root) :where(ul, ol) { list-style: none; padding: 0; }
+:where(.gcr-root) :where(table) { border-collapse: collapse; }
+:where(.gcr-root) :where(img, svg, video, canvas) { display: block; vertical-align: middle; }
+:where(.gcr-root) :where(code, kbd, samp, pre) { font-family: var(--gcr-font-mono); font-size: 1em; }
+
+/* Typographie de base de l'interface (les pages d'état gardent leurs propres polices) */
+.gcr-root :where(.fixed, .gcr-ui) { font-family: var(--gcr-font-ui); color: var(--gcr-text); line-height: 1.4; -webkit-font-smoothing: antialiased; }
