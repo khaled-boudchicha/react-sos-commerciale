@@ -10,6 +10,7 @@ import {
   supporteImpressionDirecte, listerImprimantes, getImprimanteTicket, setImprimanteTicket, PrinterInfo,
 } from '../print/engine/silentPrint';
 import { getCachet, lireImage, setCachet } from '../print/engine/cachet';
+import ChoixDisposition from '../navigation/ChoixDisposition';
 
 export function applyTheme(theme: 'light' | 'dark') {
   document.documentElement.dataset.theme = theme;
@@ -75,6 +76,9 @@ export default function Parametres() {
             </button>
           ))}
         </div>
+        <h3 className="font-bold text-[12.5px] mt-5 mb-1">Disposition du menu</h3>
+        <p className="text-[11.5px] text-ink-muted mb-3">Barre de navigation latérale ou ruban de commandes en haut, comme Microsoft Office. Réglage propre à ce poste.</p>
+        <ChoixDisposition />
       </section>
 
       <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">

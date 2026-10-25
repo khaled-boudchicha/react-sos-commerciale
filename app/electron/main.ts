@@ -63,6 +63,10 @@ function createWindow() {
     },
   });
 
+  // Barre de menus native masquée (Windows / Linux) : l'application a sa propre navigation (barre latérale ou ruban).
+  // Sans masquage automatique, Alt reste disponible pour les touches d'accès du ruban ; les raccourcis du menu restent actifs.
+  if (process.platform !== 'darwin') win.setMenuBarVisibility(false);
+
   // Aucune navigation hors de l'app ; les liens externes s'ouvrent dans le navigateur système.
   win.webContents.on('will-navigate', (e, url) => {
     const interne = url.startsWith('file://') || (process.env.NODE_ENV === 'development' && url.startsWith('http://localhost:'));

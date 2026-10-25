@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import {
@@ -30,6 +30,8 @@ export default function Stock() {
   const [params] = useSearchParams();
   const [vue, setVue] = useState<(typeof VUES)[number]['code']>(
     (VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous');
+  // Liens directs (ruban) : ?vue=alerte, ?vue=peremption…
+  useEffect(() => { setVue((VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous'); }, [params]);
   const [search, setSearch] = useState('');
   // Incrémenté après création / modification / suppression : relit la liste
   const [version, setVersion] = useState(0);

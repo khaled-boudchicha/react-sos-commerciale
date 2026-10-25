@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { AchatsResult, Achat, TYPES_ACHAT } from '../api/types';
@@ -24,6 +24,14 @@ export default function Achats() {
   // Onglets limités aux types que l'utilisateur peut consulter (droit Delphi « <type> »)
   const typesVisibles = TYPES_ACHAT.filter((t) => peutDoc('achat', t.code, 'voir'));
   const [type, setType] = useState<(typeof TYPES_ACHAT)[number]['code']>(typesVisibles[0]?.code ?? 'FA');
+  // Liens directs (ruban, palette) : ?type=FA, ?vue=journal
+  const [params] = useSearchParams();
+  useEffect(() => {
+    const t = params.get('type');
+    const v = typesVisibles.find((x) => x.code === t);
+    if (v) { setType(v.code); setVue('documents'); }
+    if (params.get('vue') === 'journal' && peutJournal) setVue('journal');
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
 

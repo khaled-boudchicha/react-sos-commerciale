@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import {
   CLIENTS, FOURNISSEURS, DEBITEURS, COORDONNEES_SOCIETE, ETAT_CLIENTS, ETAT_FOURNISSEURS,
@@ -67,7 +67,13 @@ export default function Tiers() {
   // Onglets visibles selon les droits Delphi « Clients » / « Fournisseurs »
   const vues = VUES.filter((v) => (v.code === 'fournisseurs' || v.code === 'etat_fournisseurs')
     ? peut('tiers', D.tiers.fournisseurs) : peut('tiers', D.tiers.clients));
-  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(vues[0]?.code ?? 'clients');
+  const [params] = useSearchParams();
+  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(vues.find((v) => v.code === params.get('vue'))?.code ?? vues[0]?.code ?? 'clients');
+  // Liens directs (ruban) : ?vue=fournisseurs, ?vue=debiteurs…
+  useEffect(() => {
+    const v = vues.find((x) => x.code === params.get('vue'));
+    if (v) setVue(v.code);
+  }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
   const [search, setSearch] = useState('');
 
   return (

@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import Ruban from '../navigation/Ruban';
+import { Icone } from '../navigation/icones';
+import { COULEUR_TON, MENU_LATERAL, estActive, type Action } from '../navigation/commandes';
+import { usePreferencesNavigation } from '../navigation/preferences';
 import ErrorBoundary from './ErrorBoundary';
 import { useQuery } from '@apollo/client';
 import { MY_AGENTS } from '../api/auth';
@@ -9,41 +13,9 @@ import DossierSwitcher from './DossierSwitcher';
 import AgentSwitcher from './AgentSwitcher';
 import { useSessionKeepAlive } from '../api/useSessionKeepAlive';
 import { useDroitsSync } from '../api/useDroitsSync';
-import { D, useDroits } from '../lib/droits';
+import { useDroits } from '../lib/droits';
 
-/** Libellés « Référentiels » du module tiers (hors Clients / Fournisseurs). */
-export const LIBELLES_REFERENTIELS = Object.entries(D.tiers)
-  .filter(([k]) => k !== 'clients' && k !== 'fournisseurs').map(([, v]) => v as string);
-
-type NavItem = { to: string; label: string; visible?: (d: ReturnType<typeof useDroits>) => boolean };
-
-const NAV: { group: string | null; items: NavItem[] }[] = [
-  { group: null, items: [{ to: '/', label: 'Tableau de bord' }] },
-  {
-    group: 'Activité',
-    items: [
-      { to: '/comptoir', label: 'Vente au comptoir', visible: (d) => d.peutDoc('vente', 'BCT', 'creer') || d.peutDoc('vente', 'BRT', 'creer') },
-      { to: '/ventes', label: 'Ventes', visible: (d) => d.aModule('vente') },
-      { to: '/achats', label: 'Achats', visible: (d) => d.aModule('achat') },
-      { to: '/echeances', label: 'Échéances', visible: (d) => d.aModule('vente') },
-      { to: '/stock', label: 'Stock', visible: (d) => d.peut('stock', D.stock.article) },
-      { to: '/stock/mouvements', label: 'Mouvements de stock', visible: (d) => d.peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) },
-      { to: '/tiers', label: 'Tiers', visible: (d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs]) },
-      { to: '/tresorerie', label: 'Trésorerie', visible: (d) => d.peut('autre', D.autre.tresorerie) },
-    ],
-  },
-  { group: 'Analyse', items: [{ to: '/statistiques', label: 'Statistiques', visible: (d) => d.peut('autre', D.autre.statistiques) }] },
-  {
-    group: 'Configuration',
-    items: [
-      { to: '/referentiels', label: 'Référentiels', visible: (d) => d.peutUn('tiers', LIBELLES_REFERENTIELS) },
-      { to: '/modeles', label: 'Modèles d’impression', visible: (d) => d.peut('autre', D.autre.parametres) },
-      { to: '/parametres', label: 'Paramètres', visible: (d) => d.peut('autre', D.autre.parametres) },
-      { to: '/parametres/utilisateurs', label: 'Utilisateurs & droits', visible: (d) => d.peut('autre', D.autre.droitsAcces) },
-      { to: '/outils/grille', label: 'Grille (démo)', visible: (d) => d.peut('stock', D.stock.article) },
-    ],
-  },
-];
+export { LIBELLES_REFERENTIELS } from '../navigation/commandes';
 
 export default function AppShell() {
   const { agent, dossier, dossierUser, accessError, logout } = useSession();
@@ -53,6 +25,7 @@ export default function AppShell() {
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const [changerDossier, setChangerDossier] = useState(false);
   const [changerAgent, setChangerAgent] = useState(false);
+  const disposition = usePreferencesNavigation((s) => s.disposition);
 
   // Renouvellement du JWT + veille sur le blocage de compte / l'abonnement
   useSessionKeepAlive();
@@ -91,6 +64,40 @@ export default function AppShell() {
     );
   }
 
+  const executer = (a: Action) => {
+    if (a === 'palette') setPaletteOuverte(true);
+    else if (a === 'dossier') setChangerDossier(true);
+    else if (a === 'agent') setChangerAgent(true);
+    else if (a === 'deconnexion') logout();
+  };
+
+  const surcouches = (
+    <>
+      {accessError && <BandeauAcces code={accessError} onLogout={logout} />}
+      <CommandPalette open={paletteOuverte} onClose={() => setPaletteOuverte(false)} />
+      {changerDossier && <DossierSwitcher onClose={() => setChangerDossier(false)} />}
+      {changerAgent && <AgentSwitcher onClose={() => setChangerAgent(false)} />}
+    </>
+  );
+
+  // Disposition « ruban » (style Office) : commandes en haut, contenu sur toute la largeur
+  if (disposition === 'ruban') {
+    return (
+      <div className="h-screen flex flex-col overflow-hidden">
+        <Ruban executer={executer} session={{
+          online, agent: String(agent?.label ?? agent?.agentId ?? ''), dossier: String(dossier ?? ''),
+          utilisateur: String(dossierUser?.username ?? ''), plusieursAgents,
+        }} />
+        {surcouches}
+        <main className="flex-1 p-5 overflow-auto min-h-0">
+          <ErrorBoundary resetKey={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen">
       <aside className="w-[212px] flex-none bg-surface border-r border-line-soft flex flex-col p-2.5">
@@ -101,25 +108,31 @@ export default function AppShell() {
             <div className="font-bold text-[13px] leading-tight">Gestion Com.</div>
             <div className="text-[9px] font-semibold tracking-widest text-ink-muted">DESKTOP</div>
           </div>
+          <button onClick={() => usePreferencesNavigation.getState().definirDisposition('ruban')}
+                  title="Afficher le ruban de commandes (style Office)" aria-label="Afficher le ruban de commandes"
+                  className="ml-auto h-7 w-7 rounded-md inline-flex items-center justify-center text-ink-muted hover:text-ink hover:bg-line-soft">
+            <Icone nom="ruban" taille={16} />
+          </button>
         </div>
-        {NAV.map((section) => ({ ...section, items: section.items.filter((i) => !i.visible || i.visible(droits)) }))
-          .filter((section) => section.items.length > 0)
+        {MENU_LATERAL.map((section) => ({ ...section, commandes: section.commandes.filter((c) => !c.si || c.si(droits)) }))
+          .filter((section) => section.commandes.length > 0)
           .map((section) => (
-          <div key={section.group ?? 'root'}>
-            {section.group && (
+          <div key={section.groupe ?? 'racine'}>
+            {section.groupe && (
               <div className="text-[9.5px] font-bold tracking-widest uppercase text-ink-muted px-2.5 pt-3 pb-1">
-                {section.group}
+                {section.groupe}
               </div>
             )}
-            {section.items.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/stock' || item.to === '/parametres'}
-                className={({ isActive }) =>
-                  `block px-2.5 py-1.5 rounded-sm text-[12px] font-semibold mb-0.5 ${
-                    isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-label hover:bg-line-soft'
-                  }`}>
-                {item.label}
-              </NavLink>
-            ))}
+            {section.commandes.map((c) => {
+              const actif = estActive(c, location.pathname, location.search);
+              return (
+                <NavLink key={c.id} to={c.to!}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-sm text-[12px] font-semibold mb-0.5 ${actif ? 'bg-brand-50 text-brand-700' : 'text-ink-label hover:bg-line-soft'}`}>
+                  <Icone nom={c.icone} taille={15} style={{ color: actif ? 'var(--brand-700)' : COULEUR_TON[c.ton], opacity: actif ? 1 : 0.85 }} />
+                  {c.libelle}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
         <div className="mt-auto border-t border-line-soft pt-2.5 px-1 text-[11px]">
@@ -153,11 +166,7 @@ export default function AppShell() {
           </div>
         </header>
 
-        {accessError && <BandeauAcces code={accessError} onLogout={logout} />}
-
-        <CommandPalette open={paletteOuverte} onClose={() => setPaletteOuverte(false)} />
-        {changerDossier && <DossierSwitcher onClose={() => setChangerDossier(false)} />}
-        {changerAgent && <AgentSwitcher onClose={() => setChangerAgent(false)} />}
+        {surcouches}
 
         <main className="flex-1 p-5 overflow-auto">
           <ErrorBoundary resetKey={location.pathname}>

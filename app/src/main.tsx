@@ -9,11 +9,13 @@ import { loadTheme } from './screens/Parametres';
 import './styles/index.css';
 import './styles/report-theme.css';
 import { initialiserImpression } from './impression';
+import { usePreferencesNavigation } from './navigation/preferences';
 import PontNotifications from './impression/PontNotifications';
 
 initialiserImpression();
 void useSession.getState().hydrate();
 void loadTheme();
+void usePreferencesNavigation.getState().charger();
 
 // Aide au dev navigateur (hors Electron) : window.__session.getState().setAuth(...)
 if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__session = useSession;

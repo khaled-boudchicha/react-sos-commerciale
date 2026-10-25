@@ -13,6 +13,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Accent du ruban et de la navigation : bleu marque en clair, bleu clair en sombre (contraste) */
+:root { --ruban-accent: var(--brand-700); }
+[data-theme="dark"] { --ruban-accent: var(--brand-300); }
+
 /* Montants : mono tabulaire partout */
 .money {
   font-family: var(--font-mono);
