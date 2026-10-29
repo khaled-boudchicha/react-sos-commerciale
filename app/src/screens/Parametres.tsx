@@ -35,7 +35,27 @@ export default function Parametres() {
 
   const { data: numData, refetch: refetchNum } = useQuery(NUMEROTATION_DOCS);
   const [setNum, { loading: savingNum }] = useMutation(SET_NUMEROTATION);
-  const [editNum, setEditNum] = useState<{ type: string; valeur: string } | null>(null);
+  const [editNum, setEditNum] = useState<{ type: string; valeur: string; actuel: number; erreur?: string } | null>(null);
+
+  /** Enregistre le compteur : entier, jamais en recul (même règle que l'agent). */
+  async function enregistrerCompteur() {
+    if (!editNum) return;
+    const saisie = editNum.valeur.trim();
+    const n = Number(saisie);
+    if (saisie === '' || !Number.isInteger(n) || n < 0) {
+      setEditNum({ ...editNum, erreur: 'Saisissez un nombre entier positif.' });
+      return;
+    }
+    if (n < editNum.actuel) {
+      setEditNum({ ...editNum, erreur: `Le compteur ne peut pas reculer (actuel : ${editNum.actuel}).` });
+      return;
+    }
+    try {
+      await setNum({ variables: { type: editNum.type, valeur: n } });
+      setEditNum(null);
+      void refetchNum();
+    } catch (e: any) { setEditNum({ ...editNum, erreur: e.message ?? 'Enregistrement impossible.' }); }
+  }
 
   // getNumerotationDocs renvoie un tableau [{ type, format, compteur }]
   const numerotations = (Array.isArray(numData?.numerotationDocs) ? numData.numerotationDocs : [])
@@ -189,7 +209,7 @@ export default function Parametres() {
               <span className="text-ink-muted money text-[11px]">{n.masque}</span>
               <span className="money font-bold">{n.compteur}</span>
               {peut('autre', D.autre.numerotation) && (
-                <button onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur) })}
+                <button onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur), actuel: n.compteur })}
                         className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]" title="Modifier le compteur">✎</button>
               )}
             </div>
@@ -202,22 +222,20 @@ export default function Parametres() {
           <div className="w-[420px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
             <div className="font-extrabold text-[15px] mb-1">Compteur — {editNum.type}</div>
             <div className="text-[11.5px] text-ink-muted mb-4">
-              Attention : abaisser un compteur peut provoquer des numéros en double.
+              Le compteur peut seulement avancer (actuel : {editNum.actuel}) : un numéro déjà attribué ne peut pas être réattribué.
             </div>
-            <input type="number" value={editNum.valeur} autoFocus
-                   onChange={(e) => setEditNum({ ...editNum, valeur: e.target.value })}
+            <input type="number" min={editNum.actuel} step={1} value={editNum.valeur} autoFocus
+                   onChange={(e) => setEditNum({ ...editNum, valeur: e.target.value, erreur: undefined })}
+                   onKeyDown={(e) => { if (e.key === 'Enter' && !savingNum) void enregistrerCompteur(); }}
                    className="w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right" />
+            {editNum.erreur && (
+              <div className="mt-2 text-[12px] font-semibold" style={{ color: 'var(--danger)' }}>{editNum.erreur}</div>
+            )}
             <div className="flex gap-2 mt-5">
               <button onClick={() => setEditNum(null)} disabled={savingNum}
                       className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">Annuler</button>
               <button disabled={savingNum}
-                      onClick={async () => {
-                        try {
-                          await setNum({ variables: { type: editNum.type, valeur: Number(editNum.valeur) } });
-                          setEditNum(null);
-                          void refetchNum();
-                        } catch (e: any) { setErreur(e.message ?? 'Erreur.'); setEditNum(null); }
-                      }}
+                      onClick={() => void enregistrerCompteur()}
                       className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
                 {savingNum ? 'Enregistrement…' : 'Enregistrer'}
               </button>

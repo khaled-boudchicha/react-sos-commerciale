@@ -143,7 +143,7 @@ export default function Tresorerie() {
     ) },
     // Pas de `field` : le cumul n'a de sens qu'en ordre chronologique, sans filtre de grille
     { key: 'solde', header: 'Solde cumulé', align: 'right', width: '120px', render: (m) => <span className="money">{fmtMoney(m.solde_cumul)}</span> },
-    ...(peutAnnuler ? [{ key: 'actions', header: '', align: 'right' as const, width: '70px', render: (m: MouvementTresorie) => (
+    ...(peutAnnuler && !groupe ? [{ key: 'actions', header: '', align: 'right' as const, width: '70px', render: (m: MouvementTresorie) => !annulable(m) ? null : (
       <button onClick={(e) => { e.stopPropagation(); setAnnulation(m); }} title="Annuler ce mouvement"
               className="px-1.5 py-0.5 rounded-sm border border-line text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
         Annuler
@@ -235,7 +235,7 @@ export default function Tresorerie() {
 
       {detail && (
         <MouvementDetailModal m={detail} onClose={() => setDetail(null)}
-                              onAnnuler={peutAnnuler ? () => { setAnnulation(detail); setDetail(null); } : undefined} />
+                              onAnnuler={peutAnnuler && annulable(detail) ? () => { setAnnulation(detail); setDetail(null); } : undefined} />
       )}
       <DataGrid columns={columns} rowKey={(m) => m.cle}
                 distant={distant} cleEtat="tresorerie"
@@ -247,6 +247,13 @@ export default function Tresorerie() {
     </div>
   );
 }
+
+/**
+ * Mouvement annulable : seules les lignes de la vue détaillée portent une clé reconnue
+ * par l'agent (RGF / RG / EN / DE / TR / AVC + id). Les lignes de la vue groupée
+ * (`GRP|…`) regroupent plusieurs écritures et ne s'annulent pas.
+ */
+const annulable = (m: MouvementTresorie) => /^(RGF|RG|EN|DE|TR|AVC)\d+$/.test(String(m.cle ?? ''));
 
 /** Conséquences d'une annulation selon le type de mouvement (préfixe de la clé). */
 function messageAnnulation(cle: string): string {

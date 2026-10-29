@@ -151,7 +151,12 @@ export default function AchatEditor() {
         navigate(`/achats/${editId}`);
         return;
       }
-      const { data } = await create({ variables: { input: { type_doc: type, ...commun } } });
+      const { data } = await create({ variables: { input: {
+        type_doc: type, ...commun,
+        // Auteur de la pièce (colonnes UserID / User), comme en vente
+        user_id: dossierUser ? Number(dossierUser.id) : undefined,
+        user_name: dossierUser ? String(dossierUser.username) : undefined,
+      } } });
       const created = data?.createAchat;
       // Paiement immédiat (plafonné au net), dans la caisse par défaut de l'utilisateur
       const paye = payable && created?.id

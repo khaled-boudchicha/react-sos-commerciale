@@ -5,6 +5,8 @@ import { fmtDate, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { Bucket, PageHeader, SearchInput, Tabs } from '../components/ui/atoms';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useToast } from '../components/ui/Toast';
+import { useSession } from '../store/session';
 
 type Statut = 'tous' | 'echues' | 'a_echoir';
 type Echeance = {
@@ -38,12 +40,24 @@ export default function Echeances() {
   const res: Reponse | undefined = data?.echeances;
   const lignes = useMemo(() => res?.data ?? [], [res]);
 
+  const toast = useToast();
+  const dossierUser = useSession((s) => s.dossierUser);
   const [payer, { loading: paiement }] = useMutation(MARQUER_ECHEANCE_PAYEE);
   async function confirmerPaiement() {
     if (!aPayer) return;
-    await payer({ variables: { input: { vente_id: aPayer.id, mode_payement: 'Espece' } } });
-    setAPayer(null);
-    void refetch();
+    try {
+      // Caisse par défaut de l'utilisateur : sans compte, le règlement n'entre dans aucun solde
+      await payer({ variables: { input: {
+        vente_id: aPayer.id, mode_payement: 'Espece',
+        compte: dossierUser?.compte ?? undefined, compte_id: dossierUser?.compte_id ?? undefined,
+      } } });
+      toast.success(`${aPayer.type_doc} ${aPayer.numero} réglée (${fmtMoney(aPayer.reste)} DA).`);
+      setAPayer(null);
+      void refetch();
+    } catch (e: any) {
+      toast.error(`Règlement impossible : ${e.message ?? e}`);
+      setAPayer(null);
+    }
   }
 
   const columns: Column<Echeance>[] = [
@@ -86,7 +100,8 @@ export default function Echeances() {
       {aPayer && (
         <ConfirmDialog
           title="Marquer la pièce comme payée ?"
-          message={<>Le reste de <b>{aPayer.type_doc} {aPayer.numero}</b> ({fmtMoney(aPayer.reste)} DA) sera réglé en espèces à la date du jour.</>}
+          message={<>Le reste de <b>{aPayer.type_doc} {aPayer.numero}</b> ({fmtMoney(aPayer.reste)} DA) sera réglé en espèces à la date du jour
+            {dossierUser?.compte ? <>, dans la caisse <b>{dossierUser.compte}</b></> : null}.</>}
           confirmLabel="Régler"
           loading={paiement}
           onConfirm={() => void confirmerPaiement()}
