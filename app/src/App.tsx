@@ -26,6 +26,7 @@ import { ModelesPage } from '@softly/report';
 import Diagnostic from './screens/Diagnostic';
 import NotFound from './screens/NotFound';
 import DemoGrille from './screens/DemoGrille';
+import DemoUI from './screens/DemoUI';
 import MouvementsStock from './screens/MouvementsStock';
 import Utilisateurs from './screens/Utilisateurs';
 import RequireDroit from './components/RequireDroit';
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="parametres" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><Parametres /></G>} />
           <Route path="parametres/utilisateurs" element={<G si={(d) => d.peut('autre', D.autre.droitsAcces)}><Utilisateurs /></G>} />
           <Route path="diagnostic" element={<Diagnostic />} />
+          <Route path="outils/ui" element={<DemoUI />} />
           <Route path="outils/grille" element={<G si={(d) => d.peut('stock', D.stock.article)}><DemoGrille /></G>} />
           <Route path="*" element={<NotFound />} />
         </Route>

@@ -18,7 +18,12 @@ import { exporterCsv, ExportColumn } from '../lib/export';
 import { useDebouncedValue } from '../lib/useDebounce';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import { ReponseDistante } from '../components/grille/types';
-import { Money, Tabs, PeriodPicker, PageHeader, SearchInput } from '../components/ui/atoms';
+import { Money, Tabs, PageHeader, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, CardHeader } from '../components/ui/Card';
+import { DateRangeField, SearchField, Select } from '../components/ui/Field';
+import { KpiTile } from '../components/ui/Kpi';
+import type { IconName, Tone } from '../components/ui/Icon';
 import LineChart from '../components/charts/LineChart';
 import BarChart from '../components/charts/BarChart';
 import DonutChart from '../components/charts/DonutChart';
@@ -27,24 +32,21 @@ import { D, useDroits } from '../lib/droits';
 import Etat104Panel from '../components/Etat104Panel';
 
 /** Cartouche graphique réutilisable (titre + corps). */
-function Carte({ titre, actions, children }: { titre: string; actions?: ReactNode; children: ReactNode }) {
+function Carte({ titre, actions, icon, children }: { titre: string; actions?: ReactNode; icon?: IconName; children: ReactNode }) {
   return (
-    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-      <div className="flex items-center justify-between mb-3 gap-3">
-        <div className="font-bold text-[13px]">{titre}</div>
-        {actions}
-      </div>
+    <Card>
+      <CardHeader title={titre} actions={actions} icon={icon} className="items-center" />
       {children}
-    </div>
+    </Card>
   );
 }
 
 const SECTIONS = [
-  { code: 'ventes', label: 'Ventes' },
-  { code: 'achats', label: 'Achats' },
-  { code: 'benefices', label: 'Bénéfices' },
-  { code: 'stock', label: 'Valorisation du stock' },
-  { code: 'etat104', label: 'État 104' },
+  { code: 'ventes', label: 'Ventes', icon: 'trend' },
+  { code: 'achats', label: 'Achats', icon: 'cart' },
+  { code: 'benefices', label: 'Bénéfices', icon: 'stats' },
+  { code: 'stock', label: 'Valorisation du stock', icon: 'package' },
+  { code: 'etat104', label: 'État 104', icon: 'statement' },
 ] as const;
 type Section = (typeof SECTIONS)[number]['code'];
 
@@ -65,12 +67,12 @@ export default function Statistiques() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Statistiques">
+      <PageHeader title="Statistiques" icon="stats" description="Ventes, achats, marges et valorisation du stock">
         {section !== 'stock' && section !== 'etat104' && (
-          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+          <DateRangeField from={debut} to={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
         )}
       </PageHeader>
-      <Tabs value={section} onChange={setSection} options={sections} />
+      <Tabs value={section} onChange={setSection} options={sections} label="Sections des statistiques" />
       {section === 'ventes' && <SectionVentes debut={debut} fin={fin} />}
       {section === 'achats' && <SectionAchats debut={debut} fin={fin} />}
       {section === 'benefices' && sections.some((x) => x.code === 'benefices') && <SectionBenefices debut={debut} fin={fin} />}
@@ -188,42 +190,40 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
       {ticket && <ImprimerDocument demande={ticket} onClose={() => setTicket(null)} />}
       {res && (
         <div className="grid grid-cols-4 gap-3">
-          <Kpi label="CA TTC" value={`${fmtMoney(res.total_ttc)} DA`} />
-          <Kpi label="Marge brute" value={`${fmtMoney(res.total_marge)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} % du CA HT`} />
-          <Kpi label="Charges période" value={`${fmtMoney(res.total_charges)} DA`} />
-          <Kpi label="Marge nette" value={`${fmtMoney(res.marge_nette_total)} DA`}
+          <Kpi label="CA TTC" icon="trend" value={`${fmtMoney(res.total_ttc)} DA`} />
+          <Kpi label="Marge brute" icon="stats" tone="success" value={`${fmtMoney(res.total_marge)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} % du CA HT`} />
+          <Kpi label="Charges période" icon="trendDown" tone="warning" value={`${fmtMoney(res.total_charges)} DA`} />
+          <Kpi label="Marge nette" icon="wallet" tone="teal" value={`${fmtMoney(res.marge_nette_total)} DA`}
                sub={`${fmtMoney(Number(res.total_ht) > 0 ? (Number(res.marge_nette_total) / Number(res.total_ht)) * 100 : 0, 1)} % du CA HT`} />
         </div>
       )}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Tabs value={vue} onChange={setVue} options={VUES_VENTES} />
-        <div className="flex items-center gap-3 flex-wrap">
+      <Tabs value={vue} onChange={setVue} options={VUES_VENTES} variant="underline" label="Vues des ventes" />
+      {(vue === 'article' || vue === 'famille' || vue === 'client') && (
+        <Toolbar>
           {vue === 'article' && (
             <div className="w-64"><ClientSearch value={clientFiltre} onSelect={setClientFiltre} /></div>
           )}
-          {(vue === 'article' || vue === 'famille') && (
-            <button onClick={() => imprimerTicket(vue)}
-                    className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-              Imprimer le ticket
-            </button>
-          )}
           {(vue === 'article' || vue === 'client') && (
-            <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
+            <label className="text-xs font-semibold text-ink-label flex items-center gap-2">
               Famille
-              <select value={famille} onChange={(e) => setFamille(e.target.value)}
-                      className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal">
+              <Select size="sm" value={famille} onChange={(e) => setFamille(e.target.value)} className="w-auto min-w-[160px]">
                 <option value="">Toutes</option>
                 {optionsFamille.map((f) => <option key={f} value={f}>{f}</option>)}
-              </select>
+              </Select>
             </label>
           )}
-        </div>
-      </div>
+          {(vue === 'article' || vue === 'famille') && (
+            <Button size="sm" icon="printer" className="ml-auto" onClick={() => imprimerTicket(vue)}>
+              Imprimer le ticket
+            </Button>
+          )}
+        </Toolbar>
+      )}
 
       {vue === 'periode' && (
         <>
-          <Carte titre={`Évolution du CA TTC ${groupement === 'jour' ? '— par jour' : '— par mois'}`}
-                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+          <Carte titre={`Évolution du CA TTC ${groupement === 'jour' ? '— par jour' : '— par mois'}`} icon="trend"
+                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} size="sm" label="Groupement" />}>
             <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ttc ?? 0) }))}
                        format={(v) => fmtMoney(v, 0)} />
           </Carte>
@@ -254,11 +254,11 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
       {vue === 'famille' && (
         <div className="flex flex-col gap-3.5">
           <div className="grid grid-cols-2 gap-3.5 items-start">
-            <Carte titre="Top familles — CA TTC">
+            <Carte titre="Top familles — CA TTC" icon="stats">
               <BarChart data={famillesTout.map((f) => ({ label: f.famille || '(sans famille)', value: Number(f.total_ttc ?? 0) }))}
                         format={(v) => fmtMoney(v, 0)} />
             </Carte>
-            <Carte titre="Répartition du CA TTC">
+            <Carte titre="Répartition du CA TTC" icon="pie">
               <DonutChart data={famillesTout.map((f) => ({ label: f.famille || '(sans famille)', value: Number(f.total_ttc ?? 0) }))}
                           format={(v) => fmtMoney(v, 0)} titreCentre="CA TTC" />
             </Carte>
@@ -303,7 +303,7 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
     { key: 'ht', header: 'Achats HT', align: 'right', render: (l) => <Money value={l.total_ht} /> },
     { key: 'ttc', header: 'Achats TTC', align: 'right', render: (l) => <Money value={l.total_ttc} /> },
     { key: 'ret', header: 'Retours HT', align: 'right', render: (l) => (
-      <span className="money" style={{ color: Number(l.r_total_ht) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(l.r_total_ht)}</span>
+      <span className="money" style={{ color: Number(l.r_total_ht) > 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(l.r_total_ht)}</span>
     ) },
   ];
 
@@ -314,7 +314,7 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
     { key: 'ht', header: 'Achats HT', align: 'right', width: '130px', render: (f) => <Money value={f.total_ht} />, sortAccessor: (f) => Number(f.total_ht) },
     { key: 'ttc', header: 'Achats TTC', align: 'right', width: '130px', render: (f) => <Money value={f.total_ttc} />, sortAccessor: (f) => Number(f.total_ttc) },
     { key: 'reste', header: 'Reste à payer', align: 'right', width: '130px', render: (f) => (
-      <span className="money font-medium" style={{ color: Number(f.reste_a_payer) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(f.reste_a_payer)}</span>
+      <span className="money font-medium" style={{ color: Number(f.reste_a_payer) > 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(f.reste_a_payer)}</span>
     ), sortAccessor: (f) => Number(f.reste_a_payer) },
   ];
 
@@ -331,31 +331,30 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
     <>
       {res && (
         <div className="grid grid-cols-3 gap-3">
-          <Kpi label="Achats HT" value={`${fmtMoney(res.total_ht)} DA`} />
-          <Kpi label="Achats TTC" value={`${fmtMoney(res.total_ttc)} DA`} />
-          <Kpi label="Pièces d'achat" value={String(res.nb_factures ?? 0)} />
+          <Kpi label="Achats HT" icon="cart" value={`${fmtMoney(res.total_ht)} DA`} />
+          <Kpi label="Achats TTC" icon="cart" value={`${fmtMoney(res.total_ttc)} DA`} />
+          <Kpi label="Pièces d'achat" icon="invoice" tone="neutral" value={String(res.nb_factures ?? 0)} />
         </div>
       )}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} />
-        {vue === 'article' && (
-          <label className="text-[11px] font-bold text-ink-label flex items-center gap-2">
+      <Tabs value={vue} onChange={setVue} options={VUES_ACHATS} variant="underline" label="Vues des achats" />
+      {vue === 'article' && (
+        <Toolbar>
+          <label className="text-xs font-semibold text-ink-label flex items-center gap-2">
             Filtrer par fournisseur
-            <select value={codeFour} onChange={(e) => setCodeFour(e.target.value)}
-                    className="border border-line rounded-sm px-2.5 py-1.5 bg-surface text-ink text-[12px] font-normal max-w-[220px]">
+            <Select size="sm" value={codeFour} onChange={(e) => setCodeFour(e.target.value)} className="w-auto max-w-[220px]">
               <option value="">Tous les fournisseurs</option>
               {fournisseurs.map((f) => <option key={f.code_four} value={f.code_four}>{(f.fournisseur ?? '').trim() || f.code_four}</option>)}
-            </select>
+            </Select>
           </label>
-        )}
-      </div>
+        </Toolbar>
+      )}
 
       {vue === 'periode' && (
         <>
-          <Carte titre={`Évolution des achats HT ${groupement === 'jour' ? '— par jour' : '— par mois'}`}
-                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+          <Carte titre={`Évolution des achats HT ${groupement === 'jour' ? '— par jour' : '— par mois'}`} icon="trend"
+                 actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} size="sm" label="Groupement" />}>
             <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ht ?? 0) }))}
-                       format={(v) => fmtMoney(v, 0)} couleur="#B45309" />
+                       format={(v) => fmtMoney(v, 0)} couleur="var(--chart-2)" />
           </Carte>
           <DataGrid titre={`Achats ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
                     exportCsv={{ nom: 'achats-par-periode', columns: csvAchatPeriode }}
@@ -368,11 +367,11 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
       {vue === 'fournisseur' && (
         <div className="flex flex-col gap-3.5">
           <div className="grid grid-cols-2 gap-3.5 items-start">
-            <Carte titre="Top fournisseurs — Achats HT">
+            <Carte titre="Top fournisseurs — Achats HT" icon="stats">
               <BarChart data={fournisseurs.map((f) => ({ label: (f.fournisseur ?? '').trim() || f.code_four, value: Number(f.total_ht ?? 0) }))}
                         format={(v) => fmtMoney(v, 0)} />
             </Carte>
-            <Carte titre="Répartition des achats HT">
+            <Carte titre="Répartition des achats HT" icon="pie">
               <DonutChart data={fournisseurs.map((f) => ({ label: (f.fournisseur ?? '').trim() || f.code_four, value: Number(f.total_ht ?? 0) }))}
                           format={(v) => fmtMoney(v, 0)} titreCentre="Achats HT" />
             </Carte>
@@ -380,7 +379,7 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
           <DataGrid titre={`Achats par fournisseur — ${fournisseurs.length} fournisseur(s)`} exportCsv={{ nom: 'achats-par-fournisseur', columns: csvFournisseur }} columns={colFournisseur} rows={fournisseurs} rowKey={(f) => f.code_four}
                     loading={four.loading} error={four.error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={somme(fournisseurs, 'total_ht')} />, ttc: <Money value={somme(fournisseurs, 'total_ttc')} />,
-                              reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(somme(fournisseurs, 'reste_a_payer'))}</span> }} />
+                              reste: <Money value={somme(fournisseurs, 'reste_a_payer')} tone="danger" /> }} />
         </div>
       )}
 
@@ -421,17 +420,17 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
     <>
       {res && (
         <div className="grid grid-cols-4 gap-3">
-          <Kpi label="CA HT" value={`${fmtMoney(res.total_ht)} DA`} />
-          <Kpi label="Coût de revient" value={`${fmtMoney(res.total_revien)} DA`} />
+          <Kpi label="CA HT" icon="trend" value={`${fmtMoney(res.total_ht)} DA`} />
+          <Kpi label="Coût de revient" icon="package" tone="neutral" value={`${fmtMoney(res.total_revien)} DA`} />
           {/* total_benefice = bénéfice APRÈS remises (beneficeAvecRemise), comme la marge Delphi */}
-          <Kpi label="Bénéfice après remises" value={`${fmtMoney(res.total_benefice)} DA`} />
-          <Kpi label="Taux de marge" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice après remises / CA HT" />
+          <Kpi label="Bénéfice après remises" icon="wallet" tone="success" value={`${fmtMoney(res.total_benefice)} DA`} />
+          <Kpi label="Taux de marge" icon="percent" tone="teal" value={`${fmtMoney(taux, 2)} %`} sub="bénéfice après remises / CA HT" />
         </div>
       )}
-      <Carte titre="Évolution du bénéfice après remises"
-             actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} />}>
+      <Carte titre="Évolution du bénéfice après remises" icon="trend"
+             actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} size="sm" label="Groupement" />}>
         <LineChart data={lignes.map((l) => ({ label: l.periode, value: Number(l.benefice_avec_remise ?? 0) }))}
-                   format={(v) => fmtMoney(v, 0)} couleur="#0D9488" />
+                   format={(v) => fmtMoney(v, 0)} couleur="var(--chart-3)" />
       </Carte>
       <DataGrid titre="Bénéfices par période"
                   exportCsv={{ nom: 'benefices', columns: csvBenefice }}
@@ -475,7 +474,7 @@ function SectionStock() {
     { key: 'des', header: 'Désignation', field: 'designation', render: (a) => <b>{(a.designation ?? '').replace(/\s+/g, ' ').trim() || '—'}</b> },
     { key: 'fam', header: 'Famille', width: '120px', field: 'famille', render: (a) => <span className="text-ink-muted">{a.famille || '—'}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', field: 'qte_reale', type: 'number', render: (a) => (
-      <span className="money font-medium" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.qte_reale, 2)}</span>
+      <span className="money font-medium" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(a.qte_reale, 2)}</span>
     ) },
     { key: 'pmp', header: 'PMP', align: 'right', width: '110px', field: 'pmp', render: (a) => <Money value={a.pmp} /> },
     { key: 'val', header: 'Valeur stock', align: 'right', width: '130px', field: 'stock_value', render: (a) => <Money value={a.stock_value} /> },
@@ -487,16 +486,16 @@ function SectionStock() {
     <>
       {res && (
         <div className="grid grid-cols-4 gap-3">
-          <Kpi label="Articles en catalogue" value={String(res.total ?? 0)} />
-          <Kpi label="Valeur du stock (PMP)" value={`${fmtMoney(totalDistant(res, 'stock_value'))} DA`} />
-          <Kpi label="Valeur de vente TTC" value={`${fmtMoney(totalDistant(res, 'sales_value'))} DA`} />
-          <Kpi label="Marge potentielle" value={`${fmtMoney(totalDistant(res, 'marge_potentielle'))} DA`}
+          <Kpi label="Articles en catalogue" icon="package" tone="neutral" value={String(res.total ?? 0)} />
+          <Kpi label="Valeur du stock (PMP)" icon="inventory" value={`${fmtMoney(totalDistant(res, 'stock_value'))} DA`} />
+          <Kpi label="Valeur de vente TTC" icon="tag" tone="violet" value={`${fmtMoney(totalDistant(res, 'sales_value'))} DA`} />
+          <Kpi label="Marge potentielle" icon="trend" tone="success" value={`${fmtMoney(totalDistant(res, 'marge_potentielle'))} DA`}
                sub={`stock initial : ${fmtMoney(totalDistant(res, 'initial_value'))} DA`} />
         </div>
       )}
       <DataGrid titre="Valorisation article par article"
-                  actions={<div className="w-64"><SearchInput value={search} placeholder="Code, désignation…"
-                                onChange={setSearch} /></div>}
+                  actions={<SearchField value={search} placeholder="Code, désignation…" label="Rechercher un article"
+                                        onChange={setSearch} width={256} />}
                   exportCsv={{ nom: 'valorisation-stock', columns: csvStock }}
                   columns={columns} rowKey={(a) => a.id}
                   distant={distant} cleEtat="stat-valorisation-stock"
@@ -601,7 +600,7 @@ function somme<T>(rows: T[], key: keyof T): number {
 
 function MargeCell({ value }: { value: unknown }) {
   return (
-    <span className="money" style={{ color: Number(value) < 0 ? 'var(--danger)' : 'var(--success)' }}>
+    <span className="money" style={{ color: Number(value) < 0 ? 'var(--danger-text)' : 'var(--success-text)' }}>
       {fmtMoney(value)}
     </span>
   );
@@ -609,17 +608,11 @@ function MargeCell({ value }: { value: unknown }) {
 
 function Pct({ value }: { value: unknown }) {
   const n = Number(value ?? 0);
-  return <span className="money" style={{ color: n < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(n, 1)} %</span>;
+  return <span className="money" style={{ color: n < 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(n, 1)} %</span>;
 }
 
 
 
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="bg-surface border border-line-soft rounded-md shadow-soft p-3.5">
-      <div className="text-[11px] font-semibold text-ink-muted mb-1">{label}</div>
-      <div className="money text-[17px] font-extrabold">{value}</div>
-      {sub && <div className="text-[10.5px] text-ink-muted mt-0.5">{sub}</div>}
-    </div>
-  );
+function Kpi({ label, value, sub, icon, tone = 'brand' }: { label: string; value: string; sub?: string; icon?: IconName; tone?: Tone }) {
+  return <KpiTile label={label} value={value} sub={sub} icon={icon} tone={tone} />;
 }

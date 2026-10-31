@@ -13,17 +13,17 @@ export default function ChoixDisposition() {
           const sel = disposition === d;
           return (
             <button key={d} role="radio" aria-checked={sel} onClick={() => definirDisposition(d)}
-                    className="text-left rounded-lg border p-2.5 transition-colors"
+                    className="text-left rounded-md border p-2.5 transition-colors hover:border-brand-line"
                     style={{ borderColor: sel ? 'var(--brand-700)' : 'var(--line)', background: sel ? 'color-mix(in srgb, var(--brand-700) 6%, var(--surface))' : 'var(--surface)', boxShadow: sel ? '0 0 0 3px color-mix(in srgb, var(--brand-700) 16%, transparent)' : undefined }}>
               <Vignette d={d} />
               <div className="mt-2 flex items-center gap-2">
                 <span className="w-4 h-4 rounded-full border-2 inline-flex items-center justify-center flex-none" style={{ borderColor: sel ? 'var(--brand-700)' : 'var(--line)' }}>
                   {sel && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--brand-700)' }} />}
                 </span>
-                <span className="text-[12.5px] font-bold text-ink">{d === 'lateral' ? 'Barre latérale' : 'Ruban (style Office)'}</span>
+                <span className="text-sm font-bold text-ink">{d === 'lateral' ? 'Barre latérale' : 'Ruban (style Office)'}</span>
                 <Icone nom={d === 'lateral' ? 'lateral' : 'ruban'} taille={14} className="ml-auto text-ink-muted" />
               </div>
-              <div className="text-[11px] text-ink-muted mt-0.5 pl-6">
+              <div className="text-xs text-ink-muted mt-0.5 pl-6">
                 {d === 'lateral' ? 'Menu compact à gauche, plus de place en hauteur.' : 'Onglets et groupes de commandes en haut, comme Word et Excel.'}
               </div>
             </button>
@@ -31,7 +31,7 @@ export default function ChoixDisposition() {
         })}
       </div>
       {disposition === 'ruban' && (
-        <label className="flex items-center gap-2 text-[12px] font-semibold text-ink-label">
+        <label className="flex items-center gap-2 text-sm font-semibold text-ink-label">
           <input type="checkbox" checked={rubanReduit} onChange={(e) => definirRubanReduit(e.target.checked)} style={{ accentColor: 'var(--brand-700)' }} />
           Réduire le ruban (onglets seuls) — <span className="font-normal text-ink-muted">Ctrl+F1 ou double-clic sur un onglet</span>
         </label>

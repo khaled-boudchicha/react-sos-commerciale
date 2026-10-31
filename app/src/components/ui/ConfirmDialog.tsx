@@ -1,35 +1,44 @@
-import { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
+import Dialog, { KeyHints } from './Dialog';
+import { Button } from './Button';
 
+/**
+ * Confirmation (charte v2, principe « confirmer le destructif, jamais l'ordinaire ») :
+ * - libellé de confirmation = verbe d'action (« Supprimer la pièce ») ;
+ * - en mode `danger`, le focus initial va au bouton SÛR (Entrée n'efface rien par mégarde),
+ *   le voile ne ferme pas la fenêtre et le bouton d'abandon s'appelle « Conserver » par défaut ;
+ * - Échap = abandon, dans tous les cas.
+ */
 export default function ConfirmDialog({
-  title, message, confirmLabel = 'Confirmer', danger, loading, onConfirm, onCancel,
+  title, message, confirmLabel = 'Confirmer', cancelLabel, danger, loading, onConfirm, onCancel,
 }: {
   title: string;
   message: ReactNode;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const sur = useRef<HTMLButtonElement>(null);
+  const valider = useRef<HTMLButtonElement>(null);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}
-         onClick={onCancel}>
-      <div className="w-[420px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5"
-           onClick={(e) => e.stopPropagation()}>
-        <div className="font-extrabold text-[15px] mb-1.5">{title}</div>
-        <div className="text-[12.5px] text-ink-label mb-4">{message}</div>
-        <div className="flex gap-2 justify-end">
-          <button onClick={onCancel} disabled={loading}
-                  className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">
-            Annuler
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-                  className="px-4 py-2 rounded-md font-bold text-[12px] text-white disabled:opacity-60"
-                  style={{ background: danger ? 'var(--danger)' : 'var(--brand-700)' }}>
-            {loading ? '…' : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog title={title} onClose={() => { if (!loading) onCancel(); }} size="sm"
+            icon={danger ? 'alert' : 'info'} iconTone={danger ? 'danger' : 'brand'}
+            closeOnOverlay={!danger} initialFocus={danger ? sur : valider}
+            footerStart={<KeyHints items={[['Échap', 'annuler']]} />}
+            footer={(
+              <>
+                <Button ref={sur} onClick={onCancel} disabled={loading}>
+                  {cancelLabel ?? (danger ? 'Conserver' : 'Annuler')}
+                </Button>
+                <Button ref={valider} variant={danger ? 'danger-solid' : 'primary'} onClick={onConfirm} loading={loading}>
+                  {confirmLabel}
+                </Button>
+              </>
+            )}>
+      <div className="text-base text-ink-label">{message}</div>
+    </Dialog>
   );
 }

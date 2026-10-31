@@ -3,6 +3,10 @@ import { useMutation, useQuery } from '@apollo/client';
 import { DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER } from '../api/auth';
 import { apollo } from '../api/client';
 import { useSession, dossierUserDepuisLogin } from '../store/session';
+import Dialog from './ui/Dialog';
+import { Button } from './ui/Button';
+import { Field, Select, TextInput } from './ui/Field';
+import { Alert } from './ui/States';
 
 /**
  * Changement de dossier (exercice) sans se déconnecter du cloud.
@@ -93,62 +97,44 @@ export default function DossierSwitcher({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[460px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-extrabold text-[15px]">Changer de dossier</div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
-        <div className="text-[11.5px] text-ink-muted mb-4">
-          Chaque dossier est une base distincte : ré-identifiez-vous pour y accéder.
-        </div>
-
-        {erreur && (
-          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
-               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{erreur}</div>
-        )}
-
-        <div className="flex flex-col gap-3">
-          <label className="text-[11px] font-bold text-ink-label">Dossier / exercice
-            <select value={dossier} onChange={(e) => setDossier(e.target.value)}
-                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-              {loadingDossiers && <option>Chargement…</option>}
-              {dossiers.map((d: any) => (
-                <option key={d.name} value={d.name}>{d.name}{d.isDefault ? ' (défaut)' : ''}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Utilisateur du dossier
-            {users.length > 0 ? (
-              <select value={username} onChange={(e) => setUsername(e.target.value)}
-                      className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-                <option value="">— choisir —</option>
-                {users.map((u: any, i: number) => {
-                  const v = String(u.username ?? u.UserName ?? '');
-                  return <option key={i} value={v}>{v}</option>;
-                })}
-              </select>
-            ) : (
-              <input value={username} onChange={(e) => setUsername(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            )}
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Mot de passe
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                   onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
-        </div>
-
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} disabled={loading}
-                  className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">Annuler</button>
-          <button onClick={() => void valider()} disabled={loading}
-                  className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-            {loading ? 'Ouverture…' : 'Ouvrir le dossier'}
-          </button>
-        </div>
+    <Dialog title="Changer de dossier" subtitle="Chaque dossier est une base distincte : ré-identifiez-vous pour y accéder."
+            icon="folder" size="sm" onClose={onClose} closeOnOverlay={false}
+            footer={(
+              <>
+                <Button onClick={onClose} disabled={loading}>Annuler</Button>
+                <Button variant="primary" icon="folder" onClick={() => void valider()} loading={loading}>
+                  {loading ? 'Ouverture…' : 'Ouvrir le dossier'}
+                </Button>
+              </>
+            )}>
+      <div className="flex flex-col gap-4">
+        {erreur && <Alert tone="danger" compact>{erreur}</Alert>}
+        <Field label="Dossier / exercice">
+          <Select value={dossier} onChange={(e) => setDossier(e.target.value)}>
+            {loadingDossiers && <option>Chargement…</option>}
+            {dossiers.map((d: any) => (
+              <option key={d.name} value={d.name}>{d.name}{d.isDefault ? ' (défaut)' : ''}</option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Utilisateur du dossier">
+          {users.length > 0 ? (
+            <Select value={username} onChange={(e) => setUsername(e.target.value)}>
+              <option value="">— choisir —</option>
+              {users.map((u: any, i: number) => {
+                const v = String(u.username ?? u.UserName ?? '');
+                return <option key={i} value={v}>{v}</option>;
+              })}
+            </Select>
+          ) : (
+            <TextInput leading="user" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
+          )}
+        </Field>
+        <Field label="Mot de passe">
+          <TextInput type="password" leading="lock" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}
+                     onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }} />
+        </Field>
       </div>
-    </div>
+    </Dialog>
   );
 }

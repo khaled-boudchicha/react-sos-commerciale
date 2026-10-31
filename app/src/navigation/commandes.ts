@@ -108,6 +108,7 @@ export const C = {
   utilisateurs: { id: 'utilisateurs', libelle: 'Utilisateurs & droits', court: 'Utilisateurs & droits', icone: 'droits', ton: 'config', to: '/parametres/utilisateurs', si: (d) => d.peut('autre', D.autre.droitsAcces) },
   diagnostic: { id: 'diagnostic', libelle: 'Diagnostic', icone: 'diagnostic', ton: 'config', to: '/diagnostic' },
   grille: { id: 'grille', libelle: 'Grille (démo)', icone: 'grille', ton: 'config', to: '/outils/grille', si: (d) => d.peut('stock', D.stock.article) },
+  ui: { id: 'ui', libelle: 'Charte & composants', court: 'Charte graphique', icone: 'layers', ton: 'config', to: '/outils/ui', aide: 'Vitrine de la charte graphique : couleurs, typographie, boutons, champs, états et modales.' },
 
   // Session et affichage
   disposition: { id: 'disposition', libelle: 'Menu latéral', court: 'Menu latéral', icone: 'lateral', ton: 'config', action: 'disposition', aide: 'Revenir à la barre de navigation latérale (modifiable aussi dans Paramètres).' },
@@ -200,7 +201,7 @@ export const ONGLETS: Onglet[] = [
     groupes: [
       { titre: 'Application', elements: [G(C.parametres), G(C.modeles), G(C.utilisateurs)] },
       { titre: 'Données', elements: [G(C.referentiels)] },
-      { titre: 'Outils', elements: [P(C.diagnostic), P(C.grille)] },
+      { titre: 'Outils', elements: [P(C.diagnostic), P(C.grille), P(C.ui)] },
       { titre: 'Affichage', elements: [G(C.disposition), P(C.replier)] },
     ],
   },

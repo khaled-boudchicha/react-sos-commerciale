@@ -3,8 +3,8 @@ import { LOTS } from '../../api/queries';
 import { fmtDate, fmtQte, isoDate } from '../../lib/format';
 import { LigneDoc, Sens } from './lignesDocument';
 
-const champTexte = 'w-full bg-transparent money text-[11px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
-const champSelect = 'w-full bg-transparent text-[11px] px-1 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
+const champTexte = 'w-full bg-transparent money text-xs px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
+const champSelect = 'w-full bg-transparent text-xs px-1 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
 
 /**
  * Cellule « N° de lot ».

@@ -7,6 +7,11 @@ import { useSession } from '../store/session';
 import ArticleSearch from './ArticleSearch';
 import { nomDepot } from './BonStockModal';
 import { useToast } from './ui/Toast';
+import Dialog from './ui/Dialog';
+import { Button, IconButton } from './ui/Button';
+import { Field, Select, TextInput } from './ui/Field';
+import { Alert, EmptyState } from './ui/States';
+import { Badge } from './ui/atoms';
 
 type LigneSaisie = { article: Article; qte: string };
 
@@ -74,114 +79,101 @@ export default function TransfertStockModal({ onClose, onDone }: { onClose: () =
     }
   }
 
-  const inputCls = 'mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal';
-
   function champDepot(value: string, onChange: (v: string) => void, exclure?: string) {
     if (saisieLibre) {
-      return <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Nom du dépôt" className={inputCls} />;
+      return <TextInput value={value} onChange={(e) => onChange(e.target.value)} placeholder="Nom du dépôt" />;
     }
     return (
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+      <Select value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">— choisir —</option>
         {depots.filter((d) => String(d?.id) !== exclure).map((d, i) => (
           <option key={d?.id ?? i} value={String(d?.id ?? '')}>{nomDepot(d)}</option>
         ))}
-      </select>
+      </Select>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[760px] max-h-full flex flex-col bg-surface border border-line-soft rounded-lg shadow-lifted">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-line-soft flex-none">
-          <div>
-            <div className="font-extrabold text-[15px]">Nouveau transfert entre dépôts</div>
-            <div className="text-[11px] text-ink-muted">Génère un bon de sortie et un bon d'entrée liés</div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
+    <Dialog title="Nouveau transfert entre dépôts" subtitle="Génère un bon de sortie et un bon d'entrée liés"
+            icon="movements" width={760} onClose={onClose} closeOnOverlay={false} closeOnEscape={false}
+            footer={(
+              <>
+                <Button onClick={onClose} disabled={loading}>Annuler</Button>
+                <Button variant="primary" icon="check" onClick={() => void valider()} disabled={lignes.length === 0} loading={loading}>
+                  {loading ? 'Enregistrement…' : 'Valider le transfert'}
+                </Button>
+              </>
+            )}>
+      <div className="flex flex-col gap-3.5">
+        {error && <Alert tone="danger">{error}</Alert>}
+
+        <div className="grid grid-cols-12 gap-3">
+          <Field label="Date" required span={3}>
+            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Dépôt source" required span={4}>
+            {champDepot(source, setSource)}
+          </Field>
+          <Field label="Dépôt destination" required span={5}>
+            {champDepot(destination, setDestination, saisieLibre ? undefined : source)}
+          </Field>
+          <Field label="Observation" span={12}>
+            <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+          </Field>
         </div>
 
-        <div className="px-5 py-4 overflow-auto flex flex-col gap-3.5">
-          {error && (
-            <div className="text-[12px] rounded-md px-3 py-2"
-                 style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{error}</div>
-          )}
+        <ArticleSearch onSelect={ajouter} autoFocus />
 
-          <div className="grid grid-cols-12 gap-3">
-            <label className="col-span-3 text-[11px] font-bold text-ink-label">Date
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-            </label>
-            <label className="col-span-4 text-[11px] font-bold text-ink-label">Dépôt source
-              {champDepot(source, setSource)}
-            </label>
-            <label className="col-span-5 text-[11px] font-bold text-ink-label">Dépôt destination
-              {champDepot(destination, setDestination, saisieLibre ? undefined : source)}
-            </label>
-            <label className="col-span-12 text-[11px] font-bold text-ink-label">Observation
-              <input value={observation} onChange={(e) => setObservation(e.target.value)} className={inputCls} />
-            </label>
-          </div>
-
-          <ArticleSearch onSelect={ajouter} autoFocus />
-
-          <div className="border border-line-soft rounded-md overflow-hidden">
-            <table className="w-full text-[12px] border-collapse">
-              <thead>
-                <tr>
-                  {['Article', 'Stock actuel', 'Quantité', ''].map((h, i) => (
-                    <th key={i} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-2 ${i === 1 || i === 2 ? 'text-right' : 'text-left'}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.length === 0 && (
-                  <tr><td colSpan={4} className="px-3 py-6 text-center text-ink-muted">Recherchez un article pour l'ajouter.</td></tr>
-                )}
-                {lignes.map((l, i) => {
-                  const stock = Number(l.article.qte_reale ?? 0);
-                  const insuffisant = (parseFloat(l.qte) || 0) > stock;
-                  return (
-                    <tr key={l.article.id} className="border-b border-line-soft last:border-b-0">
-                      <td className="px-3 py-1">
-                        <b>{l.article.designation}</b>
-                        <span className="block money text-[10.5px] text-ink-muted">{l.article.code}{l.article.depot ? ` · ${l.article.depot}` : ''}</span>
-                      </td>
-                      <td className="px-3 py-1 text-right money" style={{ color: insuffisant ? 'var(--danger)' : 'var(--text-muted)' }}>
-                        {fmtQte(stock)}{insuffisant ? ' ⚠' : ''}
-                      </td>
-                      <td className="w-[120px] px-2">
-                        <input type="number" step="any" min="0" value={l.qte} onChange={(e) => maj(i, e.target.value)}
-                               className="w-full border border-line rounded-sm px-2 py-1.5 bg-surface text-right money text-[12px]"
-                               style={insuffisant ? { borderColor: 'var(--danger)' } : undefined} />
-                      </td>
-                      <td className="w-[40px] px-2 text-right">
-                        <button onClick={() => retirer(i)} title="Retirer"
-                                className="px-1.5 py-0.5 rounded-sm border border-line text-[11px]" style={{ color: 'var(--danger)' }}>✕</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {depassements.length > 0 && (
-            <div className="text-[12px] rounded-md px-3 py-2"
-                 style={{ background: 'color-mix(in srgb, var(--warning) 12%, transparent)', color: 'var(--warning)' }}>
-              Quantité supérieure au stock pour {depassements.length} article(s) : le transfert risque d'être refusé.
-            </div>
-          )}
+        <div className="border border-line-soft rounded-md overflow-hidden">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr>
+                {['Article', 'Stock actuel', 'Quantité', ''].map((h, i) => (
+                  <th key={i} className={`text-2xs font-bold uppercase tracking-wider text-ink-muted bg-sunken border-b border-line-soft px-3 py-2 ${i === 1 || i === 2 ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lignes.length === 0 && (
+                <tr><td colSpan={4}>
+                  <EmptyState size="sm" icon="package" title="Aucun article" description="Recherchez un article pour l'ajouter." />
+                </td></tr>
+              )}
+              {lignes.map((l, i) => {
+                const stock = Number(l.article.qte_reale ?? 0);
+                const insuffisant = (parseFloat(l.qte) || 0) > stock;
+                return (
+                  <tr key={l.article.id} className="border-b border-line-soft last:border-b-0">
+                    <td className="px-3 py-1">
+                      <b>{l.article.designation}</b>
+                      <span className="block money text-xs text-ink-muted">{l.article.code}{l.article.depot ? ` · ${l.article.depot}` : ''}</span>
+                    </td>
+                    <td className="px-3 py-1 text-right">
+                      {insuffisant
+                        ? <Badge tone="danger" shape="square" icon="alert" className="money" title="Stock insuffisant">{fmtQte(stock)}</Badge>
+                        : <span className="money text-ink-muted">{fmtQte(stock)}</span>}
+                    </td>
+                    <td className="w-[120px] px-2 py-1">
+                      <TextInput type="number" step="any" min="0" value={l.qte} onChange={(e) => maj(i, e.target.value)}
+                                 size="sm" mono align="right" invalid={insuffisant}
+                                 aria-label={`Quantité ${l.article.code}`} />
+                    </td>
+                    <td className="w-[40px] px-2 text-right">
+                      <IconButton icon="trash" label="Retirer" tone="danger" size="xs" onClick={() => retirer(i)} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
-        <div className="flex gap-2 justify-end px-5 py-3.5 border-t border-line-soft flex-none">
-          <button onClick={onClose} disabled={loading}
-                  className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">Annuler</button>
-          <button onClick={() => void valider()} disabled={loading || lignes.length === 0}
-                  className="px-5 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-60">
-            {loading ? 'Enregistrement…' : 'Valider le transfert'}
-          </button>
-        </div>
+        {depassements.length > 0 && (
+          <Alert tone="warning" compact>
+            Quantité supérieure au stock pour {depassements.length} article(s) : le transfert risque d'être refusé.
+          </Alert>
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -9,13 +9,13 @@ body {
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 13px;
+  line-height: 1.45;
   margin: 0;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Accent du ruban et de la navigation : bleu marque en clair, bleu clair en sombre (contraste) */
-:root { --ruban-accent: var(--brand-700); }
-[data-theme="dark"] { --ruban-accent: var(--brand-300); }
+/* Accent du ruban et de la navigation : alias du texte de marque (thémé clair / sombre) */
+:root { --ruban-accent: var(--brand-text); }
 
 /* Montants : mono tabulaire partout */
 .money {
@@ -26,6 +26,31 @@ body {
 *:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+::placeholder { color: var(--text-placeholder); opacity: 1; }
+
+::selection { background: var(--brand-100); }
+
+/* Barres de défilement discrètes, cohérentes en clair et en sombre */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--line-strong); background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Squelette de chargement */
+.gc-skeleton {
+  background: linear-gradient(90deg, var(--line-soft) 25%, var(--surface-hover) 50%, var(--line-soft) 75%);
+  background-size: 200% 100%;
+}
+
+/* Mouvement réduit : aucune transition ni animation */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation: none !important;
+  }
 }
 
 /* Impression : gérée par src/print/ (iframe isolée + Paged.js) — aucune règle

@@ -5,6 +5,10 @@ import { ARTICLES } from '../api/queries';
 import { Article } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import { useDebouncedValue } from '../lib/useDebounce';
+import { Spinner } from './ui/Button';
+import { TextInput } from './ui/Field';
+import { Icon } from './ui/Icon';
+import { cn } from './ui/cn';
 
 const ARTICLE_PAR_CODE_BARRE = gql`
   query ArticleParCodeBarre($code: String!) { articleParCodeBarre(code: $code) }
@@ -82,29 +86,39 @@ export default function ArticleSearch({ onSelect, autoFocus }: {
 
   return (
     <div className="relative">
-      <input ref={inputRef} value={term} autoFocus={autoFocus}
-             onChange={(e) => setTerm(e.target.value)} onKeyDown={onKey}
-             placeholder="Article : code, désignation ou code-barres… (F2)"
-             className="w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink text-[12.5px]" />
-      {scanning && <div className="absolute right-3 top-2.5 text-[11px] text-ink-muted">…</div>}
+      <TextInput ref={inputRef} value={term} autoFocus={autoFocus} leading="search" autoComplete="off"
+                 onChange={(e) => setTerm(e.target.value)} onKeyDown={onKey}
+                 placeholder="Article : code, désignation ou code-barres… (F2)"
+                 aria-expanded={open} aria-autocomplete="list" invalid={!!scanErreur}
+                 trailing={scanning ? <Spinner size={14} className="text-brand-text" /> : undefined} />
       {scanErreur && (
-        <div className="mt-1 text-[11.5px]" style={{ color: 'var(--danger)' }}>{scanErreur}</div>
+        <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-danger-text" role="alert">
+          <Icon name="alertCircle" size={14} />{scanErreur}
+        </div>
       )}
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-surface border border-line rounded-md shadow-lifted max-h-[300px] overflow-auto">
-          {loading && <div className="px-3 py-2.5 text-[12px] text-ink-muted">Recherche…</div>}
-          {!loading && results.length === 0 && <div className="px-3 py-2.5 text-[12px] text-ink-muted">Aucun article.</div>}
+        <div className="absolute z-dropdown left-0 right-0 mt-1 bg-raised border border-line-soft rounded-md shadow-lifted max-h-[300px] overflow-auto py-1 animate-pop-in">
+          {loading && (
+            <div className="px-3 py-2.5 flex items-center gap-2 text-sm text-ink-muted" role="status">
+              <Spinner size={14} className="text-brand-text" />Recherche…
+            </div>
+          )}
+          {!loading && results.length === 0 && (
+            <div className="px-3 py-2.5 flex items-center gap-2 text-sm text-ink-muted"><Icon name="search" size={14} />Aucun article.</div>
+          )}
           {results.map((a, i) => (
             <button key={a.id} onMouseEnter={() => setHi(i)} onClick={() => choose(a)}
-                    className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-line-soft last:border-b-0 ${i === hi ? 'bg-brand-50' : ''}`}>
+                    className={cn('w-full text-left px-3 py-2 flex items-center gap-3 border-b border-line-soft last:border-b-0 transition-colors duration-fast',
+                      i === hi ? 'bg-brand-soft' : 'hover:bg-hover')}>
+              <Icon name="package" size={16} className={cn('flex-none', i === hi ? 'text-brand-text' : 'text-ink-muted')} />
               <span className="flex-1 min-w-0">
-                <span className="block font-bold text-[12.5px] truncate">{a.designation}</span>
-                <span className="block money text-[10.5px] text-ink-muted">{a.code}{a.famille ? ` · ${a.famille}` : ''}</span>
+                <span className="block font-bold text-base text-ink truncate">{a.designation}</span>
+                <span className="block money text-xs text-ink-muted">{a.code}{a.famille ? ` · ${a.famille}` : ''}</span>
               </span>
-              <span className="money text-[11px]" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger)' : 'var(--text-muted)' }}>
+              <span className="money text-xs" style={{ color: Number(a.qte_reale) <= 0 ? 'var(--danger-text)' : 'var(--text-muted)' }}>
                 stock {fmtQte(a.qte_reale)}
               </span>
-              <span className="money text-[12px] font-bold">{fmtMoney(a.prix_vente_ttc)}</span>
+              <span className="money text-sm font-bold text-ink">{fmtMoney(a.prix_vente_ttc)}</span>
             </button>
           ))}
         </div>

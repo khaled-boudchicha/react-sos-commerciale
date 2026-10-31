@@ -6,7 +6,11 @@ import {
 import { useSession } from '../store/session';
 import { CATALOGUE_DROITS, Droits, ModuleDroit, MODULES_DROITS } from '../lib/droits';
 import { fmtDate } from '../lib/format';
-import { PageHeader, StatusPill } from '../components/ui/atoms';
+import { PageHeader, StatusPill, Tabs } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Checkbox, Field, Select, TextInput } from '../components/ui/Field';
+import { Alert, EmptyState, Loading } from '../components/ui/States';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 
@@ -145,98 +149,90 @@ export default function Utilisateurs() {
     }
   }
 
-  const input = 'mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal text-[12.5px]';
   const tout = b.droits[module] === '*';
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Utilisateurs & droits">
-        <button onClick={() => setSelection('nouveau')}
-                className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">
-          + Nouvel utilisateur
-        </button>
+      <PageHeader title="Utilisateurs & droits" icon="shield"
+                  breadcrumb={[{ label: 'Paramètres', to: '/parametres' }, { label: 'Utilisateurs & droits' }]}
+                  description="Utilisateurs du dossier partagés avec le logiciel desktop : les droits accordés ici s’appliquent aux deux applications.">
+        <Button icon="plus" onClick={() => setSelection('nouveau')}>Nouvel utilisateur</Button>
       </PageHeader>
-      <div className="text-[11.5px] text-ink-muted -mt-2">
-        Utilisateurs du dossier partagés avec le logiciel desktop : les droits accordés ici s’appliquent aux deux applications.
-      </div>
 
       <div className="grid grid-cols-[280px_1fr] gap-3.5 items-start">
         {/* Liste */}
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden">
-          {loading && !users.length && <div className="p-4 text-[12px] text-ink-muted">Chargement…</div>}
+        <Card padding="none" className="overflow-hidden">
+          {loading && !users.length && <Loading className="p-4" />}
           {users.map((u) => (
-            <button key={u.id} onClick={() => setSelection(u.id)}
-                    className={`w-full text-left px-3.5 py-2.5 border-b border-line-soft last:border-0 ${selection === u.id ? 'bg-brand-50' : 'hover:bg-line-soft'}`}>
+            <button key={u.id} type="button" onClick={() => setSelection(u.id)} aria-pressed={selection === u.id}
+                    className={`w-full text-left px-3.5 py-2.5 border-b border-line-soft last:border-0 transition-colors duration-fast ${selection === u.id ? 'bg-brand-soft' : 'hover:bg-hover'}`}>
               <div className="flex items-center gap-2">
-                <b className="text-[12.5px] text-ink">{u.username}</b>
+                <b className="text-base text-ink">{u.username}</b>
                 {String(u.typeuser).toLowerCase() === 'admin' && <StatusPill tone="ok">admin</StatusPill>}
                 {Number(moi?.id) === u.id && <StatusPill tone="mut">vous</StatusPill>}
               </div>
-              <div className="text-[11px] text-ink-muted">
+              <div className="text-xs text-ink-muted">
                 {u.name || '—'}{u.last_connect ? ` · vu le ${fmtDate(u.last_connect)}` : ''}
               </div>
             </button>
           ))}
           {selection === 'nouveau' && (
-            <div className="px-3.5 py-2.5 bg-brand-50 text-[12.5px] font-bold text-brand-700">Nouvel utilisateur…</div>
+            <div className="px-3.5 py-2.5 bg-brand-soft text-base font-bold text-brand-text">Nouvel utilisateur…</div>
           )}
-        </div>
+        </Card>
 
         {/* Fiche */}
+        {selection == null && !loading && (
+          <Card><EmptyState icon="user" title="Aucun utilisateur sélectionné" description="Choisissez un utilisateur dans la liste ou créez-en un nouveau." /></Card>
+        )}
         {selection != null && (
-          <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 flex flex-col gap-4">
-            {erreur && (
-              <div className="text-[12px] rounded-md px-3 py-2"
-                   style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{erreur}</div>
-            )}
+          <Card className="flex flex-col gap-4">
+            {erreur && <Alert tone="danger" compact>{erreur}</Alert>}
             <div className="grid grid-cols-3 gap-3">
-              <label className="text-[11px] font-bold text-ink-label">Nom d’utilisateur *
-                <input value={b.username} onChange={(e) => setB({ ...b, username: e.target.value })} className={input} maxLength={50} />
-              </label>
-              <label className="text-[11px] font-bold text-ink-label">Prénom
-                <input value={b.prenom} onChange={(e) => setB({ ...b, prenom: e.target.value })} className={input} maxLength={50} />
-              </label>
-              <label className="text-[11px] font-bold text-ink-label">Nom
-                <input value={b.nom} onChange={(e) => setB({ ...b, nom: e.target.value })} className={input} maxLength={50} />
-              </label>
-              <label className="text-[11px] font-bold text-ink-label">Mot de passe
-                <input type="password" value={b.password} onChange={(e) => setB({ ...b, password: e.target.value })}
-                       placeholder={b.id == null ? '' : 'inchangé si vide'} className={input} maxLength={50} autoComplete="new-password" />
-              </label>
-              <label className="text-[11px] font-bold text-ink-label">Profil
-                <select value={b.typeuser} onChange={(e) => setB({ ...b, typeuser: e.target.value as 'admin' | 'user' })} className={input}>
+              <Field label="Nom d’utilisateur" required>
+                <TextInput value={b.username} onChange={(e) => setB({ ...b, username: e.target.value })} maxLength={50} />
+              </Field>
+              <Field label="Prénom">
+                <TextInput value={b.prenom} onChange={(e) => setB({ ...b, prenom: e.target.value })} maxLength={50} />
+              </Field>
+              <Field label="Nom">
+                <TextInput value={b.nom} onChange={(e) => setB({ ...b, nom: e.target.value })} maxLength={50} />
+              </Field>
+              <Field label="Mot de passe">
+                <TextInput type="password" value={b.password} onChange={(e) => setB({ ...b, password: e.target.value })}
+                           placeholder={b.id == null ? '' : 'inchangé si vide'} maxLength={50} autoComplete="new-password" />
+              </Field>
+              <Field label="Profil">
+                <Select value={b.typeuser} onChange={(e) => setB({ ...b, typeuser: e.target.value as 'admin' | 'user' })}>
                   <option value="user">Utilisateur (droits ci-dessous)</option>
                   <option value="admin">Administrateur (tous les droits)</option>
-                </select>
-              </label>
-              <label className="text-[11px] font-bold text-ink-label">Caisse par défaut
-                <select value={b.compte_id} onChange={(e) => setB({ ...b, compte_id: e.target.value })} className={input}>
+                </Select>
+              </Field>
+              <Field label="Caisse par défaut">
+                <Select value={b.compte_id} onChange={(e) => setB({ ...b, compte_id: e.target.value })}>
                   <option value="">—</option>
                   {comptes.map((c) => <option key={c.compte_id} value={String(c.compte_id)}>{c.compte}</option>)}
-                </select>
-              </label>
+                </Select>
+              </Field>
             </div>
 
             {/* Matrice des droits */}
             <div className={estAdmin ? 'opacity-50 pointer-events-none' : ''}>
-              <div className="flex gap-1 flex-wrap border-b border-line-soft mb-3">
-                {MODULES_DROITS.map((m) => (
-                  <button key={m.module} onClick={() => setModule(m.module)}
-                          className={`px-3 py-1.5 text-[12px] font-bold rounded-t-sm -mb-px border-b-2 ${module === m.module ? 'border-brand-700 text-brand-700' : 'border-transparent text-ink-label'}`}>
-                    {m.label} <span className="text-ink-muted font-semibold">({estAdmin ? 'tout' : compte(b.droits[m.module])})</span>
-                  </button>
-                ))}
+              <div className="mb-3">
+                <Tabs value={module} onChange={setModule} variant="underline" size="sm" label="Modules de droits"
+                      options={MODULES_DROITS.map((m) => ({
+                        code: m.module,
+                        label: <>{m.label} <span className="text-ink-muted font-semibold">({estAdmin ? 'tout' : compte(b.droits[m.module])})</span></>,
+                      }))} />
               </div>
-              <label className="flex items-center gap-2 text-[12px] font-bold text-ink mb-3">
-                <input type="checkbox" checked={tout} onChange={(e) => setModuleDroits(module, e.target.checked ? '*' : [])} />
-                Tous les droits de ce module
-              </label>
+              <Checkbox className="mb-3 font-bold" label="Tous les droits de ce module"
+                        checked={tout} onChange={(e) => setModuleDroits(module, e.target.checked ? '*' : [])} />
               <div className={`grid grid-cols-2 gap-3 ${tout ? 'opacity-50 pointer-events-none' : ''}`}>
                 {groupes.map((g) => (
                   <div key={g.groupe} className="border border-line-soft rounded-md p-3">
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="text-[10.5px] font-bold uppercase tracking-wide text-ink-muted">{g.groupe}</div>
-                      <button className="text-[10.5px] font-bold text-brand-700"
+                      <div className="text-2xs font-bold uppercase tracking-wide text-ink-muted">{g.groupe}</div>
+                      <Button variant="link" size="xs"
                               onClick={() => {
                                 const cur = b.droits[module];
                                 const liste = new Set(cur === '*' ? [] : cur);
@@ -245,43 +241,41 @@ export default function Utilisateurs() {
                                 setModuleDroits(module, [...liste]);
                               }}>
                         tout / rien
-                      </button>
+                      </Button>
                     </div>
-                    {g.libelles.length === 0 && <div className="text-[11.5px] text-ink-muted">Aucun élément.</div>}
+                    {g.libelles.length === 0 && <div className="text-xs text-ink-muted">Aucun élément.</div>}
                     {g.libelles.map((l) => (
-                      <label key={l} className="flex items-center gap-2 text-[12px] text-ink-label py-0.5">
-                        <input type="checkbox" checked={tout || (Array.isArray(b.droits[module]) && (b.droits[module] as string[]).includes(l))}
-                               onChange={() => basculer(module, l)} />
-                        {l.trim()}
-                      </label>
+                      <div key={l} className="py-0.5">
+                        <Checkbox label={l.trim()}
+                                  checked={tout || (Array.isArray(b.droits[module]) && (b.droits[module] as string[]).includes(l))}
+                                  onChange={() => basculer(module, l)} />
+                      </div>
                     ))}
                   </div>
                 ))}
               </div>
             </div>
-            {estAdmin && <div className="text-[11.5px] text-ink-muted -mt-2">Un administrateur dispose de tous les droits.</div>}
+            {estAdmin && <div className="text-xs text-ink-muted -mt-2">Un administrateur dispose de tous les droits.</div>}
 
             <div className="flex gap-2 justify-end border-t border-line-soft pt-3">
               {b.id != null && Number(moi?.id) !== b.id && (
-                <button onClick={() => setConfirmSuppr(true)}
-                        className="mr-auto rounded-md px-3 py-2 font-bold text-[12px]"
-                        style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
+                <Button variant="danger" icon="trash" className="mr-auto" onClick={() => setConfirmSuppr(true)}>
                   Supprimer
-                </button>
+                </Button>
               )}
-              <button onClick={() => void enregistrer()} disabled={creation || majEnCours}
-                      className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700 disabled:opacity-50">
+              <Button variant="primary" icon="save" onClick={() => void enregistrer()} disabled={creation || majEnCours}
+                      loading={creation || majEnCours}>
                 {creation || majEnCours ? 'Enregistrement…' : b.id == null ? 'Créer l’utilisateur' : 'Enregistrer'}
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
         )}
       </div>
 
       {confirmSuppr && (
         <ConfirmDialog title="Supprimer cet utilisateur ?"
                        message={<>L’utilisateur <b>{b.username}</b> ne pourra plus se connecter (desktop et application). Ses pièces restent intactes.</>}
-                       confirmLabel="Supprimer" danger loading={suppression}
+                       confirmLabel="Supprimer l’utilisateur" danger loading={suppression}
                        onConfirm={() => void confirmerSuppression()} onCancel={() => setConfirmSuppr(false)} />
       )}
     </div>

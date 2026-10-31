@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VENTE, UPDATE_VENTE, ADD_REGLEMENT_CLIENT } from '../api/queries';
 import { Article, Client, TYPES_VENTE, Vente, VENTE_TYPE_CODE } from '../api/types';
 import { useSession } from '../store/session';
 import { useDroits } from '../lib/droits';
 import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
-import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
+import { DocBadge, DOC_TONE, PageHeader, Tabs, type Crumb } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, TotalsPanel } from '../components/ui/Card';
+import { Field, Select, TextInput } from '../components/ui/Field';
+import { Alert, Loading } from '../components/ui/States';
 import ArticleSearch from '../components/ArticleSearch';
 import ClientSearch from '../components/ClientSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
-import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
+import { lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import { calculerTimbre, estEspeces, TYPES_TIMBRE } from '../lib/timbre';
 import RemiseGlobale from '../components/document/RemiseGlobale';
@@ -241,149 +245,140 @@ export default function VenteEditor() {
   } else if (permis.length === 0) {
     blocage = 'Accès refusé : vous n’avez le droit de créer aucun type de pièce de vente.';
   }
+  // Fil d'Ariane : Ventes › (pièce modifiée) › titre
+  const breadcrumb: Crumb[] = [
+    { label: 'Ventes', to: '/ventes' },
+    ...(enEdition && src ? [{ label: `${src.type_doc} ${src.numero}`, to: `/ventes/${editId}` }] : []),
+    { label: enEdition ? 'Modification' : 'Nouvelle pièce' },
+  ];
+
   if (blocage || !type) {
     return (
       <div className="flex flex-col gap-3.5">
-        <PageHeader title={titre}>
-          <Link to={retour} className="text-[12px] font-bold text-brand-700">← Retour</Link>
-        </PageHeader>
+        <PageHeader title={titre} backTo={retour} breadcrumb={breadcrumb} />
         {blocage
-          ? <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{blocage}</div>
-          : <div className="text-[12px] text-ink-muted">Chargement…</div>}
+          ? <Alert tone="danger">{blocage}</Alert>
+          : <Loading />}
       </div>
     );
   }
 
+  const recuSaisi = parseFloat(montantRecu) || 0;
+  const rendu = recuSaisi - totaux.net;
+
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={titre}>
-        <Link to={retour} className="text-[12px] font-bold text-brand-700">← Annuler</Link>
-      </PageHeader>
+      <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={breadcrumb}
+                  meta={<DocBadge code={type} />} />
 
       {/* En modification, le type est figé (seule la pièce courante est affichée) */}
-      <Tabs value={type} onChange={setType}
-            options={enEdition ? TYPES_VENTE.filter((t) => t.code === type) : permis} />
+      <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
+            options={(enEdition ? TYPES_VENTE.filter((t) => t.code === type) : permis)
+              .map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
 
-      {error && (
-        <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>
-      )}
+      {error && <Alert tone="danger">{error}</Alert>}
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 grid grid-cols-[2fr_1fr_1fr_1fr] gap-3">
-        <label className="text-[11px] font-bold text-ink-label">Client
-          <div className="mt-1 font-normal"><ClientSearch value={client} onSelect={setClient} /></div>
-        </label>
-        <label className="text-[11px] font-bold text-ink-label">Date
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                 className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-        </label>
-        <label className="text-[11px] font-bold text-ink-label">Mode de paiement
-          <select value={mode} onChange={(e) => setMode(e.target.value)}
-                  className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-            <option value="Espece">Espèces</option>
-            {modes.map((m: any, i) => {
-              const v = String(m.nom ?? m.name ?? m.mode ?? m);
-              return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
-            })}
-          </select>
-        </label>
-        <RemiseGlobale pct={remiseGlobale} onPct={setRemiseGlobale} baseTtc={totaux.net + totaux.remGlob} />
-      </div>
+      <Card>
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 items-start">
+          <Field label="Client" hint="F3">
+            <ClientSearch value={client} onSelect={setClient} />
+          </Field>
+          <Field label="Date" required>
+            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Mode de paiement">
+            <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="Espece">Espèces</option>
+              {modes.map((m: any, i) => {
+                const v = String(m.nom ?? m.name ?? m.mode ?? m);
+                return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
+              })}
+            </Select>
+          </Field>
+          <RemiseGlobale pct={remiseGlobale} onPct={setRemiseGlobale} baseTtc={totaux.net + totaux.remGlob} />
+        </div>
+      </Card>
 
-      <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">
-        <div className="flex flex-col gap-2.5">
+      <div className="grid grid-cols-[1fr_300px] gap-3.5 items-start">
+        <div className="flex flex-col gap-2.5 min-w-0">
           <ArticleSearch onSelect={addArticle} autoFocus />
           <LignesTable sens="vente" lignes={lignes} patch={patchLigne} remove={removeLigne} />
           <div className="grid grid-cols-[1fr_170px] gap-3">
-            <label className="text-[11px] font-bold text-ink-label">Note
-              <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            </label>
-            <label className="text-[11px] font-bold text-ink-label" title="Échéance de paiement = date de la pièce + délai">
-              Délai de paiement (j)
-              <input type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)} placeholder="défaut"
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-            </label>
+            <Field label="Note">
+              <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+            </Field>
+            <Field label="Délai de paiement (j)">
+              <TextInput type="number" min={0} value={delai} onChange={(e) => setDelai(e.target.value)} placeholder="défaut"
+                         mono align="right" title="Échéance de paiement = date de la pièce + délai" />
+            </Field>
           </div>
         </div>
 
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden sticky top-4">
-          <TotRow label="Total HT" value={totaux.ht} />
-          <TotRow label="Remises lignes" value={-totaux.remLignes} />
-          <TotRow label="TVA" value={totaux.tva} />
-          <TotRow label={`Remise globale (${fmtQte(remiseGlobale)} %)`} value={-totaux.remGlob} />
-          {!!type && TYPES_TIMBRE.includes(type) && (
-            <label className="flex justify-between items-center px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft"
-                   title="Droit de timbre sur les paiements en espèces (barème LF 2025)">
-              <span className="flex items-center gap-1.5">
-                <input type="checkbox" checked={timbreActif} disabled={!timbreApplicable && !timbreActif}
-                       onChange={(e) => setTimbreChoix(e.target.checked)} />
-                Droit de timbre{!timbreApplicable ? ' (espèces uniquement)' : ''}
-              </span>
-              <span className="money">{fmtMoney(timbre)}</span>
-            </label>
-          )}
-          <div className="px-4 py-3.5 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
-            <span>Net à payer</span>
-            <span className="money text-[16px]">{fmtMoney(totaux.net)} DA</span>
-          </div>
-          <div className="p-3 flex flex-col gap-2">
-            {!enEdition && (<>
-            <label className="text-[11px] font-bold text-ink-label">
-              Montant reçu (règlement immédiat)
-              <div className="flex gap-1.5 mt-1">
-                <input ref={montantRecuRef} type="number" min="0" step="0.01" value={montantRecu}
-                       onChange={(e) => setMontantRecu(e.target.value)} placeholder="0,00"
-                       className="flex-1 min-w-0 border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-                <button onClick={() => setMontantRecu(String(totaux.net))}
-                        className="px-3 rounded-sm border border-line text-[11px] font-bold text-ink-label">
-                  Tout
-                </button>
+        <TotalsPanel
+          className="sticky top-4"
+          rows={[
+            { label: 'Total HT', value: totaux.ht },
+            { label: 'Remises lignes', value: -totaux.remLignes },
+            { label: 'TVA', value: totaux.tva },
+            { label: `Remise globale (${fmtQte(remiseGlobale)} %)`, value: -totaux.remGlob },
+            {
+              label: (
+                <label className="inline-flex items-center gap-1.5 cursor-pointer"
+                       title="Droit de timbre sur les paiements en espèces (barème LF 2025)">
+                  <input type="checkbox" checked={timbreActif} disabled={!timbreApplicable && !timbreActif}
+                         onChange={(e) => setTimbreChoix(e.target.checked)}
+                         className="h-4 w-4 cursor-pointer accent-[var(--brand-700)]" />
+                  Droit de timbre{!timbreApplicable ? ' (espèces uniquement)' : ''}
+                </label>
+              ),
+              value: timbre,
+              hidden: !(!!type && TYPES_TIMBRE.includes(type)),
+            },
+          ]}
+          total={{ label: 'Net à payer', value: totaux.net }}
+          after={(
+            <div className="flex flex-col gap-2.5">
+              {!enEdition && (<>
+                <Field label="Montant reçu (règlement immédiat)">
+                  <div className="flex gap-1.5">
+                    <TextInput ref={montantRecuRef} type="number" min="0" step="0.01" value={montantRecu}
+                               onChange={(e) => setMontantRecu(e.target.value)} placeholder="0,00"
+                               mono align="right" className="flex-1 min-w-0" />
+                    <Button onClick={() => setMontantRecu(String(totaux.net))} title="Reçu = net à payer">
+                      Tout
+                    </Button>
+                  </div>
+                </Field>
+                {recuSaisi > 0 && (rendu >= 0 ? (
+                  <div className="flex justify-between items-center rounded-sm px-2.5 py-1.5 text-sm font-bold bg-success-soft text-success-text">
+                    <span>À rendre</span>
+                    <span className="money text-md">{fmtMoney(rendu)} DA</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between items-center rounded-sm px-2.5 py-1.5 text-sm font-bold bg-warning-soft text-warning-text">
+                    <span>Reste dû</span>
+                    <span className="money text-md">{fmtMoney(-rendu)} DA</span>
+                  </div>
+                ))}
+              </>)}
+              <Button variant="primary" size="lg" block icon="save" loading={saving}
+                      onClick={() => void save()} disabled={saving || lignes.length === 0}>
+                {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
+              </Button>
+              {!enEdition && (
+                <Button variant="accent" size="lg" block icon="cash" kbd="F10"
+                        onClick={() => { setMontantRecu(String(totaux.net)); void save(totaux.net); }}
+                        disabled={saving || lignes.length === 0}>
+                  Encaisser tout
+                </Button>
+              )}
+              <div className="flex items-center justify-center gap-1.5 text-xs text-ink-muted text-center">
+                <DocBadge code={type} /> {enEdition ? 'numéro et règlements conservés' : 'numérotée automatiquement par le serveur'}
               </div>
-            </label>
-            {(() => {
-              const recu = parseFloat(montantRecu) || 0;
-              const rendu = recu - totaux.net;
-              if (recu <= 0) return null;
-              return rendu >= 0 ? (
-                <div className="flex justify-between items-center px-1 text-[12px] font-bold" style={{ color: 'var(--success)' }}>
-                  <span>À rendre</span>
-                  <span className="money text-[14px]">{fmtMoney(rendu)} DA</span>
-                </div>
-              ) : (
-                <div className="flex justify-between items-center px-1 text-[12px] font-bold" style={{ color: 'var(--warning)' }}>
-                  <span>Reste dû</span>
-                  <span className="money text-[14px]">{fmtMoney(-rendu)} DA</span>
-                </div>
-              );
-            })()}
-            </>)}
-            <button onClick={() => void save()} disabled={saving || lignes.length === 0}
-                    className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
-              {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
-            </button>
-            {!enEdition && (
-              <button onClick={() => { setMontantRecu(String(totaux.net)); void save(totaux.net); }}
-                      disabled={saving || lignes.length === 0}
-                      className="rounded-md py-2.5 font-bold disabled:opacity-50"
-                      style={{ background: 'var(--gold-400)', color: '#3A2A05' }}>
-                Encaisser tout · F10
-              </button>
-            )}
-            <div className="text-[10.5px] text-ink-muted text-center">
-              <DocBadge code={type} /> {enEdition ? 'numéro et règlements conservés' : 'numérotée automatiquement par le serveur'}
             </div>
-          </div>
-        </div>
+          )}
+        />
       </div>
-    </div>
-  );
-}
-
-function TotRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex justify-between px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft">
-      <span>{label}</span>
-      <span className="money" style={{ color: value < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(value)}</span>
     </div>
   );
 }

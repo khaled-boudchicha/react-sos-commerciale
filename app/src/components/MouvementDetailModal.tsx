@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { MouvementTresorie } from '../api/types';
 import { fmtDate, fmtMoney } from '../lib/format';
+import Dialog from './ui/Dialog';
+import { Button } from './ui/Button';
+import { Icon } from './ui/Icon';
 
 /** Origine d'un mouvement d'après sa clé (cf. tresorieComplete côté agent). */
 function origine(m: MouvementTresorie & { n_ligne?: number | null; raison?: string | null; n_cheque?: string | null }) {
@@ -32,39 +35,29 @@ export default function MouvementDetailModal({ m, onClose, onAnnuler }: {
     ['Observation', m.observation],
     ['Référence', m.cle],
   ];
+  const visibles = lignes.filter(([, v]) => v != null && v !== '');
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }} onClick={onClose}>
-      <div className="w-[460px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start mb-3">
-          <div>
-            <div className="font-extrabold text-[15px]">{o.libelle}</div>
-            <div className="money text-[20px] font-extrabold mt-1" style={{ color: m.montant < 0 ? 'var(--danger)' : 'var(--success)' }}>
-              {m.montant < 0 ? '−' : '+'}{fmtMoney(Math.abs(m.montant))} DA
-            </div>
-          </div>
-          <button onClick={onClose} className="ml-auto text-ink-muted text-[16px]">✕</button>
-        </div>
-        <div className="border-t border-line-soft">
-          {lignes.filter(([, v]) => v != null && v !== '').map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-4 py-1.5 border-b border-dashed border-line-soft text-[12px]">
-              <span className="text-ink-muted">{k}</span><span className="text-right text-ink">{String(v)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2 mt-4">
-          {o.lien && (
-            <Link to={o.lien} onClick={onClose} className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-brand-700">
-              {o.piece} →
-            </Link>
-          )}
-          {onAnnuler && (
-            <button onClick={onAnnuler} className="ml-auto rounded-md px-3 py-1.5 font-bold text-[12px]"
-                    style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
-              Annuler ce mouvement
-            </button>
-          )}
-        </div>
+    <Dialog title={o.libelle} width={460} size="sm" onClose={onClose}
+            icon="wallet" iconTone={m.montant < 0 ? 'danger' : 'success'}
+            footerStart={o.lien ? (
+              <Link to={o.lien} onClick={onClose}
+                    className="inline-flex items-center gap-2 h-control-md px-3.5 rounded-md border border-line bg-surface text-base font-semibold text-brand-text hover:bg-hover hover:border-line-strong transition-colors duration-fast">
+                {o.piece}<Icon name="arrowRight" size={16} />
+              </Link>
+            ) : undefined}
+            footer={(o.lien || onAnnuler) ? (
+              onAnnuler ? <Button variant="danger" icon="trash" onClick={onAnnuler}>Annuler ce mouvement</Button> : <span />
+            ) : undefined}>
+      <div className="money text-2xl font-extrabold mb-3" style={{ color: m.montant < 0 ? 'var(--danger-text)' : 'var(--success-text)' }}>
+        {m.montant < 0 ? '−' : '+'}{fmtMoney(Math.abs(m.montant))} DA
       </div>
-    </div>
+      <dl className="border-t border-line-soft">
+        {visibles.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-4 py-1.5 border-b border-dashed border-line-soft text-sm">
+            <dt className="text-ink-muted">{k}</dt><dd className="text-right text-ink font-semibold">{String(v)}</dd>
+          </div>
+        ))}
+      </dl>
+    </Dialog>
   );
 }

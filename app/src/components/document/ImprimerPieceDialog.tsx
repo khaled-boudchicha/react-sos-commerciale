@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Vente } from '../../api/types';
-import Dialog, { DialogButton } from '../ui/Dialog';
+import Dialog, { KeyHints } from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { cn } from '../ui/cn';
 import { PrintDocument } from '../../print/engine/types';
 import { getCachet } from '../../print/engine/cachet';
 import { buildVenteModelePrint, modelesPour, ModeleVenteId, Societe } from '../../print/templates';
@@ -55,30 +57,33 @@ export default function ImprimerPieceDialog({ vente, code, societe, onApercu, on
 
   return (
     <Dialog title="Imprimer la pièce" subtitle={`${vente.type_doc} ${vente.numero}`} onClose={onClose} width={480}
+            icon="printer"
+            footerStart={<KeyHints items={[['Entrée', 'aperçu'], ['Échap', 'annuler']]} />}
             footer={<>
-              <DialogButton onClick={onClose} kbd="Échap">Annuler</DialogButton>
-              <DialogButton kind="primary" onClick={apercu} kbd="Entrée">Aperçu</DialogButton>
+              <Button onClick={onClose}>Annuler</Button>
+              <Button variant="primary" icon="eye" onClick={apercu}>Aperçu</Button>
             </>}>
       <div className="flex flex-col gap-3" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apercu(); } }}>
         <fieldset className="flex flex-col gap-1.5 max-h-[58vh] overflow-y-auto pr-1">
-          <legend className="text-[12px] font-bold text-ink-label mb-1.5">Modèle</legend>
+          <legend className="text-xs font-semibold text-ink-label mb-1.5">Modèle</legend>
           {options.map((o) => (
-            <label key={o.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-[10px] border cursor-pointer ${choix === o.id ? 'border-brand-500 bg-brand-50' : 'border-line hover:border-brand-300'}`}>
+            <label key={o.id} className={cn('flex items-center gap-3 px-3 py-2.5 rounded-md border cursor-pointer transition-colors duration-fast',
+              choix === o.id ? 'border-brand-line bg-brand-soft' : 'border-line hover:border-line-strong hover:bg-hover')}>
               <input type="radio" name="modele" value={o.id} checked={choix === o.id} onChange={() => setChoix(o.id)}
                      style={{ accentColor: 'var(--brand-700)' }} />
               <span className="flex flex-col">
-                <span className="text-[13px] font-bold">{o.titre}</span>
-                <span className="text-[11px] line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{o.sous}</span>
+                <span className="text-base font-bold text-ink">{o.titre}</span>
+                <span className="text-xs text-ink-muted line-clamp-2">{o.sous}</span>
               </span>
             </label>
           ))}
         </fieldset>
         {!choix.startsWith('perso:') && (
-          <label className="flex items-center gap-2.5 text-[13px] font-semibold" style={cachet ? undefined : { color: 'var(--text-secondary)' }}>
+          <label className={cn('flex items-center gap-2.5 text-base font-semibold', cachet ? 'text-ink' : 'text-ink-muted')}>
             <input type="checkbox" checked={avecCachet} disabled={!cachet} onChange={(e) => setAvecCachet(e.target.checked)}
-                   className="w-[18px] h-[18px]" style={{ accentColor: 'var(--brand-700)' }} />
+                   className="w-4 h-4" style={{ accentColor: 'var(--brand-700)' }} />
             Avec cachet
-            {!cachet && <span className="font-normal">— ajoutez l’image du cachet dans <Link to="/parametres" className="font-bold text-brand-700" onClick={onClose}>Paramètres</Link></span>}
+            {!cachet && <span className="font-normal">— ajoutez l’image du cachet dans <Link to="/parametres" className="font-bold text-brand-text hover:underline underline-offset-2" onClick={onClose}>Paramètres</Link></span>}
           </label>
         )}
       </div>

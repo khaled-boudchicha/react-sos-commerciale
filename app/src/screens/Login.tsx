@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useMutation, useLazyQuery } from '@apollo/client';
 import { LOGIN_IDENTIFY, LOGIN_WITH_AGENT, DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER, LOGIN_WITH_API_KEY } from '../api/auth';
 import { useSession, getDeviceId, AgentInfo, dossierUserDepuisLogin } from '../store/session';
+import { Button, IconButton } from '../components/ui/Button';
+import { Field, Select, TextInput, Textarea } from '../components/ui/Field';
+import { Alert } from '../components/ui/States';
+import { Badge } from '../components/ui/atoms';
+import { Icon, IconBadge } from '../components/ui/Icon';
 
 type Step = 'credentials' | 'agent' | 'dossier';
 
@@ -29,6 +34,8 @@ export default function Login() {
   // Connexion alternative : code d'appairage copié depuis le tray de l'agent
   const [modeAppairage, setModeAppairage] = useState(false);
   const [codeAppairage, setCodeAppairage] = useState('');
+  // Affichage du mot de passe en clair (bouton œil)
+  const [voirMdp, setVoirMdp] = useState(false);
 
   const [dossierName, setDossierName] = useState('');
   const [dossierUsername, setDossierUsername] = useState('');
@@ -165,140 +172,193 @@ export default function Login() {
   const dossiers: any[] = Array.isArray(dossiersData?.dossiers) ? dossiersData.dossiers : [];
   const dossierUsers: any[] = Array.isArray(dossierUsersData?.dossierUsers) ? dossierUsersData.dossierUsers : [];
 
+  const ETAPES: { id: Step; libelle: string }[] = [
+    { id: 'credentials', libelle: 'Compte' },
+    { id: 'agent', libelle: 'Établissement' },
+    { id: 'dossier', libelle: 'Dossier' },
+  ];
+  const indexEtape = ETAPES.findIndex((e) => e.id === step);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg">
-      <div className="w-[400px] bg-surface border border-line-soft rounded-lg shadow-card p-7">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-md text-white font-extrabold flex items-center justify-center"
-               style={{ background: 'var(--gradient-hero)' }}>GC</div>
+    <div className="min-h-screen flex bg-bg">
+      {/* Panneau de marque */}
+      <aside className="hidden lg:flex w-[44%] max-w-[620px] flex-col justify-between p-10 text-ink-inverse relative overflow-hidden"
+             style={{ background: 'var(--gradient-hero)' }}>
+        <span aria-hidden="true" className="absolute -right-24 -top-24 w-96 h-96 rounded-full" style={{ background: 'rgb(255 255 255 / .07)' }} />
+        <span aria-hidden="true" className="absolute -left-20 bottom-10 w-72 h-72 rounded-full" style={{ background: 'rgb(255 255 255 / .05)' }} />
+        <div className="relative flex items-center gap-3">
+          <div className="w-11 h-11 rounded-md font-extrabold text-lg flex items-center justify-center" style={{ background: 'rgb(255 255 255 / .18)' }}>GC</div>
           <div>
-            <div className="font-extrabold text-[15px]">Gestion Commerciale</div>
-            <div className="text-[11px] text-ink-muted">
-              {step === 'credentials' && 'Étape 1/3 — Compte cloud'}
-              {step === 'agent' && 'Étape 2/3 — Choix de la pharmacie'}
-              {step === 'dossier' && 'Étape 3/3 — Dossier et utilisateur'}
-            </div>
+            <div className="font-extrabold text-lg leading-tight">Gestion Commerciale</div>
+            <div className="text-2xs font-bold uppercase tracking-widest" style={{ color: 'var(--gold-400)' }}>SOFTLY · Desktop</div>
           </div>
         </div>
-        <div className="flex gap-1.5 my-4">
-          {(['credentials', 'agent', 'dossier'] as Step[]).map((s, i) => (
-            <div key={s} className="h-1 flex-1 rounded-full"
-                 style={{ background: ['credentials', 'agent', 'dossier'].indexOf(step) >= i ? 'var(--brand-700)' : 'var(--line-soft)' }} />
-          ))}
-        </div>
-
-        {error && (
-          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
-               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>
-            {error}
-          </div>
-        )}
-
-        {step === 'credentials' && modeAppairage && (
-          <form onSubmit={handleAppairage} className="flex flex-col gap-3">
-            <div className="text-[11.5px] text-ink-muted">
-              Dans l’agent de la pharmacie, cliquez sur « Copier le code d’appairage », puis collez-le ici.
-            </div>
-            <label className="text-[11px] font-bold text-ink-label">
-              Code d’appairage
-              <textarea className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-[11px] h-20"
-                        value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
-                        placeholder='{"u":"…","k":"…","a":"…"}' />
-            </label>
-            <button type="submit" disabled={appairage || !codeAppairage.trim()}
-                    className="mt-1 rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-              {appairage ? 'Connexion…' : 'Se connecter'}
-            </button>
-            <button type="button" onClick={() => { setModeAppairage(false); setError(null); }}
-                    className="text-[11.5px] font-bold text-brand-700">← Connexion avec un compte cloud</button>
-          </form>
-        )}
-
-        {step === 'credentials' && !modeAppairage && (
-          <form onSubmit={handleIdentify} className="flex flex-col gap-3">
-            <label className="text-[11px] font-bold text-ink-label">
-              Identifiant
-              <input className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                     value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">
-              Mot de passe
-              <input type="password" className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                     value={password} onChange={(e) => setPassword(e.target.value)} />
-            </label>
-            <button type="submit" disabled={identifying}
-                    className="mt-2 rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-              {identifying ? 'Connexion…' : 'Continuer'}
-            </button>
-            <button type="button" onClick={() => { setModeAppairage(true); setError(null); }}
-                    className="text-[11.5px] font-bold text-brand-700">Se connecter avec un code d’appairage</button>
-          </form>
-        )}
-
-        {step === 'agent' && (
-          <div className="flex flex-col gap-2">
-            {agents.map((a) => (
-              <button key={a.agentId} onClick={() => { setSelectedAgent(a); setNeedsForce(false); setError(null); }}
-                      className={`flex items-center gap-3 border rounded-md px-3 py-2.5 text-left ${selectedAgent?.agentId === a.agentId ? 'border-brand-500 bg-brand-50' : 'border-line'}`}>
-                <span className="w-8 h-8 rounded-sm bg-brand-100 text-brand-700 font-extrabold text-[11px] flex items-center justify-center">PC</span>
-                <span className="flex-1">
-                  <span className="block font-bold text-[12.5px]">{a.label || a.agentId}</span>
-                  <span className="block text-[10.5px] text-ink-muted">{a.agentId}{a.lastDossier ? ` · ${a.lastDossier}` : ''}</span>
+        <div className="relative">
+          <h1 className="text-3xl font-extrabold tracking-tight leading-tight">Ventes, stock et trésorerie,<br />au même endroit.</h1>
+          <ul className="mt-6 flex flex-col gap-3 text-base opacity-95">
+            {([
+              ['receipt', 'Factures, bons de livraison et comptoir en quelques touches'],
+              ['package', 'Stock, lots et péremptions suivis en temps réel'],
+              ['wallet', 'Caisses, banques, échéances et recouvrement'],
+              ['keyboard', 'Pensé pour le clavier : F2, F3, F10, Ctrl+K'],
+            ] as const).map(([icone, texte]) => (
+              <li key={texte} className="flex items-center gap-3">
+                <span className="w-8 h-8 rounded-md flex items-center justify-center flex-none" style={{ background: 'rgb(255 255 255 / .14)' }}>
+                  <Icon name={icone} size={16} />
                 </span>
-                <span className="text-[10px] font-bold" style={{ color: a.isOnline ? 'var(--success)' : 'var(--text-muted)' }}>
-                  {a.isOnline ? 'En ligne' : 'Hors ligne'}
-                </span>
-              </button>
+                {texte}
+              </li>
             ))}
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setStep('credentials')} className="flex-1 border border-line rounded-md py-2 font-bold text-ink-label">Retour</button>
-              <button onClick={() => handleConnectAgent(needsForce)} disabled={!selectedAgent || connecting}
-                      className="flex-[2] rounded-md py-2 font-bold text-white bg-brand-700 disabled:opacity-60">
-                {connecting ? 'Connexion…' : needsForce ? 'Forcer la connexion' : 'Continuer'}
-              </button>
-            </div>
-          </div>
-        )}
+          </ul>
+        </div>
+        <div className="relative text-xs opacity-75">Connexion sécurisée au serveur SOFTLY · vos données restent sur le PC de l’établissement.</div>
+      </aside>
 
-        {step === 'dossier' && (
-          <form onSubmit={handleDossierLogin} className="flex flex-col gap-3">
-            <label className="text-[11px] font-bold text-ink-label">
-              Dossier / exercice
-              <select className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                      value={dossierName} onChange={(e) => setDossierName(e.target.value)}>
-                {loadingDossiers && <option>Chargement…</option>}
-                {dossiers.map((d: any) => (
-                  <option key={d.name} value={d.name}>{d.name}{d.isDefault ? ' (défaut)' : ''}</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">
-              Utilisateur du dossier
-              {dossierUsers.length > 0 ? (
-                <select className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                        value={dossierUsername} onChange={(e) => setDossierUsername(e.target.value)}>
-                  <option value="">— choisir —</option>
-                  {dossierUsers.map((u: any) => (
-                    <option key={u.id ?? u.username} value={u.username ?? u.UserName}>{u.username ?? u.UserName}</option>
-                  ))}
-                </select>
-              ) : (
-                <input className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                       value={dossierUsername} onChange={(e) => setDossierUsername(e.target.value)} />
-              )}
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">
-              Mot de passe
-              <input type="password" className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink"
-                     value={dossierPassword} onChange={(e) => setDossierPassword(e.target.value)} />
-            </label>
-            <button type="submit" disabled={loggingDossierUser}
-                    className="mt-2 rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-              {loggingDossierUser ? 'Ouverture…' : 'Ouvrir le dossier'}
-            </button>
-          </form>
-        )}
-      </div>
+      {/* Formulaire */}
+      <main className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-[420px]">
+          <div className="lg:hidden flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-md text-ink-inverse font-extrabold flex items-center justify-center" style={{ background: 'var(--gradient-hero)' }}>GC</div>
+            <div className="font-extrabold text-lg">Gestion Commerciale</div>
+          </div>
+
+          {/* Étapes */}
+          <ol className="flex items-center gap-2 mb-6" aria-label="Étapes de connexion">
+            {ETAPES.map((e, i) => {
+              const fait = i < indexEtape;
+              const courant = i === indexEtape;
+              return (
+                <li key={e.id} className="flex items-center gap-2 flex-1 min-w-0" aria-current={courant ? 'step' : undefined}>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-2xs font-extrabold flex-none transition-colors ${
+                    fait ? 'bg-success-solid text-ink-inverse' : courant ? 'bg-brand-700 text-ink-inverse' : 'bg-line-soft text-ink-muted'}`}>
+                    {fait ? <Icon name="check" size={12} strokeWidth={3} /> : i + 1}
+                  </span>
+                  <span className={`text-xs font-semibold truncate ${courant ? 'text-ink' : 'text-ink-muted'}`}>{e.libelle}</span>
+                  {i < ETAPES.length - 1 && <span className={`h-px flex-1 ${fait ? 'bg-success-solid' : 'bg-line'}`} />}
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="bg-surface border border-line-soft rounded-lg shadow-card p-7">
+            <h2 className="text-xl font-extrabold text-ink">
+              {step === 'credentials' && (modeAppairage ? 'Code d’appairage' : 'Connexion à votre compte')}
+              {step === 'agent' && 'Choisissez l’établissement'}
+              {step === 'dossier' && 'Ouvrir un dossier'}
+            </h2>
+            <p className="text-sm text-ink-muted mt-1 mb-5">
+              {step === 'credentials' && (modeAppairage ? 'Pour un poste dédié, sans compte cloud.' : 'Identifiants de votre compte SOFTLY.')}
+              {step === 'agent' && 'Le PC (agent) qui héberge les données de l’établissement.'}
+              {step === 'dossier' && 'Exercice comptable et utilisateur du dossier.'}
+            </p>
+
+            {error && <Alert tone="danger" compact className="mb-4">{error}</Alert>}
+
+            {step === 'credentials' && modeAppairage && (
+              <form onSubmit={handleAppairage} className="flex flex-col gap-4">
+                <Field label="Code d’appairage" help="Dans l’agent de l’établissement, cliquez sur « Copier le code d’appairage », puis collez-le ici.">
+                  <Textarea className="money text-xs h-24" rows={4}
+                            value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
+                            placeholder='{"u":"…","k":"…","a":"…"}' />
+                </Field>
+                <Button type="submit" variant="primary" size="lg" block loading={appairage} disabled={!codeAppairage.trim()} iconRight="arrowRight">
+                  {appairage ? 'Connexion…' : 'Se connecter'}
+                </Button>
+                <Button variant="link" icon="arrowLeft" onClick={() => { setModeAppairage(false); setError(null); }} className="self-center">
+                  Connexion avec un compte cloud
+                </Button>
+              </form>
+            )}
+
+            {step === 'credentials' && !modeAppairage && (
+              <form onSubmit={handleIdentify} className="flex flex-col gap-4">
+                <Field label="Identifiant">
+                  <TextInput size="lg" leading="user" autoComplete="username"
+                             value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
+                </Field>
+                <Field label="Mot de passe">
+                  <TextInput size="lg" leading="lock" type={voirMdp ? 'text' : 'password'} autoComplete="current-password"
+                             value={password} onChange={(e) => setPassword(e.target.value)}
+                             trailing={<IconButton icon={voirMdp ? 'eyeOff' : 'eye'} size="xs" label={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                                   onClick={() => setVoirMdp((v) => !v)} />} />
+                </Field>
+                <Button type="submit" variant="primary" size="lg" block loading={identifying} iconRight="arrowRight" className="mt-1">
+                  {identifying ? 'Connexion…' : 'Continuer'}
+                </Button>
+                <div className="flex items-center gap-3 text-xs text-ink-muted"><span className="h-px flex-1 bg-line-soft" />ou<span className="h-px flex-1 bg-line-soft" /></div>
+                <Button icon="scanBarcode" block onClick={() => { setModeAppairage(true); setError(null); }}>
+                  Se connecter avec un code d’appairage
+                </Button>
+              </form>
+            )}
+
+            {step === 'agent' && (
+              <div className="flex flex-col gap-2.5">
+                <div role="radiogroup" aria-label="Établissement" className="flex flex-col gap-2 max-h-[320px] overflow-auto">
+                  {agents.map((a) => {
+                    const sel = selectedAgent?.agentId === a.agentId;
+                    return (
+                      <button key={a.agentId} role="radio" aria-checked={sel}
+                              onClick={() => { setSelectedAgent(a); setNeedsForce(false); setError(null); }}
+                              className={`flex items-center gap-3 border rounded-md px-3 py-2.5 text-left transition-colors ${sel ? 'border-brand-line bg-brand-soft' : 'border-line-soft hover:border-line-strong hover:bg-hover'}`}>
+                        <IconBadge name="server" tone={a.isOnline ? 'brand' : 'neutral'} size="md" />
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-bold text-base text-ink truncate">{a.label || a.agentId}</span>
+                          <span className="block text-xs text-ink-muted truncate">{a.agentId}{a.lastDossier ? ` · ${a.lastDossier}` : ''}</span>
+                        </span>
+                        <Badge tone={a.isOnline ? 'success' : 'neutral'} dot>{a.isOnline ? 'En ligne' : 'Hors ligne'}</Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <Button icon="arrowLeft" onClick={() => setStep('credentials')} size="lg">Retour</Button>
+                  <Button variant={needsForce ? 'danger-solid' : 'primary'} size="lg" block iconRight="arrowRight"
+                          onClick={() => handleConnectAgent(needsForce)} disabled={!selectedAgent} loading={connecting}>
+                    {connecting ? 'Connexion…' : needsForce ? 'Forcer la connexion' : 'Continuer'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {step === 'dossier' && (
+              <form onSubmit={handleDossierLogin} className="flex flex-col gap-4">
+                <Field label="Dossier / exercice">
+                  <Select size="lg" value={dossierName} onChange={(e) => setDossierName(e.target.value)}>
+                    {loadingDossiers && <option>Chargement…</option>}
+                    {dossiers.map((d: any) => (
+                      <option key={d.name} value={d.name}>{d.name}{d.isDefault ? ' (défaut)' : ''}</option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Utilisateur du dossier">
+                  {dossierUsers.length > 0 ? (
+                    <Select size="lg" value={dossierUsername} onChange={(e) => setDossierUsername(e.target.value)}>
+                      <option value="">— choisir —</option>
+                      {dossierUsers.map((u: any) => (
+                        <option key={u.id ?? u.username} value={u.username ?? u.UserName}>{u.username ?? u.UserName}</option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <TextInput size="lg" leading="user" autoComplete="username"
+                               value={dossierUsername} onChange={(e) => setDossierUsername(e.target.value)} />
+                  )}
+                </Field>
+                <Field label="Mot de passe">
+                  <TextInput size="lg" leading="lock" type={voirMdp ? 'text' : 'password'} autoComplete="current-password"
+                             value={dossierPassword} onChange={(e) => setDossierPassword(e.target.value)}
+                             trailing={<IconButton icon={voirMdp ? 'eyeOff' : 'eye'} size="xs" label={voirMdp ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                                   onClick={() => setVoirMdp((v) => !v)} />} />
+                </Field>
+                <Button type="submit" variant="primary" size="lg" block loading={loggingDossierUser} icon="folder" className="mt-1">
+                  {loggingDossierUser ? 'Ouverture…' : 'Ouvrir le dossier'}
+                </Button>
+              </form>
+            )}
+          </div>
+          <p className="text-center text-xs text-ink-muted mt-5">Besoin d’aide ? Contactez le support SOFTLY.</p>
+        </div>
+      </main>
     </div>
   );
 }

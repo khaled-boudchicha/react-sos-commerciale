@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { VENTE, DELETE_VENTE, COORDONNEES_SOCIETE } from '../api/queries';
 import { Vente, LigneVente, VENTE_TYPE_CODE } from '../api/types';
@@ -7,6 +7,10 @@ import { D, useDroits } from '../lib/droits';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { DocBadge, PayStatus, Money, PageHeader } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList, TotalsPanel } from '../components/ui/Card';
+import { Alert, Skeleton } from '../components/ui/States';
+import { Menu, type MenuItem } from '../components/ui/Menu';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import TransformerMenu from '../components/document/TransformerMenu';
@@ -23,8 +27,6 @@ import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
-
-const btn = 'rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label';
 
 export default function VenteDetail() {
   const { id } = useParams();
@@ -68,11 +70,11 @@ export default function VenteDetail() {
 
   const columns: Column<LigneVente>[] = [
     { key: 'code', header: 'Code', width: '100px', sortAccessor: (l) => String(l.code_article ?? ''), render: (l) => <span className="money">{l.code_article}</span> },
-    { key: 'designation', header: 'Désignation', render: (l) => <span><b>{l.designation}</b>{l.n_lot ? <span className="text-ink-muted money text-[10.5px]"> · lot {l.n_lot}</span> : null}</span> },
+    { key: 'designation', header: 'Désignation', render: (l) => <span><b>{l.designation}</b>{l.n_lot ? <span className="text-ink-muted money text-xs"> · lot {l.n_lot}</span> : null}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
     ...(aRetours ? [{ key: 'retour', header: 'Retourné', align: 'right' as const, width: '80px', sortAccessor: (l: LigneVente) => Number(l.qte_retournee ?? 0),
       render: (l: LigneVente) => Number(l.qte_retournee ?? 0) > 0
-        ? <span className="money" style={{ color: 'var(--danger)' }}>{fmtQte(l.qte_retournee)}</span> : null }] : []),
+        ? <span className="money" style={{ color: 'var(--danger-text)' }}>{fmtQte(l.qte_retournee)}</span> : null }] : []),
     { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', sortAccessor: (l) => Number(l.prix_ht ?? 0), render: (l) => <Money value={l.prix_ht} /> },
     { key: 'remise', header: 'Rem. %', align: 'right', width: '70px', render: (l) => <span className="money">{fmtMoney(l.remise ?? 0, 1)}</span> },
     { key: 'tva', header: 'TVA %', align: 'right', width: '65px', render: (l) => <span className="money">{fmtMoney(l.tva, 0)}</span> },
@@ -85,40 +87,50 @@ export default function VenteDetail() {
     return <RequireDroit si={false}>{null}</RequireDroit>;
   }
 
+  const titre = v ? `${v.type_doc} ${v.numero}` : 'Pièce de vente';
+  const avecReglement = TYPES_AVEC_REGLEMENT.includes(code);
+
+  // Actions secondaires regroupées (charte : plus de 4 boutons → menu)
+  const plusActions: MenuItem[] = v ? [
+    ...(peutRetour ? [{
+      label: code === 'FA' ? 'Avoir' : 'Bon de retour', icon: 'return' as const,
+      onSelect: () => setRetour(true),
+    }] : []),
+    ...(peutImprimer && v.type === 4 ? [{
+      label: 'Ticket 80mm', icon: 'receipt' as const, onSelect: () => setDemande(demandeTicket(v, societe)),
+    }] : []),
+    ...(peutDoc('vente', code, 'creer') ? [{
+      label: 'Dupliquer', icon: 'copy' as const, onSelect: () => navigate(`/ventes/nouvelle?type=${code}&from=${v.id}`),
+    }] : []),
+  ] : [];
+
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={v ? `${v.type_doc} ${v.numero}` : 'Pièce de vente'}>
-        <Link to="/ventes" className="text-[12px] font-bold text-brand-700">← Retour à la liste</Link>
+      <PageHeader title={titre} backTo="/ventes" backLabel="Retour à la liste"
+                  breadcrumb={[{ label: 'Ventes', to: '/ventes' }, { label: titre }]}
+                  meta={v && (
+                    <>
+                      <DocBadge code={code} />
+                      {avecReglement && <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} />}
+                    </>
+                  )}>
         {v && v.modifiable !== false && peutDoc('vente', code, 'modifier') && (
-          <button onClick={() => navigate(`/ventes/nouvelle?edit=${v.id}`)} className={btn}>Modifier</button>
+          <Button variant="primary" icon="edit" onClick={() => navigate(`/ventes/nouvelle?edit=${v.id}`)}>Modifier</Button>
         )}
         {v && (
           <TransformerMenu sens="vente" id={v.id} cibles={v.transformations_possibles ?? []} onDone={recharger} />
         )}
-        {v && peutRetour && (
-          <button onClick={() => setRetour(true)} className={btn}
-                  title="Créer un avoir ou un bon de retour sur tout ou partie des lignes">
-            {code === 'FA' ? 'Avoir' : 'Bon de retour'}
-          </button>
-        )}
         {v && peutImprimer && (
-          <button onClick={() => setChoixImpression(true)} className={btn}>Imprimer…</button>
+          <Button icon="printer" onClick={() => setChoixImpression(true)}>Imprimer…</Button>
         )}
-        {v && peutImprimer && v.type === 4 && (
-          <button onClick={() => setDemande(demandeTicket(v, societe))} className={btn}>Ticket 80mm</button>
-        )}
-        {v && peutDoc('vente', code, 'creer') && (
-          <button onClick={() => navigate(`/ventes/nouvelle?type=${code}&from=${v.id}`)}
-                  title="Créer une nouvelle pièce reprenant ces lignes" className={btn}>
-            Dupliquer
-          </button>
+        {plusActions.length > 0 && (
+          <Menu label="Plus d'actions" iconOnly items={plusActions} width={230} />
         )}
         {v && peutDoc('vente', code, 'supprimer') && (
-          <button onClick={() => setConfirm(true)}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px]"
-                  style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
-            Supprimer
-          </button>
+          <>
+            <span className="h-6 w-px bg-line-soft mx-0.5" aria-hidden="true" />
+            <Button variant="danger" icon="trash" onClick={() => setConfirm(true)}>Supprimer</Button>
+          </>
         )}
       </PageHeader>
       {retour && v && (
@@ -134,8 +146,13 @@ export default function VenteDetail() {
       {printDoc && <PrintPreview doc={printDoc} onClose={() => setPrintDoc(null)} />}
       {demande && <ImprimerDocument demande={demande} onClose={() => setDemande(null)} />}
       {modelePerso && v && <ImpressionModele modeleRef={modelePerso} data={donneesVente(v, societe)} titre={`${v.type_doc} ${v.numero}`} onClose={() => setModelePerso(null)} />}
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
-      {delError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{delError}</div>}
+      {error && (
+        <Alert tone="danger" title="Impossible de charger la pièce"
+               action={<Button size="sm" icon="refresh" onClick={() => refetch()}>Réessayer</Button>}>
+          {error.message}
+        </Alert>
+      )}
+      {delError && <Alert tone="danger" title="Suppression impossible">{delError}</Alert>}
       {confirm && v && (
         <ConfirmDialog
           title="Supprimer cette pièce ?"
@@ -144,29 +161,43 @@ export default function VenteDetail() {
           onConfirm={handleDelete} onCancel={() => setConfirm(false)}
         />
       )}
-      {loading && !v && <div className="text-[12px] text-ink-muted">Chargement…</div>}
-
-      {v && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3 flex items-center gap-5 flex-wrap text-[12px]">
-          <DocBadge code={code} />
-          <Field label="Client"><b>{v.raison ?? v.code_cli ?? '—'}</b></Field>
-          <Field label="Date">{fmtDate(v.date)}</Field>
-          <Field label="Mode">{v.mode_payement ?? '—'}</Field>
-          {TYPES_AVEC_REGLEMENT.includes(code) && v.date_echeance && (
-            <Field label="Échéance">
-              {fmtDate(v.date_echeance)}
-              {Number(v.reste_a_payer) > 0.009 && joursRetard(v.date_echeance) > 0 && (
-                <span className="ml-1.5 font-bold" style={{ color: 'var(--danger)' }}>· en retard de {joursRetard(v.date_echeance)} j</span>
-              )}
-            </Field>
-          )}
-          {v.user_name && <Field label="Par">{v.user_name}</Field>}
-          {code === 'BL' && v.grouped ? <Field label="Statut"><b>Facturé</b></Field> : null}
-          <span className="ml-auto">{TYPES_AVEC_REGLEMENT.includes(code) && <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} />}</span>
-        </div>
+      {loading && !v && (
+        <Card>
+          <div className="grid grid-cols-4 gap-x-6 gap-y-3" role="status" aria-label="Chargement de la pièce">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="flex flex-col gap-1.5">
+                <Skeleton width="40%" height={10} />
+                <Skeleton width="75%" height={14} />
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
-      <div className="grid grid-cols-[1fr_270px] gap-3.5 items-start">
+      {v && (
+        <Card padding="md">
+          <DescriptionList columns={4} items={[
+            { label: 'Client', value: v.raison ?? v.code_cli ?? '—' },
+            { label: 'Date', value: fmtDate(v.date) },
+            { label: 'Mode de paiement', value: v.mode_payement ?? '—' },
+            ...(avecReglement && v.date_echeance ? [{
+              label: 'Échéance',
+              value: (
+                <>
+                  {fmtDate(v.date_echeance)}
+                  {Number(v.reste_a_payer) > 0.009 && joursRetard(v.date_echeance) > 0 && (
+                    <span className="ml-1.5 font-bold text-danger-text">· en retard de {joursRetard(v.date_echeance)} j</span>
+                  )}
+                </>
+              ),
+            }] : []),
+            ...(v.user_name ? [{ label: 'Par', value: v.user_name }] : []),
+            ...(code === 'BL' && v.grouped ? [{ label: 'Statut', value: 'Facturé' }] : []),
+          ]} />
+        </Card>
+      )}
+
+      <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">
         <div className="flex flex-col gap-3.5 min-w-0">
           <DataGrid complet columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
                     emptyMessage="Aucune ligne." footer={{ _label: `${lignes.length} ligne(s)`, ttc: <Money value={v?.total_ttc} /> }} />
@@ -175,44 +206,43 @@ export default function VenteDetail() {
                         retours={v.retours} pieceOrigine={v.piece_origine} />
           )}
           {v && TYPES_RETOUR.includes(code) && (
-            <div className="text-[11.5px] text-ink-muted bg-surface border border-line-soft rounded-md px-4 py-3">
+            <Alert tone="info" compact>
               Cet avoir / retour vient en déduction du solde du client (relevé, débiteurs).
-            </div>
+            </Alert>
           )}
-          {v && TYPES_AVEC_REGLEMENT.includes(code) && (
+          {v && avecReglement && (
             <ReglementsPiece sens="vente" pieceId={v.id} numero={v.numero} reglements={v.reglements ?? []}
                              reste={Number(v.reste_a_payer ?? 0)} onChange={recharger} />
           )}
         </div>
         {v && (
-          <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden">
-            <Row label="Total HT" value={v.total_ht} />
-            <Row label={`Remise globale${Number(v.remise_p) ? ` (${fmtQte(v.remise_p)} %)` : ''}`} value={-(Number(v.remise ?? 0))} neg />
-            <Row label="TVA" value={v.tva ?? 0} />
-            {Number(v.timbre) > 0 && <Row label="Droit de timbre" value={v.timbre} />}
-            <div className="px-4 py-3 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
-              <span>Net à payer</span><span className="money text-[15px]">{fmtMoney(v.net_a_payer)} DA</span>
-            </div>
-            <Row label="Réglé" value={v.regler} />
-            <Row label="Reste" value={v.reste_a_payer} danger={Number(v.reste_a_payer) > 0} />
-          </div>
+          <TotalsPanel
+            rows={[
+              { label: 'Total HT', value: Number(v.total_ht ?? 0) },
+              { label: `Remise globale${Number(v.remise_p) ? ` (${fmtQte(v.remise_p)} %)` : ''}`, value: -(Number(v.remise ?? 0)) },
+              { label: 'TVA', value: Number(v.tva ?? 0) },
+              { label: 'Droit de timbre', value: Number(v.timbre ?? 0), hidden: !(Number(v.timbre) > 0) },
+            ]}
+            total={{ label: 'Net à payer', value: Number(v.net_a_payer ?? 0) }}
+            after={(
+              <div className="flex flex-col gap-1.5 text-base text-ink-label">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span>Réglé</span><Money value={v.regler} className="font-semibold" />
+                </div>
+                <div className="flex items-baseline justify-between gap-4">
+                  <span>Reste</span>
+                  <Money value={v.reste_a_payer} className="font-semibold" tone={Number(v.reste_a_payer) > 0 ? 'danger' : undefined} />
+                </div>
+              </div>
+            )}
+          />
         )}
       </div>
-      {v?.observation && <div className="text-[12px] text-ink-muted">Note : {v.observation}</div>}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <span><span className="text-[10px] font-bold uppercase text-ink-muted mr-1.5">{label}</span>{children}</span>;
-}
-
-function Row({ label, value, neg, danger }: { label: string; value: unknown; neg?: boolean; danger?: boolean }) {
-  const v = Number(value ?? 0);
-  return (
-    <div className="flex justify-between px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft">
-      <span>{label}</span>
-      <span className="money" style={{ color: danger || (neg && v < 0) ? 'var(--danger)' : undefined }}>{fmtMoney(v)}</span>
+      {v?.observation && (
+        <Card padding="sm" className="text-sm text-ink-label">
+          <span className="font-semibold text-ink-muted">Note : </span>{v.observation}
+        </Card>
+      )}
     </div>
   );
 }

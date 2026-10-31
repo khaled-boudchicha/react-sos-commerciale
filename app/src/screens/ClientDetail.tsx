@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { ETAT_CLIENT, FACTURES_NON_REGLEES, COORDONNEES_SOCIETE, SET_CREDIT_INITIAL_CLIENT } from '../api/queries';
 import { useToast } from '../components/ui/Toast';
@@ -8,7 +8,13 @@ import type { DemandeImpression } from '../impression/demandes';
 import { demandeEtatClient, demandeImpayes } from '../impression/demandes';
 import { fmtDate, fmtMoney, isoToday } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
-import { Money, PageHeader, StatusPill, Tabs, PeriodPicker } from '../components/ui/atoms';
+import { Money, PageHeader, StatusPill, Tabs, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList } from '../components/ui/Card';
+import { DateRangeField, Field, TextInput } from '../components/ui/Field';
+import { KpiTile } from '../components/ui/Kpi';
+import { Alert, Skeleton } from '../components/ui/States';
+import Dialog from '../components/ui/Dialog';
 import ReglerTiersModal from '../components/ReglerTiersModal';
 import AvancesPanel from '../components/AvancesPanel';
 import { D, useDroits } from '../lib/droits';
@@ -27,9 +33,9 @@ type FactureNR = {
 };
 
 const VUES = [
-  { code: 'releve', label: 'Relevé' },
-  { code: 'impayees', label: 'Factures non réglées' },
-  { code: 'avances', label: 'Avances' },
+  { code: 'releve', label: 'Relevé', icon: 'statement' },
+  { code: 'impayees', label: 'Factures non réglées', icon: 'invoice' },
+  { code: 'avances', label: 'Avances', icon: 'wallet' },
 ] as const;
 
 export default function ClientDetail() {
@@ -61,7 +67,7 @@ export default function ClientDetail() {
     { key: 'numero', header: 'N°', width: '130px', render: (l) => <span className="money">{l.numero ?? '—'}</span> },
     { key: 'mode', header: 'Mode', width: '90px', sortAccessor: (l) => l.mode_payement ?? '', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (l) => (
-      <span className="money font-semibold" style={{ color: Number(l.montant) < 0 ? 'var(--success)' : undefined }}>{fmtMoney(l.montant)}</span>
+      <Money value={l.montant} colorNeg={false} tone={Number(l.montant) < 0 ? 'success' : undefined} className="font-semibold" />
     ) },
     { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', sortAccessor: (l) => Number(l.total_cumul ?? 0), render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
   ];
@@ -72,50 +78,58 @@ export default function ClientDetail() {
     { key: 'net', header: 'Montant', align: 'right', width: '115px', sortAccessor: (f) => Number(f.net_a_payer ?? 0), render: (f) => <Money value={f.net_a_payer} /> },
     { key: 'regler', header: 'Réglé', align: 'right', width: '115px', render: (f) => <Money value={f.regler} /> },
     { key: 'reste', header: 'Reste', align: 'right', width: '115px', sortAccessor: (f) => Number(f.reste_a_payer ?? 0), render: (f) => (
-      <span className="money font-semibold" style={{ color: 'var(--danger)' }}>{fmtMoney(f.reste_a_payer)}</span>
+      <Money value={f.reste_a_payer} tone="danger" className="font-semibold" />
     ) },
   ];
 
+  const titre = client?.nom_client ?? `Client ${code}`;
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={client?.nom_client ?? `Client ${code}`}>
-        <Link to="/tiers" className="text-[12px] font-bold text-brand-700">← Retour aux tiers</Link>
+      <PageHeader title={titre} icon="user" backTo="/tiers" backLabel="Retour aux tiers"
+                  breadcrumb={[{ label: 'Tiers', to: '/tiers' }, { label: 'Clients', to: '/tiers?vue=clients' }, { label: titre }]}
+                  meta={client && (Number(client.credit) <= 0
+                    ? <StatusPill tone="ok">À jour</StatusPill>
+                    : <StatusPill tone="warn">Nous doit</StatusPill>)}>
+        {client && (
+          <>
+            <Button icon="printer" onClick={() => setPrintDoc(demandeEtatClient({ client, lignes, debut, fin }, societe))}>
+              Imprimer le relevé
+            </Button>
+            {peut('tiers', D.tiers.clients) && (
+              <Button icon="edit" onClick={() => setShowCredit(true)}>Crédit initial</Button>
+            )}
+            <Button variant="primary" icon="cash" onClick={() => setShowRegler(true)}>Régler</Button>
+          </>
+        )}
       </PageHeader>
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
+      {error && (
+        <Alert tone="danger" action={<Button size="sm" icon="refresh" onClick={() => void refetch()}>Réessayer</Button>}>
+          {error.message}
+        </Alert>
+      )}
 
+      {!client && loading && <Card><Skeleton lines={3} /></Card>}
       {client && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3.5 flex items-center gap-6 flex-wrap">
-          <div className="w-11 h-11 rounded-md bg-brand-100 text-brand-700 font-extrabold flex items-center justify-center">
-            {client.nom_client?.slice(0, 2).toUpperCase()}
-          </div>
-          <Head label="Code"><span className="money">{client.code_cli}</span></Head>
-          <Head label="CA"><span className="money">{fmtMoney(client.ca)}</span></Head>
-          <Head label="Crédit initial"><span className="money">{fmtMoney(client.credit_initial)}</span></Head>
-          <Head label="Réglé"><span className="money">{fmtMoney(client.regler)}</span></Head>
-          <Head label="Avances"><span className="money">{fmtMoney(client.solde_avance)}</span></Head>
-          <div className="ml-auto text-right">
-            <div className="text-[10px] font-bold uppercase text-ink-muted">Solde</div>
-            <div className="money text-[19px] font-extrabold" style={{ color: Number(client.credit) > 0 ? 'var(--warning)' : 'var(--success)' }}>
-              {fmtMoney(client.credit)} DA
+        <div className="grid grid-cols-[minmax(0,1fr)_280px] gap-3">
+          <Card>
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 flex-none rounded-md bg-brand-soft text-brand-text font-extrabold flex items-center justify-center">
+                {client.nom_client?.slice(0, 2).toUpperCase()}
+              </div>
+              <DescriptionList columns={4} className="flex-1" items={[
+                { label: 'Code', value: client.code_cli, mono: true, full: true },
+                { label: 'CA', value: fmtMoney(client.ca), mono: true },
+                { label: 'Crédit initial', value: fmtMoney(client.credit_initial), mono: true },
+                { label: 'Réglé', value: fmtMoney(client.regler), mono: true },
+                { label: 'Avances', value: fmtMoney(client.solde_avance), mono: true },
+              ]} />
             </div>
-          </div>
-          {Number(client.credit) <= 0
-            ? <StatusPill tone="ok">À jour</StatusPill>
-            : <StatusPill tone="warn">Nous doit</StatusPill>}
-          <button onClick={() => setPrintDoc(demandeEtatClient({ client, lignes, debut, fin }, societe))}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Imprimer le relevé
-          </button>
-          {peut('tiers', D.tiers.clients) && (
-            <button onClick={() => setShowCredit(true)}
-                    className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-              Crédit initial
-            </button>
-          )}
-          <button onClick={() => setShowRegler(true)}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-            Régler
-          </button>
+          </Card>
+          <KpiTile label="Solde" icon="wallet"
+                   tone={Number(client.credit) > 0 ? 'warning' : 'success'}
+                   valueTone={Number(client.credit) > 0 ? 'warning' : 'success'}
+                   value={`${fmtMoney(client.credit)} DA`}
+                   sub={Number(client.credit) > 0 ? 'Créance du client' : 'Aucune somme due'} />
         </div>
       )}
 
@@ -134,44 +148,35 @@ export default function ClientDetail() {
                           onDone={() => { void refetch(); void refetchFnr(); }} />
       )}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={vue} onChange={setVue} options={VUES} />
-        {vue === 'releve' && (
-          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
-        )}
-      </div>
+      <Tabs value={vue} onChange={setVue} options={VUES} variant="underline" label="Vues du client" />
+      {vue === 'releve' && (
+        <Toolbar>
+          <DateRangeField from={debut} to={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        </Toolbar>
+      )}
 
       {vue === 'releve' && (
         <DataGrid complet columns={relCols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
                   emptyMessage="Aucune opération sur la période." />
       )}
       {vue === 'impayees' && impayees.length > 0 && client && (
-        <div>
-          <button onClick={() => setPrintDoc(demandeImpayes({ codeCli: client.code_cli, nom: client.nom_client, factures: impayees }, societe))}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+        <Toolbar>
+          <Button size="sm" icon="printer"
+                  onClick={() => setPrintDoc(demandeImpayes({ codeCli: client.code_cli, nom: client.nom_client, factures: impayees }, societe))}>
             Imprimer la situation des impayés
-          </button>
-        </div>
+          </Button>
+        </Toolbar>
       )}
       {vue === 'impayees' && (
         <DataGrid complet columns={fnrCols} rows={impayees} rowKey={(f) => f.id} loading={fnrLoading}
                   emptyMessage="Aucune facture en attente."
                   footer={{ _label: `${impayees.length} facture(s)`,
-                            reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(impayees.reduce((s, f) => s + Number(f.reste_a_payer), 0))}</span> }} />
+                            reste: <Money value={impayees.reduce((s, f) => s + Number(f.reste_a_payer), 0)} tone="danger" /> }} />
       )}
       {/* L'imputation d'une avance modifie le relevé et les impayés : on les recharge. */}
       {vue === 'avances' && code && (
         <AvancesPanel sens="client" code={code} onChanged={() => { void refetch(); void refetchFnr(); }} />
       )}
-    </div>
-  );
-}
-
-function Head({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] font-bold uppercase text-ink-muted">{label}</div>
-      <div className="text-[13px] font-semibold">{children}</div>
     </div>
   );
 }
@@ -198,37 +203,25 @@ function CreditInitialModal({ codeCli, nom, actuel, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[420px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-extrabold text-[15px]">Crédit initial — {nom}</div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
-        <div className="text-[11.5px] text-ink-muted mb-4">
-          Solde de départ du client (créance d'ouverture). Remplace la valeur actuelle ; les paiements
-          déjà faits sur ce crédit sont conservés, le montant ne peut donc pas descendre en dessous.
-        </div>
-        {erreur && (
-          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
-               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{erreur}</div>
-        )}
-        <div className="flex flex-col gap-3">
-          <label className="text-[11px] font-bold text-ink-label">Montant (DA)
-            <input type="number" step="0.01" value={montant} autoFocus
+    <Dialog title={`Crédit initial — ${nom}`} size="sm" icon="wallet" onClose={onClose} closeOnOverlay={false}
+            footer={(
+              <>
+                <Button onClick={onClose} disabled={loading}>Annuler</Button>
+                <Button variant="primary" icon="save" onClick={() => void valider()} loading={loading}>
+                  {loading ? 'Enregistrement…' : 'Enregistrer'}
+                </Button>
+              </>
+            )}>
+      <p className="text-sm text-ink-muted mb-4">
+        Solde de départ du client (créance d'ouverture). Remplace la valeur actuelle ; les paiements
+        déjà faits sur ce crédit sont conservés, le montant ne peut donc pas descendre en dessous.
+      </p>
+      {erreur && <Alert tone="danger" compact className="mb-3">{erreur}</Alert>}
+      <Field label="Montant (DA)" required>
+        <TextInput type="number" step="0.01" value={montant} autoFocus mono align="right"
                    onChange={(e) => setMontant(e.target.value)}
-                   onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-          </label>
-        </div>
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} disabled={loading}
-                  className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">Annuler</button>
-          <button onClick={() => void valider()} disabled={loading}
-                  className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-            {loading ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
-      </div>
-    </div>
+                   onKeyDown={(e) => { if (e.key === 'Enter') void valider(); }} />
+      </Field>
+    </Dialog>
   );
 }

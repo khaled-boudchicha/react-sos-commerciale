@@ -1,10 +1,15 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery } from '@apollo/client';
 import { ETAT_FOURNISSEUR, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
-import { PageHeader, StatusPill, PeriodPicker, Tabs } from '../components/ui/atoms';
+import { Money, PageHeader, StatusPill, Tabs, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList } from '../components/ui/Card';
+import { DateRangeField } from '../components/ui/Field';
+import { KpiTile } from '../components/ui/Kpi';
+import { Alert, Skeleton } from '../components/ui/States';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeEtatFournisseur } from '../impression/demandes';
@@ -13,8 +18,8 @@ import ReglerTiersModal from '../components/ReglerTiersModal';
 import AvancesPanel from '../components/AvancesPanel';
 
 const VUES = [
-  { code: 'releve', label: 'Relevé' },
-  { code: 'avances', label: 'Avances' },
+  { code: 'releve', label: 'Relevé', icon: 'statement' },
+  { code: 'avances', label: 'Avances', icon: 'wallet' },
 ] as const;
 
 export default function FournisseurDetail() {
@@ -40,44 +45,55 @@ export default function FournisseurDetail() {
     { key: 'numero', header: 'N°', width: '130px', render: (l) => <span className="money">{l.numero ?? '—'}</span> },
     { key: 'mode', header: 'Mode', width: '90px', sortAccessor: (l) => l.mode_payement ?? '', render: (l) => <span className="text-ink-muted">{l.mode_payement ?? '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (l) => (
-      <span className="money font-semibold" style={{ color: Number(l.montant) < 0 ? 'var(--success)' : undefined }}>{fmtMoney(l.montant)}</span>
+      <Money value={l.montant} colorNeg={false} tone={Number(l.montant) < 0 ? 'success' : undefined} className="font-semibold" />
     ) },
     { key: 'cumul', header: 'Solde cumulé', align: 'right', width: '120px', sortAccessor: (l) => Number(l.total_cumul ?? 0), render: (l) => <span className="money">{fmtMoney(l.total_cumul)}</span> },
   ];
 
+  const titre = fournisseur?.nom ?? `Fournisseur ${code}`;
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={fournisseur?.nom ?? `Fournisseur ${code}`}>
-        <Link to="/tiers" className="text-[12px] font-bold text-brand-700">← Retour aux tiers</Link>
+      <PageHeader title={titre} icon="building" backTo="/tiers" backLabel="Retour aux tiers"
+                  breadcrumb={[{ label: 'Tiers', to: '/tiers' }, { label: 'Fournisseurs', to: '/tiers?vue=fournisseurs' }, { label: titre }]}
+                  meta={fournisseur && (Number(fournisseur.credit) <= 0
+                    ? <StatusPill tone="ok">À jour</StatusPill>
+                    : <StatusPill tone="warn">À payer</StatusPill>)}>
+        {fournisseur && (
+          <>
+            <Button icon="printer" onClick={() => setPrintDoc(demandeEtatFournisseur({ fournisseur, lignes, debut, fin }, societe))}>
+              Imprimer le relevé
+            </Button>
+            <Button variant="primary" icon="cash" onClick={() => setShowRegler(true)}>Payer</Button>
+          </>
+        )}
       </PageHeader>
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
+      {error && (
+        <Alert tone="danger" action={<Button size="sm" icon="refresh" onClick={() => void refetch()}>Réessayer</Button>}>
+          {error.message}
+        </Alert>
+      )}
 
+      {!fournisseur && loading && <Card><Skeleton lines={3} /></Card>}
       {fournisseur && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3.5 flex items-center gap-6 flex-wrap">
-          <div className="w-11 h-11 rounded-md bg-brand-100 text-brand-700 font-extrabold flex items-center justify-center">
-            {(fournisseur.nom || fournisseur.code_four).slice(0, 2).toUpperCase()}
-          </div>
-          <Head label="Code"><span className="money">{fournisseur.code_four}</span></Head>
-          <Head label="Total achats"><span className="money">{fmtMoney(fournisseur.total_achats)}</span></Head>
-          <Head label="Crédit initial"><span className="money">{fmtMoney(fournisseur.credit_initial)}</span></Head>
-          <Head label="Réglé"><span className="money">{fmtMoney(fournisseur.regler)}</span></Head>
-          <div className="ml-auto text-right">
-            <div className="text-[10px] font-bold uppercase text-ink-muted">Solde (on lui doit)</div>
-            <div className="money text-[19px] font-extrabold" style={{ color: Number(fournisseur.credit) > 0 ? 'var(--warning)' : 'var(--success)' }}>
-              {fmtMoney(fournisseur.credit)} DA
+        <div className="grid grid-cols-[minmax(0,1fr)_280px] gap-3">
+          <Card>
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 flex-none rounded-md bg-brand-soft text-brand-text font-extrabold flex items-center justify-center">
+                {(fournisseur.nom || fournisseur.code_four).slice(0, 2).toUpperCase()}
+              </div>
+              <DescriptionList columns={3} className="flex-1" items={[
+                { label: 'Code', value: fournisseur.code_four, mono: true, full: true },
+                { label: 'Total achats', value: fmtMoney(fournisseur.total_achats), mono: true },
+                { label: 'Crédit initial', value: fmtMoney(fournisseur.credit_initial), mono: true },
+                { label: 'Réglé', value: fmtMoney(fournisseur.regler), mono: true },
+              ]} />
             </div>
-          </div>
-          {Number(fournisseur.credit) <= 0
-            ? <StatusPill tone="ok">À jour</StatusPill>
-            : <StatusPill tone="warn">À payer</StatusPill>}
-          <button onClick={() => setPrintDoc(demandeEtatFournisseur({ fournisseur, lignes, debut, fin }, societe))}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Imprimer le relevé
-          </button>
-          <button onClick={() => setShowRegler(true)}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-            Payer
-          </button>
+          </Card>
+          <KpiTile label="Solde (on lui doit)" icon="wallet"
+                   tone={Number(fournisseur.credit) > 0 ? 'warning' : 'success'}
+                   valueTone={Number(fournisseur.credit) > 0 ? 'warning' : 'success'}
+                   value={`${fmtMoney(fournisseur.credit)} DA`}
+                   sub={Number(fournisseur.credit) > 0 ? 'Reste à payer au fournisseur' : 'Aucune somme due'} />
         </div>
       )}
 
@@ -90,12 +106,12 @@ export default function FournisseurDetail() {
 
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <Tabs value={vue} onChange={setVue} options={VUES} />
-        {vue === 'releve' && (
-          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
-        )}
-      </div>
+      <Tabs value={vue} onChange={setVue} options={VUES} variant="underline" label="Vues du fournisseur" />
+      {vue === 'releve' && (
+        <Toolbar>
+          <DateRangeField from={debut} to={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        </Toolbar>
+      )}
 
       {vue === 'releve' && (
         <DataGrid complet columns={cols} rows={lignes} rowKey={(_l, i) => i} loading={loading}
@@ -105,15 +121,6 @@ export default function FournisseurDetail() {
       {vue === 'avances' && code && (
         <AvancesPanel sens="fournisseur" code={code} onChanged={() => { void refetch(); }} />
       )}
-    </div>
-  );
-}
-
-function Head({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] font-bold uppercase text-ink-muted">{label}</div>
-      <div className="text-[13px] font-semibold">{children}</div>
     </div>
   );
 }

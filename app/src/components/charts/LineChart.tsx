@@ -60,8 +60,8 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
            style={{ display: 'block', overflow: 'visible' }}>
         <defs>
           <linearGradient id={`g${uid}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={couleur} stopOpacity="0.18" />
-            <stop offset="100%" stopColor={couleur} stopOpacity="0.02" />
+            <stop offset="0%" style={{ stopColor: couleur, stopOpacity: 0.18 }} />
+            <stop offset="100%" style={{ stopColor: couleur, stopOpacity: 0.02 }} />
           </linearGradient>
         </defs>
 
@@ -69,7 +69,7 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
         {vals.map((v, i) => (
           <g key={i}>
             <line x1={M.l} x2={W - M.r} y1={y(v)} y2={y(v)} stroke="var(--line-soft)" strokeWidth="1" />
-            <text x={M.l - 8} y={y(v) + 3} textAnchor="end" fontSize="10" fill="var(--ink-muted)">{format(v)}</text>
+            <text x={M.l - 8} y={y(v) + 3} textAnchor="end" fontSize="10" fill="var(--text-muted)">{format(v)}</text>
           </g>
         ))}
 
@@ -78,7 +78,7 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
 
         {/* Étiquettes X */}
         {data.map((d, i) => (i % pasX === 0 || i === data.length - 1) ? (
-          <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="var(--ink-muted)">{d.label}</text>
+          <text key={i} x={x(i)} y={H - 10} textAnchor="middle" fontSize="10" fill="var(--text-muted)">{d.label}</text>
         ) : null)}
 
         {/* Survol : trait + point */}
@@ -94,15 +94,17 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
       </svg>
 
       {pt && (
-        <div className="absolute pointer-events-none rounded-md shadow-lifted text-[11px] px-2.5 py-1.5 whitespace-nowrap"
+        <div className="absolute pointer-events-none rounded-md shadow-lifted z-tooltip text-xs px-2.5 py-1.5 whitespace-nowrap"
              style={{
                left: `${(x(hover!) / W) * 100}%`,
                top: `${(y(pt.value) / hauteur) * 100}%`,
                transform: `translate(-50%, calc(-100% - 8px))`,
-               background: 'var(--surface)', border: '1px solid var(--line-soft)',
+               background: 'var(--surface-raised)', border: '1px solid var(--line-soft)',
              }}>
           <div className="font-semibold text-ink">{pt.label}</div>
-          <div className="money" style={{ color: couleur }}>{format(pt.value)}</div>
+          <div className="money flex items-center gap-1.5 text-ink">
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: couleur }} />{format(pt.value)}
+          </div>
         </div>
       )}
     </div>

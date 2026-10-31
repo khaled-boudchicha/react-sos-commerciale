@@ -3,14 +3,15 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { AchatsResult, Achat, TYPES_ACHAT } from '../api/types';
-import { fmtDate, isoFirstOfMonth, isoToday, fmtMoney } from '../lib/format';
+import { fmtDate, isoFirstOfMonth, isoToday } from '../lib/format';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
 import Journal from './JournalVentes';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeBordereau } from '../impression/demandes';
-import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader } from '../components/ui/atoms';
+import { DocBadge, DOC_TONE, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
 
@@ -83,7 +84,7 @@ export default function Achats() {
     { key: 'ttc', header: 'Net à payer', align: 'right', width: '120px', field: 'net_a_payer', render: (a) => <Money value={a.net_a_payer ?? a.total_ttc} /> },
     { key: 'regler', header: 'Réglé', align: 'right', width: '110px', field: 'regler', render: (a) => <Money value={a.regler} /> },
     { key: 'reste', header: 'Reste', align: 'right', width: '110px', field: 'reste_a_payer', render: (a) => (
-      <span className="money font-medium" style={{ color: Number(a.reste_a_payer) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.reste_a_payer)}</span>
+      <Money value={a.reste_a_payer} tone={Number(a.reste_a_payer) > 0 ? 'danger' : undefined} />
     ) },
     { key: 'statut', header: 'Statut', width: '86px', render: (a) => <PayStatus regler={Number(a.regler)} reste={Number(a.reste_a_payer)} /> },
   ];
@@ -100,32 +101,38 @@ export default function Achats() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Documents d'achat">
+      <PageHeader title="Documents d'achat" icon="cart">
         {vue === 'documents' && (
-          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
-        )}
-        {vue === 'documents' && (
-        <button onClick={() => void imprimerBordereau()} disabled={bordereauEnCours}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
-          {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
-        </button>
+          <Button icon="printer" onClick={() => void imprimerBordereau()} loading={bordereauEnCours}>
+            {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
+          </Button>
         )}
         {vue === 'documents' && peutCreer && (
-        <button onClick={() => navigate(`/achats/nouvelle${peutDoc('achat', type, 'creer') ? `?type=${type}` : ''}`)}
-                className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Nouvelle pièce
-        </button>
+          <Button variant="primary" icon="plus"
+                  onClick={() => navigate(`/achats/nouvelle${peutDoc('achat', type, 'creer') ? `?type=${type}` : ''}`)}>
+            Nouvelle pièce
+          </Button>
         )}
       </PageHeader>
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
-      {peutJournal && (
-        <Tabs value={vue} onChange={setVue}
-              options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
+      {(peutJournal || vue === 'documents') && (
+        <Toolbar>
+          {peutJournal && (
+            <Tabs value={vue} onChange={setVue} label="Vue"
+                  options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
+          )}
+          {vue === 'documents' && (
+            <div className="ml-auto">
+              <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+            </div>
+          )}
+        </Toolbar>
       )}
       {vue === 'journal' && peutJournal && <Journal sens="achat" />}
       {vue === 'documents' && (
       <>
-      <Tabs value={type} onChange={setType} options={typesVisibles} />
+      <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
+            options={typesVisibles.map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
       <DataGrid
         exportCsv={{ nom: `achats-${type.toLowerCase()}`, columns: csvDocs }}
         columns={columns} rowKey={(a) => a.id}
@@ -135,7 +142,7 @@ export default function Achats() {
           _label: `${r?.total ?? 0} pièce(s)`,
           ttc: <Money value={totalDistant(r, 'net_a_payer')} />,
           regler: <Money value={totalDistant(r, 'regler')} />,
-          reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(totalDistant(r, 'reste_a_payer'))}</span>,
+          reste: <Money value={totalDistant(r, 'reste_a_payer')} tone="danger" />,
         })}
       />
       </>

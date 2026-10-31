@@ -3,6 +3,10 @@ import { useLazyQuery } from '@apollo/client';
 import { CLIENTS } from '../api/queries';
 import { Client } from '../api/types';
 import { fmtMoney } from '../lib/format';
+import { IconButton, Spinner } from './ui/Button';
+import { TextInput } from './ui/Field';
+import { Icon } from './ui/Icon';
+import { cn } from './ui/cn';
 
 /** Recherche de client (équivalent F3). */
 export default function ClientSearch({ value, onSelect }: {
@@ -22,11 +26,14 @@ export default function ClientSearch({ value, onSelect }: {
 
   if (value) {
     return (
-      <div className="flex items-center justify-between border border-line rounded-sm px-3 py-2 bg-surface text-[12.5px]">
-        <span><b>{value.nom}</b> <span className="money text-[10.5px] text-ink-muted">{value.code}</span></span>
-        <span className="flex items-center gap-3">
-          <span className="text-[11px] text-ink-muted">Solde : <span className="money" style={{ color: Number(value.credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(value.credit)}</span></span>
-          <button onClick={() => onSelect(null)} className="text-ink-muted font-bold">✕</button>
+      <div className="flex items-center justify-between gap-3 h-control-md border border-line rounded-sm pl-3 pr-1 bg-surface text-base min-w-0">
+        <span className="flex items-center gap-2 min-w-0">
+          <Icon name="user" size={16} className="text-ink-muted flex-none" />
+          <b className="truncate">{value.nom}</b> <span className="money text-xs text-ink-muted">{value.code}</span>
+        </span>
+        <span className="flex items-center gap-2 flex-none">
+          <span className="text-xs text-ink-muted">Solde : <span className="money" style={{ color: Number(value.credit) > 0 ? 'var(--warning-text)' : undefined }}>{fmtMoney(value.credit)}</span></span>
+          <IconButton icon="close" label="Retirer le client" size="sm" onClick={() => onSelect(null)} />
         </span>
       </div>
     );
@@ -34,18 +41,21 @@ export default function ClientSearch({ value, onSelect }: {
 
   return (
     <div className="relative">
-      <input value={term} onChange={(e) => setTerm(e.target.value)}
-             placeholder="Client : nom ou code… (F3) — vide = comptoir"
-             className="w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink text-[12.5px]" />
+      <TextInput value={term} onChange={(e) => setTerm(e.target.value)} leading="search" autoComplete="off"
+                 placeholder="Client : nom ou code… (F3) — vide = comptoir"
+                 aria-expanded={open} aria-autocomplete="list" />
       {open && (
-        <div className="absolute z-30 left-0 right-0 mt-1 bg-surface border border-line rounded-md shadow-lifted max-h-[260px] overflow-auto">
-          {loading && <div className="px-3 py-2.5 text-[12px] text-ink-muted">Recherche…</div>}
-          {!loading && results.length === 0 && <div className="px-3 py-2.5 text-[12px] text-ink-muted">Aucun client.</div>}
+        <div className="absolute z-dropdown left-0 right-0 mt-1 bg-raised border border-line-soft rounded-md shadow-lifted max-h-[260px] overflow-auto py-1 animate-pop-in">
+          {loading && <div className="px-3 py-2.5 flex items-center gap-2 text-sm text-ink-muted" role="status"><Spinner size={14} className="text-brand-text" />Recherche…</div>}
+          {!loading && results.length === 0 && (
+            <div className="px-3 py-2.5 flex items-center gap-2 text-sm text-ink-muted"><Icon name="search" size={14} />Aucun client.</div>
+          )}
           {results.map((c) => (
             <button key={c.id} onClick={() => { onSelect(c); setTerm(''); setOpen(false); }}
-                    className="w-full text-left px-3 py-2 flex justify-between items-center border-b border-line-soft last:border-b-0 hover:bg-brand-50">
-              <span><b className="text-[12.5px]">{c.nom}</b> <span className="money text-[10.5px] text-ink-muted">{c.code}</span></span>
-              <span className="money text-[11px]" style={{ color: Number(c.credit) > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                    className={cn('w-full text-left px-3 py-2 flex justify-between items-center gap-3 border-b border-line-soft last:border-b-0',
+                      'hover:bg-hover focus:bg-brand-soft')}>
+              <span><b className="text-base text-ink">{c.nom}</b> <span className="money text-xs text-ink-muted">{c.code}</span></span>
+              <span className="money text-xs" style={{ color: Number(c.credit) > 0 ? 'var(--warning-text)' : 'var(--text-muted)' }}>
                 {fmtMoney(c.credit)}
               </span>
             </button>
