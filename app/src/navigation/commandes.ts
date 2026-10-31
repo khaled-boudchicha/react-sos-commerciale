@@ -250,3 +250,54 @@ export const MENU_LATERAL: { groupe: string | null; commandes: Commande[] }[] = 
   { groupe: 'Analyse', commandes: [C.statistiques] },
   { groupe: 'Configuration', commandes: [C.referentiels, C.modeles, L(C.parametres, 'Paramètres', { exact: 'chemin' }), C.utilisateurs, C.grille] },
 ];
+
+// ─── Ajouts : teintes charte v2, index des commandes, barre d'accès rapide ──
+
+/**
+ * Teinte charte v2 de chaque famille (`TONE_VARS` de components/ui) : le ruban lit `*-text` pour les icônes
+ * et `*-soft` pour leurs pastilles (contraste AA en clair et en sombre), là où `COULEUR_TON` donne des aplats.
+ */
+export const TEINTE_TON: Record<Ton, 'brand' | 'orange' | 'teal' | 'violet' | 'success' | 'info' | 'neutral'> = {
+  ventes: 'brand',
+  achats: 'orange',
+  stock: 'teal',
+  tiers: 'violet',
+  finances: 'success',
+  analyse: 'info',
+  config: 'neutral',
+};
+
+/** Toutes les commandes du registre, par identifiant. */
+export const COMMANDES_PAR_ID: Readonly<Record<string, Commande>> = Object.fromEntries((Object.values(C) as Commande[]).map((c) => [c.id, c]));
+
+/** Barre d'accès rapide par défaut (identifiants de commandes). */
+export const ACCES_RAPIDE_DEFAUT: readonly string[] = ['tableau', 'nouvelleFA', 'comptoir'];
+
+/** Commandes proposées dans le menu « Personnaliser la barre d'accès rapide » (cases à cocher). */
+export const ACCES_RAPIDE_PROPOSES: readonly string[] = [
+  'tableau', 'comptoir', 'nouvelleFA', 'nouveauBL', 'nouveauFP', 'nouveauBR', 'ventes', 'achats',
+  'articles', 'clients', 'fournisseurs', 'echeances', 'tresorerie', 'statistiques', 'rechercher',
+];
+
+/** Commandes de la barre d'accès rapide : identifiants inconnus ignorés, doublons retirés, droits appliqués. */
+export function commandesAccesRapide(ids: readonly string[], d: Droits): Commande[] {
+  const vus = new Set<string>();
+  const sortie: Commande[] = [];
+  for (const id of ids) {
+    const c = COMMANDES_PAR_ID[id];
+    if (!c || vus.has(id) || (c.si && !c.si(d))) continue;
+    vus.add(id);
+    sortie.push(c);
+  }
+  return sortie;
+}
+
+/** Commande la plus proche d'un écran (icône et libellé de secours des écrans récents). */
+export function commandeDeChemin(chemin: string, recherche = ''): Commande | undefined {
+  const avecRoute = (Object.values(C) as Commande[]).filter((c) => c.to);
+  return avecRoute.find((c) => estActive(c, chemin, recherche))
+    // à défaut : la commande dont la route est le plus long préfixe (fiche, édition…)
+    ?? avecRoute
+      .filter((c) => { const p = c.to!.split('?')[0]; return p !== '/' && (chemin === p || chemin.startsWith(`${p}/`)); })
+      .sort((a, b) => b.to!.split('?')[0].length - a.to!.split('?')[0].length)[0];
+}

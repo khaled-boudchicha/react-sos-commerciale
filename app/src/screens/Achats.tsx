@@ -11,6 +11,7 @@ import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeBordereau } from '../impression/demandes';
 import { DocBadge, DOC_TONE, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Toolbar } from '../components/ui/atoms';
+import type { VueGrille } from '../components/grille/types';
 import { Button } from '../components/ui/Button';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
@@ -76,17 +77,31 @@ export default function Achats() {
     ));
   }
 
+  // Colonnes historiques (tri / filtres / totaux côté serveur) + optionnelles masquées par défaut
+  const vide = <span className="text-ink-muted">—</span>;
   const columns: Column<Achat>[] = [
-    { key: 'numero', header: 'N° pièce', field: 'numero', render: (a) => <span className="flex items-center gap-2"><DocBadge code={type === 'FA' ? 'BR' : type} /><span className="money">{a.numero}</span></span> },
-    { key: 'date', header: 'Date', width: '90px', field: 'date', type: 'date', render: (a) => fmtDate(a.date) },
-    { key: 'fournisseur', header: 'Fournisseur', field: 'fournisseur', render: (a) => <b>{a.fournisseur ?? a.raison ?? a.code_four ?? a.code_cli ?? '—'}</b> },
-    { key: 'mode', header: 'Mode', width: '90px', field: 'mode_payement', render: (a) => <span className="text-ink-muted">{a.mode_payement ?? '—'}</span> },
-    { key: 'ttc', header: 'Net à payer', align: 'right', width: '120px', field: 'net_a_payer', render: (a) => <Money value={a.net_a_payer ?? a.total_ttc} /> },
-    { key: 'regler', header: 'Réglé', align: 'right', width: '110px', field: 'regler', render: (a) => <Money value={a.regler} /> },
-    { key: 'reste', header: 'Reste', align: 'right', width: '110px', field: 'reste_a_payer', render: (a) => (
+    { key: 'numero', header: 'N° pièce', field: 'numero', width: '170px', pinned: 'left',
+      render: (a) => <span className="flex items-center gap-2"><DocBadge code={type === 'FA' ? 'BR' : type} /><span className="money font-semibold">{a.numero}</span></span> },
+    { key: 'date', header: 'Date', width: '96px', field: 'date', type: 'date', render: (a) => <span className="money">{fmtDate(a.date)}</span> },
+    { key: 'code_four', header: 'Code fournisseur', width: '120px', hidden: true, render: (a) => (a.code_four ?? a.code_cli ? <span className="money">{a.code_four ?? a.code_cli}</span> : vide) },
+    { key: 'fournisseur', header: 'Fournisseur', field: 'fournisseur', render: (a) => <b title={a.fournisseur ?? a.raison ?? undefined}>{a.fournisseur ?? a.raison ?? a.code_four ?? a.code_cli ?? '—'}</b> },
+    { key: 'mode', header: 'Mode', width: '96px', field: 'mode_payement', render: (a) => <span className="text-ink-label">{a.mode_payement ?? '—'}</span> },
+    { key: 'ht', header: 'Total HT', align: 'right', width: '120px', hidden: true, render: (a) => (a.total_ht == null ? vide : <Money value={a.total_ht} />) },
+    { key: 'ttc', header: 'Net à payer', align: 'right', width: '124px', field: 'net_a_payer', render: (a) => <Money value={a.net_a_payer ?? a.total_ttc} className="font-semibold" /> },
+    { key: 'regler', header: 'Réglé', align: 'right', width: '116px', field: 'regler', render: (a) => <Money value={a.regler} /> },
+    { key: 'reste', header: 'Reste', align: 'right', width: '116px', field: 'reste_a_payer', render: (a) => (
       <Money value={a.reste_a_payer} tone={Number(a.reste_a_payer) > 0 ? 'danger' : undefined} />
     ) },
-    { key: 'statut', header: 'Statut', width: '86px', render: (a) => <PayStatus regler={Number(a.regler)} reste={Number(a.reste_a_payer)} /> },
+    { key: 'statut', header: 'Statut', width: '92px', render: (a) => <PayStatus regler={Number(a.regler)} reste={Number(a.reste_a_payer)} /> },
+    { key: 'observation', header: 'Observation', width: '220px', hidden: true,
+      render: (a) => (a.observation ? <span className="text-ink-label" title={a.observation}>{a.observation}</span> : vide) },
+  ];
+  const tous = ['numero', 'date', 'code_four', 'fournisseur', 'mode_payement', 'ht', 'net_a_payer', 'regler', 'reste_a_payer', 'statut', 'observation'];
+  const seulement = (garder: string[]) => tous.filter((c) => !garder.includes(c));
+  const vues: VueGrille[] = [
+    { id: 'standard', libelle: 'Standard', etat: { ordreColonnes: tous, masquees: seulement(['numero', 'date', 'fournisseur', 'mode_payement', 'net_a_payer', 'regler', 'reste_a_payer', 'statut']) } },
+    { id: 'reglements', libelle: 'Règlements fournisseurs', etat: { ordreColonnes: tous, masquees: seulement(['numero', 'date', 'code_four', 'fournisseur', 'net_a_payer', 'regler', 'reste_a_payer', 'statut']) } },
+    { id: 'complete', libelle: 'Complète (toutes les colonnes)', etat: { ordreColonnes: tous, masquees: [], figees: { numero: 'gauche', statut: 'droite' }, densite: 'compacte' } },
   ];
 
   const csvDocs: ExportColumn<Achat>[] = [
@@ -136,7 +151,7 @@ export default function Achats() {
       <DataGrid
         exportCsv={{ nom: `achats-${type.toLowerCase()}`, columns: csvDocs }}
         columns={columns} rowKey={(a) => a.id}
-        distant={distant} cleEtat="achats"
+        distant={distant} cleEtat="achats" grille={{ vues }}
         onRowClick={(a) => navigate(`/achats/${a.id}`)}
         footer={(r) => ({
           _label: `${r?.total ?? 0} pièce(s)`,

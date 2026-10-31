@@ -1,4 +1,6 @@
-import { Icone } from './icones';
+import { Icon } from '../components/ui/Icon';
+import { Checkbox } from '../components/ui/Field';
+import { cn } from '../components/ui/cn';
 import { usePreferencesNavigation, type Disposition } from './preferences';
 
 /**
@@ -12,16 +14,16 @@ export default function ChoixDisposition() {
         {(['lateral', 'ruban'] as Disposition[]).map((d) => {
           const sel = disposition === d;
           return (
-            <button key={d} role="radio" aria-checked={sel} onClick={() => definirDisposition(d)}
-                    className="text-left rounded-md border p-2.5 transition-colors hover:border-brand-line"
-                    style={{ borderColor: sel ? 'var(--brand-700)' : 'var(--line)', background: sel ? 'color-mix(in srgb, var(--brand-700) 6%, var(--surface))' : 'var(--surface)', boxShadow: sel ? '0 0 0 3px color-mix(in srgb, var(--brand-700) 16%, transparent)' : undefined }}>
+            <button key={d} type="button" role="radio" aria-checked={sel} onClick={() => definirDisposition(d)}
+                    className={cn('text-left rounded-md border p-2.5 transition-colors duration-fast',
+                      sel ? 'border-brand-700 bg-brand-soft shadow-soft' : 'border-line bg-surface hover:border-brand-line')}>
               <Vignette d={d} />
               <div className="mt-2 flex items-center gap-2">
-                <span className="w-4 h-4 rounded-full border-2 inline-flex items-center justify-center flex-none" style={{ borderColor: sel ? 'var(--brand-700)' : 'var(--line)' }}>
-                  {sel && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--brand-700)' }} />}
+                <span className={cn('w-4 h-4 rounded-full border-2 inline-flex items-center justify-center flex-none', sel ? 'border-brand-700' : 'border-line')}>
+                  {sel && <span className="w-2 h-2 rounded-full bg-brand-700" />}
                 </span>
                 <span className="text-sm font-bold text-ink">{d === 'lateral' ? 'Barre latérale' : 'Ruban (style Office)'}</span>
-                <Icone nom={d === 'lateral' ? 'lateral' : 'ruban'} taille={14} className="ml-auto text-ink-muted" />
+                <Icon name={d === 'lateral' ? 'layoutSidebar' : 'layoutRibbon'} size={14} className="ml-auto text-ink-muted" />
               </div>
               <div className="text-xs text-ink-muted mt-0.5 pl-6">
                 {d === 'lateral' ? 'Menu compact à gauche, plus de place en hauteur.' : 'Onglets et groupes de commandes en haut, comme Word et Excel.'}
@@ -31,39 +33,39 @@ export default function ChoixDisposition() {
         })}
       </div>
       {disposition === 'ruban' && (
-        <label className="flex items-center gap-2 text-sm font-semibold text-ink-label">
-          <input type="checkbox" checked={rubanReduit} onChange={(e) => definirRubanReduit(e.target.checked)} style={{ accentColor: 'var(--brand-700)' }} />
-          Réduire le ruban (onglets seuls) — <span className="font-normal text-ink-muted">Ctrl+F1 ou double-clic sur un onglet</span>
-        </label>
+        <Checkbox checked={rubanReduit} onChange={(e) => definirRubanReduit(e.target.checked)}
+                  label="Réduire le ruban (onglets seuls)" description="Ctrl+F1 ou double-clic sur un onglet ; un clic sur un onglet le déplie temporairement." />
       )}
     </div>
   );
 }
 
-/** Mini-maquette de la mise en page. */
+/** Mini-maquette de la mise en page (aplats décoratifs : jetons `*-solid` / `*-soft`). */
 function Vignette({ d }: { d: Disposition }) {
-  const trait = (w: string, o = 0.35) => <span className="block h-[3px] rounded-full" style={{ width: w, background: 'var(--text-muted)', opacity: o }} />;
+  const trait = (w: string, o = 0.35) => <span className="block h-[3px] rounded-full bg-ink-muted" style={{ width: w, opacity: o }} />;
   return (
-    <div className="h-[86px] rounded-md overflow-hidden border flex" style={{ borderColor: 'var(--line-soft)', background: 'var(--bg)', flexDirection: d === 'lateral' ? 'row' : 'column' }}>
+    <div className={cn('h-[86px] rounded-md overflow-hidden border border-line-soft bg-bg flex', d === 'lateral' ? 'flex-row' : 'flex-col')} aria-hidden="true">
       {d === 'lateral' ? (
         <>
-          <div className="w-[30%] p-1.5 flex flex-col gap-1.5" style={{ background: 'var(--surface)', borderRight: '1px solid var(--line-soft)' }}>
-            <span className="w-4 h-4 rounded-[4px]" style={{ background: 'var(--gradient-hero)' }} />
+          <div className="w-[30%] p-1.5 flex flex-col gap-1.5 bg-surface border-r border-line-soft">
+            <span className="w-4 h-4 rounded-xs" style={{ background: 'var(--gradient-hero)' }} />
             {trait('80%', 0.6)}{trait('65%')}{trait('75%')}{trait('55%')}{trait('70%')}
           </div>
-          <div className="flex-1 p-2 flex flex-col gap-1.5">{trait('50%', 0.6)}<div className="flex-1 rounded-[4px]" style={{ background: 'var(--surface)' }} /></div>
+          <div className="flex-1 p-2 flex flex-col gap-1.5">{trait('50%', 0.6)}<div className="flex-1 rounded-xs bg-surface" /></div>
         </>
       ) : (
         <>
           <div className="h-[11px]" style={{ background: 'var(--gradient-hero)' }} />
-          <div className="h-[9px] flex items-end gap-1.5 px-1.5" style={{ background: 'var(--surface)' }}>
-            <span className="w-4 h-[6px] rounded-t-sm" style={{ background: 'var(--brand-700)' }} />{trait('14%', 0.7)}{trait('12%')}{trait('12%')}
+          <div className="h-[9px] flex items-end gap-1.5 px-1.5 bg-surface">
+            <span className="w-4 h-[6px] rounded-t-sm bg-brand-700" />{trait('14%', 0.7)}{trait('12%')}{trait('12%')}
           </div>
-          <div className="h-[22px] flex items-center gap-1.5 px-1.5" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--line-soft)' }}>
-            {['var(--brand-700)', 'var(--teal)', 'var(--orange)', 'var(--violet)', 'var(--success)'].map((c) => <span key={c} className="w-3.5 h-3.5 rounded-[3px]" style={{ background: `color-mix(in srgb, ${c} 30%, transparent)` }} />)}
-            <span className="w-px h-3 mx-0.5" style={{ background: 'var(--line)' }} />{trait('18%')}
+          <div className="h-[22px] flex items-center gap-1.5 px-1.5 bg-surface border-b border-line-soft">
+            {['brand', 'teal', 'orange', 'violet', 'success'].map((t) => (
+              <span key={t} className="w-3.5 h-3.5 rounded-[3px] border" style={{ background: `var(--${t}-soft)`, borderColor: `var(--${t}-line)` }} />
+            ))}
+            <span className="w-px h-3 mx-0.5 bg-line" />{trait('18%')}
           </div>
-          <div className="flex-1 p-1.5"><div className="h-full rounded-[4px]" style={{ background: 'var(--surface)' }} /></div>
+          <div className="flex-1 p-1.5"><div className="h-full rounded-xs bg-surface" /></div>
         </>
       )}
     </div>

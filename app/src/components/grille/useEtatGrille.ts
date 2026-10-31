@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ColonneGrille, EtatGrille, FiltreColonne } from './types';
+import { ColonneGrille, DensiteGrille, DispositionGrille, EtatGrille, FiltreColonne } from './types';
 
 const PREFIXE = 'gc.grille.';
 
@@ -35,14 +35,22 @@ function lire(cle?: string): Partial<EtatGrille> | null {
  * « Browser storage » : lecture/écriture protégées, repli sur l'état initial).
  */
 export function useEtatGrille<T>(colonnes: ColonneGrille<T>[], taillePage: number, cleEtat?: string) {
-  const [etat, setEtat] = useState<EtatGrille>(() => ({ ...etatInitial(colonnes, taillePage), ...lire(cleEtat), page: 0 }));
+  const [etat, setEtat] = useState<EtatGrille>(() => {
+    const e: EtatGrille = { ...etatInitial(colonnes, taillePage), ...lire(cleEtat), page: 0 };
+    // État mémorisé antérieur à des colonnes optionnelles : elles restent masquées dès le premier rendu
+    const cachees = colonnes.filter((c) => c.visible === false && !e.ordreColonnes.includes(c.champ) && !e.masquees.includes(c.champ)).map((c) => c.champ);
+    return cachees.length ? { ...e, masquees: [...e.masquees, ...cachees] } : e;
+  });
 
   // Nouvelles colonnes (colonnes auto chargées après coup) : complète l'ordre
   const champs = colonnes.map((c) => c.champ).join('|');
   useEffect(() => {
     setEtat((e) => {
       const manquantes = colonnes.map((c) => c.champ).filter((c) => !e.ordreColonnes.includes(c));
-      return manquantes.length ? { ...e, ordreColonnes: [...e.ordreColonnes, ...manquantes] } : e;
+      if (!manquantes.length) return e;
+      // Colonnes optionnelles apparues depuis l'état mémorisé : elles restent masquées par défaut
+      const cachees = colonnes.filter((c) => manquantes.includes(c.champ) && c.visible === false).map((c) => c.champ);
+      return { ...e, ordreColonnes: [...e.ordreColonnes, ...manquantes], masquees: [...e.masquees, ...cachees.filter((c) => !e.masquees.includes(c))] };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [champs]);
@@ -103,6 +111,22 @@ export function useEtatGrille<T>(colonnes: ColonneGrille<T>[], taillePage: numbe
     redimensionner: (champ: string, largeur: number) => maj((e) => ({ largeurs: { ...e.largeurs, [champ]: Math.round(largeur) } })),
     basculerVisibilite: (champ: string) => maj((e) => ({
       masquees: e.masquees.includes(champ) ? e.masquees.filter((c) => c !== champ) : [...e.masquees, champ],
+    })),
+    /** Fige une colonne à gauche / à droite, ou la libère ('aucune'). */
+    figer: (champ: string, cote: 'gauche' | 'droite' | 'aucune') => maj((e) => ({ figees: { ...(e.figees ?? {}), [champ]: cote } })),
+    densite: (densite: DensiteGrille) => maj({ densite }),
+    basculerRetour: (defaut: boolean) => maj((e) => ({ retour: !(e.retour ?? defaut) })),
+    /** Applique une vue : disposition complète (colonnes, ordre, largeurs, figées, tri, densité) ; filtres conservés. */
+    appliquerVue: (id: string, d: DispositionGrille) => maj((e) => ({
+      ordreColonnes: d.ordreColonnes ?? colonnes.map((c) => c.champ),
+      masquees: d.masquees ?? colonnes.filter((c) => c.visible === false).map((c) => c.champ),
+      largeurs: d.largeurs ?? {},
+      figees: d.figees ?? {},
+      tri: d.tri ?? e.tri,
+      densite: d.densite ?? e.densite,
+      retour: d.retour ?? e.retour,
+      vue: id,
+      page: 0,
     })),
     page: (page: number) => maj({ page }),
     taillePage: (taillePage: number) => maj({ taillePage, page: 0 }),

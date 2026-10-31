@@ -4,6 +4,7 @@ import Ruban from '../navigation/Ruban';
 import { Icone } from '../navigation/icones';
 import { COULEUR_TON, MENU_LATERAL, estActive, type Action } from '../navigation/commandes';
 import { usePreferencesNavigation } from '../navigation/preferences';
+import { useEnregistrerRecents } from '../navigation/recents';
 import ErrorBoundary from './ErrorBoundary';
 import { useQuery } from '@apollo/client';
 import { MY_AGENTS } from '../api/auth';
@@ -35,6 +36,7 @@ export default function AppShell() {
   const location = useLocation();
   const droits = useDroits();
   useDroitsSync();
+  useEnregistrerRecents(); // écrans récents (menu Fichier du ruban)
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const [changerDossier, setChangerDossier] = useState(false);
   const [changerAgent, setChangerAgent] = useState(false);
@@ -42,6 +44,13 @@ export default function AppShell() {
   const [replie, setReplie] = useState(lireRepli);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'));
   const disposition = usePreferencesNavigation((s) => s.disposition);
+  // Le thème peut changer ailleurs (Paramètres, ruban) : l'icône de bascule suit l'attribut data-theme
+  useEffect(() => {
+    const racine = document.documentElement;
+    const obs = new MutationObserver(() => setTheme(racine.dataset.theme === 'dark' ? 'dark' : 'light'));
+    obs.observe(racine, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   // Renouvellement du JWT + veille sur le blocage de compte / l'abonnement
   useSessionKeepAlive();

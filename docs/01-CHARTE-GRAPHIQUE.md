@@ -160,7 +160,18 @@ Règles :
 
 - **Barre latérale** (par défaut) : groupes Activité / Analyse / Configuration, icônes colorées par famille, élément actif marqué d'un fond `brand-soft` et d'un liseré. Le menu peut se **réduire en icônes seules** (préférence du poste). En bas : carte utilisateur et dossier, bascule vers le ruban, déconnexion.
 - **En-tête** : recherche globale (Ctrl+K), état de l'agent, bascule clair / sombre, aide aux raccourcis (Ctrl+/), menu de compte.
-- **Ruban façon Office** (au choix, dans Paramètres) : onglets, groupes, touches d'accès Alt, menu Fichier (backstage).
+- **Ruban façon Office** (au choix, dans Paramètres) : onglets navigables au clavier, groupes, touches d'accès Alt, menu Fichier (backstage) avec
+  **Récents** (10 derniers écrans), **barre d'accès rapide personnalisable** (clic droit « Ajouter / Retirer », menu Personnaliser,
+  Alt puis 1–9), **repli adaptatif des groupes** en menus déroulants quand la largeur manque, options d'affichage (onglets seuls),
+  bascule clair / sombre dans le menu Compte.
+
+### Listes à nombreuses colonnes (grille)
+- Menu **Vue** : vues prédéfinies par écran (Ventes : Standard, Comptable, Recouvrement, Complète ; Achats : Standard, Règlements,
+  Complète) et **vues enregistrées** par l'utilisateur ; densité compacte / normale / confort ; retour à la ligne ; ajuster au contenu.
+- Colonnes **figées** à gauche / à droite (en-tête : clic droit ; sélecteur : épingle), **ombres de bord** au défilement horizontal,
+  colonnes optionnelles masquées par défaut (affichées par « Colonnes » ou une vue).
+- **Éditeur de lignes** des pièces : N° + Article figés à gauche, Total + suppression figés à droite, modèles Saisie rapide / Standard /
+  Complète, densité, pied récapitulatif collant.
 - **Palette de commandes (Ctrl+K)** : aller à un écran, créer une pièce, chercher un client, un fournisseur ou un article. Les résultats sont groupés et iconographiés, et la navigation au clavier est annoncée (`listbox`).
 
 ## 9. Règles de contribution
