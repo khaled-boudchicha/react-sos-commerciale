@@ -23,6 +23,9 @@ import { Money, Tabs, PageHeader, ExportBtn, Toolbar } from '../components/ui/at
 import { Button } from '../components/ui/Button';
 import { Checkbox, SearchField } from '../components/ui/Field';
 import { KpiTile } from '../components/ui/Kpi';
+import ApercuTiers from '../components/document/ApercuTiers';
+import ApercuDisposition, { BoutonApercu } from '../components/document/ApercuDisposition';
+import { useApercu } from '../components/document/useApercu';
 
 // Limite de sécurité pour l'export « tout » : au-delà, on prévient plutôt que
 // d'exporter silencieusement une liste tronquée.
@@ -120,6 +123,9 @@ function ClientsGrid({ search, slotAction }: { search: string; slotAction: HTMLE
       return data.clients as ClientsResult;
     },
   }), [client, search, version]);
+  // Aperçu rapide (désactivé par défaut) : clic = aperçu, double-clic / Entrée = ouvrir la fiche
+  const ouvrirClient = (c: Client) => navigate(`/tiers/client/${encodeURIComponent(c.code)}`);
+  const apercu = useApercu<Client>('clients', ouvrirClient, distant.cle);
   const [fetchAll, { loading: exporting }] = useLazyQuery(CLIENTS, { fetchPolicy: 'network-only' });
   async function exporter() {
     const { data: all } = await fetchAll({ variables: { search: search || undefined, limit: LIMIT_EXPORT, offset: 0 } });
@@ -148,11 +154,22 @@ function ClientsGrid({ search, slotAction }: { search: string; slotAction: HTMLE
         <Button variant="primary" icon="plus" onClick={crud.openCreate}>Nouveau client</Button>
       </ActionEntete>
       {crud.modals}
-      <DataGrid columns={columns} rowKey={(c) => c.id}
-                distant={distant} cleEtat="tiers-clients"
-                actions={<ExportBtn onClick={() => void exporter()} loading={exporting} />}
-                onRowClick={(c) => navigate(`/tiers/client/${encodeURIComponent(c.code)}`)}
-                footer={(r) => ({ _label: `${r?.total ?? 0} client(s)` })} />
+      <ApercuDisposition apercu={apercu} libelle="Aperçu du client"
+                         panneau={(fermer) => (
+                           <ApercuTiers sens="client" tiers={apercu.selection} onFermer={fermer}
+                                        onOuvrir={() => apercu.selection && ouvrirClient(apercu.selection)} />
+                         )}>
+        <DataGrid columns={columns} rowKey={(c) => c.id}
+                  distant={distant} cleEtat="tiers-clients"
+                  actions={(
+                    <>
+                      <BoutonApercu apercu={apercu} objet={{ de: 'du client', le: 'la fiche' }} />
+                      <ExportBtn onClick={() => void exporter()} loading={exporting} />
+                    </>
+                  )}
+                  {...apercu.propsGrille()}
+                  footer={(r) => ({ _label: `${r?.total ?? 0} client(s)` })} />
+      </ApercuDisposition>
     </>
   );
 }
@@ -172,6 +189,9 @@ function FournisseursGrid({ search, slotAction }: { search: string; slotAction: 
       return data.fournisseurs as FournisseursResult;
     },
   }), [client, search, version]);
+  // Aperçu rapide (désactivé par défaut) : clic = aperçu, double-clic / Entrée = ouvrir la fiche
+  const ouvrirFournisseur = (f: Fournisseur) => navigate(`/tiers/fournisseur/${encodeURIComponent(f.code)}`);
+  const apercu = useApercu<Fournisseur>('fournisseurs', ouvrirFournisseur, distant.cle);
   const [fetchAll, { loading: exporting }] = useLazyQuery(FOURNISSEURS, { fetchPolicy: 'network-only' });
   async function exporter() {
     const { data: all } = await fetchAll({ variables: { search: search || undefined, limit: LIMIT_EXPORT, offset: 0 } });
@@ -197,11 +217,23 @@ function FournisseursGrid({ search, slotAction }: { search: string; slotAction: 
         <Button variant="primary" icon="plus" onClick={crud.openCreate}>Nouveau fournisseur</Button>
       </ActionEntete>
       {crud.modals}
-      <DataGrid columns={columns} rowKey={(f) => f.id}
-                distant={distant} cleEtat="tiers-fournisseurs"
-                actions={<ExportBtn onClick={() => void exporter()} loading={exporting} />}
-                onRowClick={(f) => navigate(`/tiers/fournisseur/${encodeURIComponent(f.code)}`)}
-                footer={(r) => ({ _label: `${r?.total ?? 0} fournisseur(s)` })} />
+      <ApercuDisposition apercu={apercu} libelle="Aperçu du fournisseur"
+                         panneau={(fermer) => (
+                           <ApercuTiers sens="fournisseur" tiers={apercu.selection} onFermer={fermer}
+                                        onOuvrir={() => apercu.selection && ouvrirFournisseur(apercu.selection)} />
+                         )}>
+        <DataGrid columns={columns} rowKey={(f) => f.id}
+                  distant={distant} cleEtat="tiers-fournisseurs"
+                  actions={(
+                    <>
+                      <BoutonApercu apercu={apercu} objet={{ de: 'du fournisseur', le: 'la fiche' }} />
+                      <ExportBtn onClick={() => void exporter()} loading={exporting} />
+                    </>
+                  )}
+                  // Un seul « Exporter » (celui de l'écran, comme pour les clients) : menu d'export de la grille masqué
+                  {...apercu.propsGrille({ export: undefined })}
+                  footer={(r) => ({ _label: `${r?.total ?? 0} fournisseur(s)` })} />
+      </ApercuDisposition>
     </>
   );
 }

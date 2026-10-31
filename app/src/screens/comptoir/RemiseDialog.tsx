@@ -25,12 +25,12 @@ export default function RemiseDialog({ pct, baseTtc, onValider, onClose }: {
               <DialogButton kind="primary" onClick={valider} kbd="Entrée">Appliquer</DialogButton>
             </>}>
       <div className="grid grid-cols-2 gap-3">
-        <label className="text-[11px] font-bold text-ink-label">Pourcentage
+        <label className="text-xs leading-[1.45] font-bold text-ink-label">Pourcentage
           <div className="mt-1">
             <NumberEdit value={p} onChange={setP} onEnter={valider} size="lg" suffix="%" min={0} max={100} autoFocus ariaLabel="Remise en pourcentage" />
           </div>
         </label>
-        <label className="text-[11px] font-bold text-ink-label">Montant
+        <label className="text-xs leading-[1.45] font-bold text-ink-label">Montant
           <div className="mt-1">
             <NumberEdit value={montant} onChange={(m) => setP(baseTtc > 0 ? Math.min(100, (m / baseTtc) * 100) : 0)}
                         onEnter={valider} size="lg" suffix="DA" min={0} max={baseTtc} ariaLabel="Remise en montant" />

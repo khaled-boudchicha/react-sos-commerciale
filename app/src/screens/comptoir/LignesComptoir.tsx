@@ -28,14 +28,13 @@ export default function LignesComptoir({
 }) {
   const actifRef = useRef<HTMLDivElement>(null);
   useEffect(() => { actifRef.current?.scrollIntoView({ block: 'nearest' }); }, [selection]);
-  const secondaire = { color: 'var(--text-secondary)' };
   // Remises affichées TTC, comme le prix unitaire et le montant de la ligne
   const remisesTtc = lignes.reduce((s, l) => s + remiseTtc(l), 0);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col rounded-xl bg-surface border border-line-soft shadow-soft overflow-hidden">
-      <div className="grid items-center h-10 px-2 border-b border-line-soft text-[10.5px] font-bold tracking-[.6px] uppercase flex-none"
-           style={{ gridTemplateColumns: COLONNES, ...secondaire }}>
+      <div className="grid items-center h-10 px-2 border-b border-line-soft text-[10.5px] font-bold tracking-[.6px] uppercase flex-none text-ink-muted"
+           style={{ gridTemplateColumns: COLONNES }}>
         <span className="text-center">#</span><span>Article</span>
         <span className="text-right pr-2.5">P.U. TTC</span><span className="text-center">Quantité</span>
         <span className="text-right pr-2.5">Remise</span><span className="text-right pr-2">Montant</span><span />
@@ -43,10 +42,10 @@ export default function LignesComptoir({
 
       <div className="flex-1 min-h-0 overflow-auto">
         {lignes.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-6" style={secondaire}>
+          <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-6 text-ink-muted">
             <span style={{ color: retour ? 'var(--pos-return)' : 'var(--brand-500)' }}><Icon name={retour ? 'retour' : 'panier'} size={34} strokeWidth={1.6} /></span>
             <span className="text-[15px] font-bold text-ink">{retour ? 'Retour : scannez les articles rendus' : 'Ticket vide'}</span>
-            <span className="text-[13px]">Scannez un code-barres, tapez une désignation (F6) ou touchez une tuile article.</span>
+            <span className="text-base leading-[1.45]">Scannez un code-barres, tapez une désignation (F6) ou touchez une tuile article.</span>
           </div>
         ) : lignes.map((l, i) => {
           const actif = l.key === selection;
@@ -60,10 +59,10 @@ export default function LignesComptoir({
                    background: actif ? (retour ? 'var(--pos-return-soft)' : 'var(--brand-50)') : undefined,
                    boxShadow: actif ? `inset 0 0 0 2px ${retour ? 'var(--pos-return-line)' : 'var(--brand-300)'}` : undefined,
                  }}>
-              <span className="money text-center text-[12px]" style={secondaire}>{i + 1}</span>
+              <span className="money text-center text-sm leading-[1.45] text-ink-muted">{i + 1}</span>
               <div className="flex flex-col gap-[3px] min-w-0 pr-2 py-2">
                 <span className="text-[15px] font-bold leading-[1.2]">{l.designation}</span>
-                <span className="money text-[11px] flex flex-wrap gap-x-3" style={secondaire}>
+                <span className="money text-xs leading-[1.45] flex flex-wrap gap-x-3 text-ink-muted">
                   <span>{l.code_article}</span>
                   {l.n_lot ? <span>Lot {l.n_lot}{l.date_peremption ? ` · exp. ${fmtMoisAnnee(l.date_peremption)}` : ''}</span> : null}
                   {l.stock != null && (
@@ -79,18 +78,17 @@ export default function LignesComptoir({
               </div>
               <div className="px-1.5">
                 <NumberEdit size="pos" spin value={l.qte} decimals={3} minDecimals={0} min={0.001} step={1}
-                            className="!text-center !text-[16px] !font-bold" ariaLabel={`Quantité, ligne ${i + 1}`}
+                            className="!text-center !text-lg !leading-5 !font-bold" ariaLabel={`Quantité, ligne ${i + 1}`}
                             onChange={(v) => patch(l.key, { qte: v > 0 ? v : l.qte })} />
               </div>
               <div className="px-1.5">
                 <NumberEdit size="pos" value={round2(remise)} min={0} ariaLabel={`Remise, ligne ${i + 1}`}
-                            className={remise > 0 ? '!text-[var(--pos-amber)]' : '!text-[var(--text-secondary)]'}
+                            className={remise > 0 ? '!text-warning-text' : '!text-ink-muted'}
                             onChange={(v) => patch(l.key, depuisRemiseMontant(l, v / (1 + (l.tva || 0) / 100)))} />
               </div>
-              <span className="money text-right pr-2 text-[16px] font-extrabold">{fmtMoney(totalTtcLigne(l))}</span>
+              <span className="money text-right pr-2 text-lg leading-[1.45] font-extrabold">{fmtMoney(totalTtcLigne(l))}</span>
               <button type="button" onClick={() => remove(l.key)} aria-label={`Supprimer la ligne ${i + 1}`} tabIndex={-1}
-                      className="w-[38px] h-[38px] justify-self-center rounded-lg flex items-center justify-center hover:bg-[var(--pos-alert-soft)] hover:text-[var(--pos-alert)]"
-                      style={secondaire}>
+                      className="w-[38px] h-[38px] justify-self-center rounded-lg flex items-center justify-center text-ink-muted hover:bg-danger-soft">
                 <Icon name="corbeille" size={18} />
               </button>
             </div>
@@ -98,14 +96,13 @@ export default function LignesComptoir({
         })}
       </div>
 
-      <div className="flex-none flex items-center gap-[22px] h-11 px-[18px] border-t border-line-soft text-[12px] font-semibold text-ink-label"
-           style={{ background: 'var(--surface-sunken)' }}>
+      <div className="flex-none flex items-center gap-[22px] h-11 px-[18px] border-t border-line-soft bg-sunken text-sm leading-[1.45] font-semibold text-ink-label">
         <span><b className="money text-ink">{lignes.length}</b> ligne{lignes.length > 1 ? 's' : ''} · <b className="money text-ink">{fmtQte(articles)}</b> article{articles > 1 ? 's' : ''}</span>
         <span>Remises lignes <b className="money text-ink">{fmtMoney(remisesTtc)}</b></span>
         {tuilesMasquees && (
           <button type="button" onClick={onAfficherTuiles} className="font-bold text-brand-900">Afficher les tuiles</button>
         )}
-        <span className="ml-auto flex gap-3.5" style={secondaire}>
+        <span className="ml-auto flex gap-3.5 text-ink-muted">
           <span className="flex items-center gap-1.5"><Kbd>↑ ↓</Kbd> ligne</span>
           <span className="flex items-center gap-1.5"><Kbd>+ −</Kbd> quantité</span>
           <span className="flex items-center gap-1.5"><Kbd>Suppr</Kbd> retirer</span>

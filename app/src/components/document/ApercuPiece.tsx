@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { useQuery } from '@apollo/client';
 import { VENTE, ACHAT } from '../../api/queries';
 import { ACHAT_TYPE_CODE, VENTE_TYPE_CODE, type Achat, type LigneAchat, type LigneVente, type ReglementPiece, type Vente } from '../../api/types';
@@ -6,10 +6,11 @@ import { useDroits } from '../../lib/droits';
 import { useSession } from '../../store/session';
 import { fmtDate, fmtQte } from '../../lib/format';
 import { Badge, DocBadge, Money, PayStatus } from '../ui/atoms';
-import { Button, IconButton } from '../ui/Button';
+import { Button } from '../ui/Button';
 import { DescriptionList, SectionTitle, TotalsPanel } from '../ui/Card';
-import { Icon, Kbd } from '../ui/Icon';
+import { Icon } from '../ui/Icon';
 import { Alert, EmptyState, Skeleton, StatePanel } from '../ui/States';
+import ApercuCadre, { ApercuEnteteSimple, ApercuInvite, BoutonFermerApercu } from './ApercuCadre';
 import { TYPES_AVEC_REGLEMENT } from './ReglementsPiece';
 
 /** Nombre de lignes de la pièce montrées dans l'aperçu. */
@@ -37,42 +38,14 @@ export default function ApercuPiece({ sens, id, onOuvrir, onFermer }: {
   // Données d'une autre pièce encore présentes pendant le changement de sélection : ignorées
   const piece = brut && Number(brut.id) === Number(id) ? brut : undefined;
 
-  const racine = useRef<HTMLDivElement>(null);
-  const corps = useRef<HTMLDivElement>(null);
-  useEffect(() => { corps.current?.scrollTo?.({ top: 0 }); }, [id]);
-
-  const surTouche = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'Escape' || e.defaultPrevented) return;
-    e.preventDefault();
-    e.stopPropagation();
-    onFermer();
-  };
-
-  const fermer = <IconButton icon="close" label="Fermer l'aperçu (Échap)" size="sm" onClick={onFermer} />;
+  const fermer = <BoutonFermerApercu onFermer={onFermer} />;
   const enveloppe = (entete: ReactNode, contenu: ReactNode) => (
-    <div ref={racine} onKeyDown={surTouche} className="flex-1 flex flex-col min-h-0">
-      <div className="flex-none border-b border-line-soft px-4 py-3">{entete}</div>
-      <div ref={corps} className="flex-1 min-h-0 overflow-auto px-4 py-3.5 flex flex-col gap-4 [&>*]:shrink-0">{contenu}</div>
-    </div>
+    <ApercuCadre entete={entete} onFermer={onFermer} cle={id}>{contenu}</ApercuCadre>
   );
-  const enteteSimple = (titre: ReactNode) => (
-    <div className="flex items-center gap-2">
-      <Icon name="layoutSidebar" size={16} className="text-ink-muted" />
-      <span className="flex-1 min-w-0 font-bold text-base text-ink">{titre}</span>
-      {fermer}
-    </div>
-  );
+  const enteteSimple = (titre: ReactNode) => <ApercuEnteteSimple titre={titre} onFermer={onFermer} />;
 
   if (id == null) {
-    return enveloppe(enteteSimple('Aperçu'), (
-      <EmptyState icon="eye" size="sm" title="Sélectionnez une pièce"
-                  description={(
-                    <>
-                      Cliquez sur une ligne ou parcourez la liste avec les flèches du clavier.
-                      <span className="block mt-1.5">Double-clic ou <Kbd>Entrée</Kbd> pour ouvrir la pièce.</span>
-                    </>
-                  )} />
-    ));
+    return enveloppe(enteteSimple('Aperçu'), <ApercuInvite titre="Sélectionnez une pièce" ouvrir="la pièce" />);
   }
 
   if (!piece) {

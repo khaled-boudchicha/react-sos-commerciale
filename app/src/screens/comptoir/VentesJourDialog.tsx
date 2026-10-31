@@ -33,9 +33,9 @@ export default function VentesJourDialog({ onReimprimer, onClose }: {
   return (
     <Dialog title="Ventes au comptoir du jour" subtitle={`${ventes.length} ticket(s) · total ${fmtMoney(total)} DA · encaissé ${fmtMoney(encaisse)} DA`}
             onClose={onClose} width={760} footer={<DialogButton onClick={onClose} kbd="Échap">Fermer</DialogButton>}>
-      {loading && <div className="text-[12px] text-ink-muted">Chargement…</div>}
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
-      {!loading && ventes.length === 0 && <div className="text-[12px] text-ink-muted">Aucune vente au comptoir aujourd’hui.</div>}
+      {loading && <div className="text-sm leading-[1.45] text-ink-muted">Chargement…</div>}
+      {error && <div className="text-sm leading-[1.45]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
+      {!loading && ventes.length === 0 && <div className="text-sm leading-[1.45] text-ink-muted">Aucune vente au comptoir aujourd’hui.</div>}
       {ventes.length > 0 && (
         <table className="w-full text-[12.5px]">
           <thead>

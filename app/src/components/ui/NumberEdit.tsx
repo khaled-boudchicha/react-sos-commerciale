@@ -44,7 +44,7 @@ const TAILLES = {
   sm: 'text-sm py-1 px-2',
   md: 'text-base py-2 px-3',
   lg: 'text-lg py-2.5 px-3 font-bold',
-  xl: 'text-[26px] py-3 px-4 font-extrabold',
+  xl: 'text-3xl leading-[1.45] py-3 px-4 font-extrabold',
   pos: 'h-[38px] text-md px-2.5 rounded-lg font-medium',
   montant: 'h-[68px] text-[34px] px-0 font-extrabold bg-transparent',
 };
@@ -100,7 +100,7 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
 
   if (!spin) return input;
   const btn = size === 'pos'
-    ? 'w-[38px] h-[38px] flex-none rounded-lg border border-line bg-surface text-ink-label text-[18px] font-extrabold hover:border-brand-300 disabled:opacity-50'
+    ? 'w-[38px] h-[38px] flex-none rounded-lg border border-line bg-surface text-ink-label text-xl leading-[1.45] font-extrabold hover:border-brand-300 disabled:opacity-50'
     : 'w-9 flex-none rounded-sm border border-line bg-surface text-ink-label font-extrabold hover:border-brand-300 disabled:opacity-50';
   return (
     <div className="flex gap-1 items-center">

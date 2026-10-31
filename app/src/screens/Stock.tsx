@@ -20,6 +20,9 @@ import { Badge, Money, Tabs, PageHeader, StatusPill, Toolbar } from '../componen
 import { Button } from '../components/ui/Button';
 import { SearchField } from '../components/ui/Field';
 import { SectionTitle } from '../components/ui/Card';
+import ApercuArticle from '../components/document/ApercuArticle';
+import ApercuDisposition, { BoutonApercu } from '../components/document/ApercuDisposition';
+import { useApercu } from '../components/document/useApercu';
 
 const VUES = [
   { code: 'tous', label: 'Articles' },
@@ -53,6 +56,11 @@ export default function Stock() {
       return data.articles as ArticlesResult;
     },
   }), [client, search, stockAlerte, margeNegative, version]);
+
+  // Aperçu rapide (désactivé par défaut) : clic = aperçu, double-clic / Entrée = ouvrir la fiche.
+  // La vue fait partie de la clé : changer d'onglet vide la sélection.
+  const ouvrirArticle = (a: Article) => navigate(`/stock/article/${a.id}`);
+  const apercu = useApercu<Article>('articles', ouvrirArticle, `${vue}|${distant.cle}`);
 
   // Listes déroulantes du formulaire article (familles, dépôts, unités, TVA)
   const { data: refData } = useQuery(REFERENTIELS);
@@ -160,11 +168,18 @@ export default function Stock() {
       </Toolbar>
       {vue === 'peremption' ? <PeremptionPanel /> : (
         <>
-          <DataGrid columns={columns} rowKey={(a) => a.id}
-                    distant={distant} cleEtat="stock-articles"
-                    exportCsv={{ nom: 'articles-stock', columns: csvStock }}
-                    onRowClick={(a) => navigate(`/stock/article/${a.id}`)}
-                    footer={(r) => ({ _label: `${r?.total ?? 0} article(s)` })} />
+          <ApercuDisposition apercu={apercu} libelle="Aperçu de l'article"
+                             panneau={(fermer) => (
+                               <ApercuArticle article={apercu.selection} onFermer={fermer}
+                                              onOuvrir={() => apercu.selection && ouvrirArticle(apercu.selection)} />
+                             )}>
+            <DataGrid columns={columns} rowKey={(a) => a.id}
+                      distant={distant} cleEtat="stock-articles"
+                      exportCsv={{ nom: 'articles-stock', columns: csvStock }}
+                      actions={<BoutonApercu apercu={apercu} objet={{ de: "de l'article", le: 'la fiche' }} />}
+                      {...apercu.propsGrille()}
+                      footer={(r) => ({ _label: `${r?.total ?? 0} article(s)` })} />
+          </ApercuDisposition>
         </>
       )}
     </div>

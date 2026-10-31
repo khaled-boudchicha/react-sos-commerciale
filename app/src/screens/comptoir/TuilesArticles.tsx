@@ -41,22 +41,22 @@ export default function TuilesArticles({ niveau, onArticle, onMasquer }: {
             );
           })}
         </div>
-        <button type="button" onClick={onMasquer} className="ml-auto h-[34px] px-3 text-[12px] font-bold text-brand-900 whitespace-nowrap">
+        <button type="button" onClick={onMasquer} className="ml-auto h-[34px] px-3 text-sm leading-[1.45] font-bold text-brand-900 whitespace-nowrap">
           Masquer les tuiles
         </button>
       </div>
       <div className="grid gap-2 overflow-auto content-start" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', maxHeight: 136 }}>
-        {loading && <div className="col-span-6 text-[12px] py-2" style={{ color: 'var(--text-secondary)' }}>Chargement…</div>}
-        {!loading && articles.length === 0 && <div className="col-span-6 text-[12px] py-2" style={{ color: 'var(--text-secondary)' }}>Aucun article dans cette famille.</div>}
+        {loading && <div className="col-span-6 text-sm leading-[1.45] py-2 text-ink-muted">Chargement…</div>}
+        {!loading && articles.length === 0 && <div className="col-span-6 text-sm leading-[1.45] py-2 text-ink-muted">Aucun article dans cette famille.</div>}
         {articles.map((a) => {
           const epuise = Number(a.qte_reale) <= 0;
           return (
             <button key={a.id} type="button" onClick={() => onArticle(a)} title={`${a.code} · stock ${a.qte_reale ?? 0}`}
-                    className="h-16 rounded-[10px] border border-line bg-surface px-2.5 py-2 flex flex-col justify-between items-start text-left hover:border-brand-500 hover:bg-brand-50 active:translate-y-px">
-              <span className="text-[12px] font-bold leading-[1.2] text-ink line-clamp-2">{a.designation}</span>
+                    className="h-16 rounded-md border border-line bg-surface px-2.5 py-2 flex flex-col justify-between items-start text-left hover:border-brand-500 hover:bg-brand-50 active:translate-y-px">
+              <span className="text-sm font-bold leading-[1.2] text-ink line-clamp-2">{a.designation}</span>
               <span className="flex w-full justify-between items-baseline">
-                <span className="money text-[13px] font-extrabold text-brand-900">{fmtMoney(prixTtcUnitaire(ligneComptoir(a, niveau)))}</span>
-                {epuise && <span className="text-[10px] font-bold" style={{ color: 'var(--pos-alert)' }}>épuisé</span>}
+                <span className="money text-base leading-[1.45] font-extrabold text-brand-900">{fmtMoney(prixTtcUnitaire(ligneComptoir(a, niveau)))}</span>
+                {epuise && <span className="text-2xs leading-[1.45] font-bold" style={{ color: 'var(--pos-alert)' }}>épuisé</span>}
               </span>
             </button>
           );
