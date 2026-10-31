@@ -153,6 +153,13 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const [focus, setFocus] = useState<{ index: number; col: number }>({ index: 0, col: 0 });
   const [details, setDetails] = useState<Set<Cle>>(new Set());
 
+  // Sélection pilotée par l'écran (ex. « Effacer la sélection ») : la prop prime quand elle change
+  const selectionProp = props.selectionnees;
+  useEffect(() => {
+    if (!selectionProp) return;
+    setSelectionnees((cur) => (cur.size === selectionProp.length && selectionProp.every((k) => cur.has(k)) ? cur : new Set(selectionProp)));
+  }, [selectionProp]);
+
   const changerSelection = (s: Set<Cle>) => {
     setSelectionnees(s);
     props.surSelection?.([...s], donneesAffichees.filter((l) => s.has(cleDe(l))));

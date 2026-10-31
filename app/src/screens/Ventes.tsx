@@ -5,7 +5,9 @@ import { VENTES, COORDONNEES_SOCIETE } from '../api/queries';
 import { VentesResult, Vente, TYPES_VENTE } from '../api/types';
 import { fmtDate, isoFirstOfMonth, isoToday, fmtMoney } from '../lib/format';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
-import { ExportColumn } from '../lib/export';
+import { ExportColumn, exporterCsv } from '../lib/export';
+import { SelectionBar, SelectionStat, useSelectionLignes } from '../components/ui/SelectionBar';
+import { useToast } from '../components/ui/Toast';
 import Journal from './JournalVentes';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
@@ -20,8 +22,12 @@ import ApercuPiece from '../components/document/ApercuPiece';
 import ApercuDisposition, { BoutonApercu } from '../components/document/ApercuDisposition';
 import { useApercu } from '../components/document/useApercu';
 
+/** Clé stable d'une pièce (sélection multiple). */
+const cleVente = (v: Vente) => v.id;
+
 export default function Ventes() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [vue, setVue] = useState<'documents' | 'journal'>('documents');
   const { peut, peutDoc, restreintAuxSiennes } = useDroits();
   const peutJournal = peut('vente', D.vente.journal);
@@ -72,9 +78,13 @@ export default function Ventes() {
   async function imprimerBordereau() {
     const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 } });
     const docs: Vente[] = all?.ventes?.data ?? [];
+    bordereauDe(docs, `Bordereau des ventes — ${typeLabel}`);
+  }
+  /** Bordereau d'un ensemble de pièces (toute la période, ou la sélection). */
+  function bordereauDe(docs: Vente[], titre: string) {
     setPrintDoc(demandeBordereau(
       {
-        titre: `Bordereau des ventes — ${typeLabel}`, tiersLabel: 'Client',
+        titre, tiersLabel: 'Client',
         debut, fin,
         lignes: docs.map((v) => ({
           numero: v.numero, date: v.date, tiers: v.raison ?? v.code_cli, mode_payement: v.mode_payement,
@@ -85,6 +95,18 @@ export default function Ventes() {
     ));
   }
   const isAvoir = type === 'FAV' || type === 'BRT';
+
+  // Sélection multiple (actions groupées) — conservée d'une page à l'autre, vidée au changement de liste
+  const sel = useSelectionLignes<Vente>(cleVente, distant.cle);
+  const totSel = sel.lignes.reduce((t, v) => ({
+    net: t.net + Number(v.net_a_payer ?? v.total_ttc ?? 0), regler: t.regler + Number(v.regler ?? 0), reste: t.reste + Number(v.reste_a_payer ?? 0),
+  }), { net: 0, regler: 0, reste: 0 });
+  async function copierNumeros() {
+    try {
+      await navigator.clipboard.writeText(sel.lignes.map((v) => v.numero).join('\n'));
+      toast.success(`${sel.nombre} numéro(s) copié(s) dans le presse-papiers.`);
+    } catch { toast.error('Copie impossible : presse-papiers indisponible.'); }
+  }
 
   // Colonnes : les 8 historiques (tri / filtres / totaux côté serveur) + colonnes optionnelles masquées
   // par défaut (affichées via « Colonnes » ou une vue). Les optionnelles n'envoient aucun champ au serveur.
@@ -188,6 +210,18 @@ export default function Ventes() {
       <>
       <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
             options={typesVisibles.map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
+      <SelectionBar nombre={sel.nombre} libelle={sel.nombre > 1 ? 'pièces' : 'pièce'} feminin onClear={sel.vider}
+                    resume={(
+                      <>
+                        <SelectionStat label="Net">{fmtMoney(totSel.net)}</SelectionStat>
+                        <SelectionStat label="Réglé">{fmtMoney(totSel.regler)}</SelectionStat>
+                        <SelectionStat label="Reste"><span className="text-danger-text">{fmtMoney(totSel.reste)}</span></SelectionStat>
+                      </>
+                    )}>
+        <Button size="sm" icon="printer" onClick={() => bordereauDe(sel.lignes, `Bordereau des ventes — ${typeLabel} (sélection)`)}>Bordereau</Button>
+        <Button size="sm" icon="download" onClick={() => exporterCsv(`ventes-${type.toLowerCase()}-selection`, csvDocs, sel.lignes)}>Exporter CSV</Button>
+        <Button size="sm" icon="copy" onClick={() => void copierNumeros()}>Copier les numéros</Button>
+      </SelectionBar>
       <ApercuDisposition apercu={apercu} libelle="Aperçu de la pièce de vente"
                          panneau={(fermer) => (
                            <ApercuPiece sens="vente" id={apercu.selection?.id ?? null} onFermer={fermer}
@@ -198,7 +232,7 @@ export default function Ventes() {
         columns={columns} rowKey={(v) => v.id}
         distant={distant} cleEtat="ventes"
         actions={<BoutonApercu apercu={apercu} />}
-        {...apercu.propsGrille({ vues })}
+        {...apercu.propsGrille({ vues, selection: 'multiple', toutSelectionner: 'page', selectionnees: sel.cles, surSelection: sel.surSelection })}
         footer={(r) => ({
           _label: `${r?.total ?? 0} pièce(s)`,
           ttc: <Money value={totalDistant(r, 'net_a_payer')} />,

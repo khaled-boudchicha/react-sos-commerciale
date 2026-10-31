@@ -136,6 +136,7 @@ Règles :
 | `Dialog` (= `Modal`), `ConfirmDialog`, `FormModal`, `KeyHints` | modales | coquille unique : voile thémé, piège de focus, Échap, focus restauré ; confirmation destructive : focus sur le bouton **sûr**, « Conserver » par défaut |
 | `Skeleton`, `Loading`, `LoadingOverlay`, `EmptyState`, `StatePanel`, `Alert` | états | chargement, vide actionnable, erreur, accès refusé, page introuvable |
 | `useToast` | notifications | `success`, `info`, `warning`, `error` ; annoncées (`aria-live`) ; pause au survol ; erreurs longues |
+| `SelectionBar`, `SelectionStat`, `useSelectionLignes` | actions groupées | sélection multiple conservée d'une page à l'autre, totaux de la sélection, actions de masse (bordereau, export CSV, copie des numéros) ; Ventes et Achats |
 
 ### Gabarits d'écran
 - **Liste** : `PageHeader` (titre et **une** action primaire) → `Toolbar` (période, recherche, onglets) → `DataGrid` (états vide, chargement et erreur intégrés).

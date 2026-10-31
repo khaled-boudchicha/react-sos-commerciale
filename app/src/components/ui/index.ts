@@ -25,3 +25,4 @@ export {
 } from './ContextMenu';
 export { Tooltip, TooltipBubble, placeTooltip, type TooltipSide, type TooltipContentProps } from './Tooltip';
 export { cn } from './cn';
+export { SelectionBar, SelectionStat, useSelectionLignes } from './SelectionBar';
