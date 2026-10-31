@@ -16,6 +16,9 @@ import { Button } from '../components/ui/Button';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
 import GrouperBLModal from '../components/document/GrouperBLModal';
+import ApercuPiece from '../components/document/ApercuPiece';
+import ApercuDisposition, { BoutonApercu } from '../components/document/ApercuDisposition';
+import { useApercu } from '../components/document/useApercu';
 
 export default function Ventes() {
   const navigate = useNavigate();
@@ -57,6 +60,9 @@ export default function Ventes() {
       return data.ventes as VentesResult & { resumes?: Record<string, number | null> };
     },
   }), [client, type, debut, fin, userId]);
+
+  // Aperçu rapide (désactivé par défaut : clic = ouvrir la pièce, comme avant)
+  const apercu = useApercu<Vente>('ventes', (v) => navigate(`/ventes/${v.id}`), distant.cle);
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
@@ -182,11 +188,17 @@ export default function Ventes() {
       <>
       <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
             options={typesVisibles.map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
+      <ApercuDisposition apercu={apercu} libelle="Aperçu de la pièce de vente"
+                         panneau={(fermer) => (
+                           <ApercuPiece sens="vente" id={apercu.selection?.id ?? null} onFermer={fermer}
+                                        onOuvrir={() => apercu.selection && navigate(`/ventes/${apercu.selection.id}`)} />
+                         )}>
       <DataGrid
         exportCsv={{ nom: `ventes-${type.toLowerCase()}`, columns: csvDocs }}
         columns={columns} rowKey={(v) => v.id}
-        distant={distant} cleEtat="ventes" grille={{ vues }}
-        onRowClick={(v) => navigate(`/ventes/${v.id}`)}
+        distant={distant} cleEtat="ventes"
+        actions={<BoutonApercu apercu={apercu} />}
+        {...apercu.propsGrille({ vues })}
         footer={(r) => ({
           _label: `${r?.total ?? 0} pièce(s)`,
           ttc: <Money value={totalDistant(r, 'net_a_payer')} />,
@@ -194,6 +206,7 @@ export default function Ventes() {
           reste: <span className="money" style={{ color: 'var(--danger-text)' }}>{fmtMoney(totalDistant(r, 'reste_a_payer'))}</span>,
         })}
       />
+      </ApercuDisposition>
       </>
       )}
     </div>

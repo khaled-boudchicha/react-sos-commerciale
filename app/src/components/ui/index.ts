@@ -3,7 +3,7 @@
  * `import { Button, Card, PageHeader } from '../components/ui';`
  */
 export { Icon, IconBadge, Kbd, TONE_VARS, hasIcon, type IconName, type Tone } from './Icon';
-export { Button, IconButton, ButtonGroup, Spinner, type ButtonProps, type ButtonVariant, type ButtonSize } from './Button';
+export { Button, IconButton, ButtonGroup, Spinner, type ButtonProps, type IconButtonProps, type ButtonVariant, type ButtonSize } from './Button';
 export {
   Field, TextInput, Select, Textarea, Checkbox, Switch, SearchField, SegmentedControl, DateRangeField, CONTROL,
 } from './Field';
@@ -19,4 +19,9 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as FormModal } from './FormModal';
 export { useToast, ToastProvider } from './Toast';
 export { Menu, type MenuItem } from './Menu';
+export {
+  ContextMenu, MenuList, placeMenu, nextByLetter,
+  type ContextMenuItem, type ContextMenuAnchor, type ContextMenuProps, type MenuCloseReason,
+} from './ContextMenu';
+export { Tooltip, TooltipBubble, placeTooltip, type TooltipSide, type TooltipContentProps } from './Tooltip';
 export { cn } from './cn';

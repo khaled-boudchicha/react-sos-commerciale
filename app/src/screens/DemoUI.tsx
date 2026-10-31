@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import {
-  Alert, Badge, BarList, Button, ButtonGroup, Card, CardHeader, Checkbox, ConfirmDialog, DateRangeField, DescriptionList,
+  Alert, Badge, BarList, Button, ButtonGroup, Card, CardHeader, Checkbox, ConfirmDialog, ContextMenu, DateRangeField, DescriptionList,
   DocBadge, EmptyState, Field, Icon, IconBadge, IconButton, Kbd, KpiTile, Menu, Modal, Money, PageHeader, PayStatus,
-  SearchField, SectionTitle, SegmentedControl, Select, Skeleton, StatusDot, Switch, Tabs, TextInput, TotalsPanel, useToast,
-  type IconName, type Tone,
+  SearchField, SectionTitle, SegmentedControl, Select, Skeleton, StatusDot, Switch, Tabs, TextInput, Tooltip, TotalsPanel, useToast,
+  type ContextMenuAnchor, type ContextMenuItem, type IconName, type Tone,
 } from '../components/ui';
 import { isoFirstOfMonth, isoToday } from '../lib/format';
 
@@ -37,6 +37,26 @@ export default function DemoUI() {
   const [modale, setModale] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [actif, setActif] = useState(true);
+  const [menuCtx, setMenuCtx] = useState<{ anchor: ContextMenuAnchor; trigger?: HTMLElement } | null>(null);
+  const [colonnes, setColonnes] = useState({ ht: true, tva: true, marge: false });
+  const [densiteMenu, setDensiteMenu] = useState<'compacte' | 'confort'>('compacte');
+  const elementsCtx: ContextMenuItem[] = [
+    { heading: 'Pièce FA 2026/0042' },
+    { label: 'Ouvrir', icon: 'eye', kbd: 'Entrée', onSelect: () => toast.info('Ouvrir (démo).') },
+    { label: 'Dupliquer', icon: 'copy', kbd: 'Ctrl+D', onSelect: () => toast.success('Pièce dupliquée (démo).') },
+    { label: 'Imprimer', icon: 'printer', kbd: 'Ctrl+P', onSelect: () => undefined },
+    { label: 'Transformer en avoir', icon: 'creditNote', disabled: true, onSelect: () => undefined },
+    'separator',
+    { heading: 'Colonnes' },
+    { label: 'Total HT', checked: colonnes.ht, keepOpen: true, onSelect: () => setColonnes((c) => ({ ...c, ht: !c.ht })) },
+    { label: 'TVA', checked: colonnes.tva, keepOpen: true, onSelect: () => setColonnes((c) => ({ ...c, tva: !c.tva })) },
+    { label: 'Marge', checked: colonnes.marge, keepOpen: true, onSelect: () => setColonnes((c) => ({ ...c, marge: !c.marge })) },
+    { heading: 'Densité' },
+    { label: 'Compacte', checked: densiteMenu === 'compacte', radio: true, onSelect: () => setDensiteMenu('compacte') },
+    { label: 'Confort', checked: densiteMenu === 'confort', radio: true, onSelect: () => setDensiteMenu('confort') },
+    'separator',
+    { label: 'Supprimer', icon: 'trash', tone: 'danger', kbd: 'Suppr', onSelect: () => setConfirm(true) },
+  ];
 
   return (
     <div className="flex flex-col gap-5">
@@ -145,6 +165,37 @@ export default function DemoUI() {
           </div>
         </Bloc>
 
+        <Bloc titre="Menu contextuel et info-bulles"
+              description="Clic droit (ou Maj+F10) sur la zone, ou bouton : ↑ ↓ Début Fin, une lettre pour sauter, Échap. Info-bulles au survol (450 ms) et au focus clavier.">
+          <div className="flex flex-col gap-3">
+            <div tabIndex={0} role="button" aria-haspopup="menu" aria-label="Zone de démonstration du menu contextuel"
+                 onContextMenu={(e) => {
+                   e.preventDefault();
+                   setMenuCtx({ anchor: e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : e.currentTarget.getBoundingClientRect() });
+                 }}
+                 className="h-20 rounded-md border border-dashed border-line-strong bg-sunken flex items-center justify-center gap-2 text-sm text-ink-muted">
+              <Icon name="more" size={16} /> Clic droit ici
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button icon="columns" iconRight="chevronDown" aria-haspopup="menu" aria-expanded={!!menuCtx?.trigger}
+                      onClick={(e) => {
+                        const b = e.currentTarget;
+                        setMenuCtx((m) => (m?.trigger === b ? null : { anchor: b.getBoundingClientRect(), trigger: b }));
+                      }}>
+                Affichage
+              </Button>
+              <Tooltip content="Enregistrer la pièce" kbd="Ctrl+S"><Button variant="primary" icon="save">Enregistrer</Button></Tooltip>
+              <Tooltip content="Encaisser" kbd="F10" side="bottom"
+                       description="Enregistre le règlement du client et imprime le ticket si l’option est cochée.">
+                <Button variant="success" icon="cash">Encaisser</Button>
+              </Tooltip>
+              <IconButton icon="printer" label="Imprimer" tooltip kbd="Ctrl+P" />
+              <IconButton icon="refresh" label="Actualiser" tooltip tooltipSide="bottom" />
+              <IconButton icon="trash" label="Supprimer" tone="danger" tooltip />
+            </div>
+          </div>
+        </Bloc>
+
         <Bloc titre="États et retours" description="Dire ce qui se passe : alertes, notifications, squelettes, vides.">
           <div className="flex flex-col gap-2.5">
             <Alert tone="success" compact>Pièce FA 2026/0042 enregistrée.</Alert>
@@ -208,6 +259,10 @@ export default function DemoUI() {
         </div>
       </Card>
 
+      {menuCtx && (
+        <ContextMenu label="Actions de la pièce" anchor={menuCtx.anchor} trigger={menuCtx.trigger} items={elementsCtx}
+                     width={menuCtx.trigger ? 240 : 270} onClose={() => setMenuCtx(null)} />
+      )}
       {modale && (
         <Modal title="Nouveau règlement" subtitle="Client C0042 — Pharmacie El Amel" icon="cash" iconTone="success"
                onClose={() => setModale(false)} closeOnOverlay={false}

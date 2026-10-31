@@ -1,6 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon, Kbd, type IconName } from './Icon';
+import { Tooltip, type TooltipSide } from './Tooltip';
 import { cn } from './cn';
 
 /**
@@ -98,10 +99,19 @@ export type IconButtonProps = Omit<ButtonProps, 'icon' | 'iconRight' | 'children
   label: string;
   /** Teinte de l'icône au repos (ex. danger pour une corbeille). */
   tone?: 'default' | 'danger' | 'brand';
+  /**
+   * Info-bulle de la charte (`Tooltip`) au lieu de l'attribut `title` natif : `true` reprend le libellé,
+   * un contenu la remplace. Absent : comportement historique (`title`).
+   */
+  tooltip?: boolean | ReactNode;
+  /** Raccourci affiché dans l'info-bulle (avec `tooltip`) et annoncé (`aria-keyshortcuts`). */
+  kbd?: string;
+  /** Côté préféré de l'info-bulle (retournée automatiquement si la place manque). */
+  tooltipSide?: TooltipSide;
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { icon, label, variant = 'ghost', size = 'md', tone = 'default', className, loading, pressed, disabled, to, type, ...rest },
+  { icon, label, variant = 'ghost', size = 'md', tone = 'default', className, loading, pressed, disabled, to, type, tooltip, kbd, tooltipSide, ...rest },
   ref,
 ) {
   const s = SIZES[size];
@@ -111,14 +121,24 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     BASE, ICON_ONLY[size], VARIANTS[variant], '!px-0', toneCls,
     pressed && '!bg-brand-soft !text-brand-text !border-brand-line', className,
   );
-  if (to && !disabled) {
-    return <Link to={to} className={classes} title={label} aria-label={label}><Icon name={icon} size={s.icon} /></Link>;
-  }
+  const bulle = tooltip != null && tooltip !== false;
+  const title = bulle ? undefined : label;
+  const raccourci = kbd ? kbd.replace(/\bCtrl\b/g, 'Control') : undefined;
+  const bouton = to && !disabled
+    ? <Link to={to} className={classes} title={title} aria-label={label} aria-keyshortcuts={raccourci}><Icon name={icon} size={s.icon} /></Link>
+    : (
+      <button ref={ref} type={type ?? 'button'} className={classes} title={title} aria-label={label} aria-keyshortcuts={raccourci}
+              disabled={disabled || loading} aria-pressed={pressed} {...rest}>
+        {loading ? <Spinner size={s.icon} /> : <Icon name={icon} size={s.icon} />}
+      </button>
+    );
+  if (!bulle) return bouton;
+  // Un texte répète le nom accessible (aria-label) : il n'est pas relié en plus par aria-describedby.
   return (
-    <button ref={ref} type={type ?? 'button'} className={classes} title={label} aria-label={label}
-            disabled={disabled || loading} aria-pressed={pressed} {...rest}>
-      {loading ? <Spinner size={s.icon} /> : <Icon name={icon} size={s.icon} />}
-    </button>
+    <Tooltip content={tooltip === true ? label : tooltip} kbd={kbd} side={tooltipSide}
+             describe={typeof tooltip !== 'boolean' && typeof tooltip !== 'string'}>
+      {bouton}
+    </Tooltip>
   );
 });
 

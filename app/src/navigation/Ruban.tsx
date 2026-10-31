@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, ty
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDroits } from '../lib/droits';
 import { Icon, Kbd, TONE_VARS } from '../components/ui/Icon';
+import { TooltipBubble } from '../components/ui/Tooltip';
 import { StatusDot } from '../components/ui/atoms';
 import { cn } from '../components/ui/cn';
 import {
@@ -55,7 +56,7 @@ export default function Ruban({ session, executer }: { session: InfosSession; ex
   const [deplieTemporaire, setDeplieTemporaire] = useState(false);
   const [backstage, setBackstage] = useState(false);
   const [touches, setTouches] = useState<Touches>(null);
-  const [bulle, setBulle] = useState<{ cmd: Commande; x: number; y: number } | null>(null);
+  const [bulle, setBulle] = useState<{ cmd: Commande; rect: DOMRect } | null>(null);
   const [menu, setMenu] = useState<MenuOuvert | null>(null);
   const [groupeOuvert, setGroupeOuvert] = useState<GroupeOuvert | null>(null);
   const minuterie = useRef<number>();
@@ -218,7 +219,7 @@ export default function Ruban({ session, executer }: { session: InfosSession; ex
     if (menu) return;
     const r = e.currentTarget.getBoundingClientRect();
     window.clearTimeout(minuterie.current);
-    minuterie.current = window.setTimeout(() => setBulle({ cmd, x: Math.min(r.left, window.innerWidth - 300), y: r.bottom + 6 }), 550);
+    minuterie.current = window.setTimeout(() => setBulle({ cmd, rect: r }), 550);
   };
   const quitter = () => { window.clearTimeout(minuterie.current); setBulle(null); };
   useEffect(() => () => window.clearTimeout(minuterie.current), []);
@@ -578,23 +579,15 @@ function ToucheAcces({ lettre, petit }: { lettre: string; petit?: boolean }) {
   );
 }
 
-function InfoBulle({ cmd, x, y }: { cmd: Commande; x: number; y: number }) {
+/** Info-bulle détaillée d'une commande (rendu de la bibliothèque, apparition pilotée par le ruban). */
+function InfoBulle({ cmd, rect }: { cmd: Commande; rect: DOMRect }) {
   const t = teinte(cmd);
   return (
-    <div role="tooltip" className="fixed z-tooltip w-[280px] rounded-md bg-raised border border-line-soft shadow-lifted p-3 pointer-events-none animate-fade-in"
-         style={{ left: Math.max(8, x), top: y }}>
-      <div className="flex items-center gap-2">
-        <span className="w-6 h-6 rounded-xs inline-flex items-center justify-center flex-none" style={{ color: t.text, background: t.soft }}>
-          <Icon name={cmd.icone} size={14} />
-        </span>
-        <span className="text-sm font-bold text-ink truncate">{cmd.libelle}</span>
-        {cmd.raccourci && (
-          <span className="ml-auto flex items-center gap-0.5 flex-none">
-            {cmd.raccourci.split('+').map((k) => <Kbd key={k}>{k}</Kbd>)}
-          </span>
-        )}
-      </div>
-      {cmd.aide && <p className="mt-1.5 text-xs text-ink-label">{cmd.aide}</p>}
-    </div>
+    <TooltipBubble anchor={rect} side="bottom" align="start" width={280} content={cmd.libelle} kbd={cmd.raccourci} description={cmd.aide}
+                   leading={(
+                     <span className="w-6 h-6 rounded-xs inline-flex items-center justify-center flex-none" style={{ color: t.text, background: t.soft }}>
+                       <Icon name={cmd.icone} size={14} />
+                     </span>
+                   )} />
   );
 }
