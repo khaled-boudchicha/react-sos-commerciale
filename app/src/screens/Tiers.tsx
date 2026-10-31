@@ -230,7 +230,8 @@ function FournisseursGrid({ search, slotAction }: { search: string; slotAction: 
                       <ExportBtn onClick={() => void exporter()} loading={exporting} />
                     </>
                   )}
-                  {...apercu.propsGrille()}
+                  // Un seul « Exporter » (celui de l'écran, comme pour les clients) : menu d'export de la grille masqué
+                  {...apercu.propsGrille({ export: undefined })}
                   footer={(r) => ({ _label: `${r?.total ?? 0} fournisseur(s)` })} />
       </ApercuDisposition>
     </>

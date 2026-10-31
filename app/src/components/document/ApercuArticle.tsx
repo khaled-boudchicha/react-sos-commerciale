@@ -145,26 +145,26 @@ function LotsArticle({ articleId, onOuvrir }: { articleId: number; onOuvrir: () 
         <div className="text-sm text-ink-muted">Aucun lot en stock.</div>
       ) : (
         <>
-        <ul className="flex flex-col">
-          {premiers.map((l) => {
-            const jours = l.date_peremption ? joursAvant(l.date_peremption) : null;
-            return (
-              <li key={l.id} className="flex items-center gap-2 py-1.5 border-b border-line-soft text-sm last:border-b-0">
-                <span className="flex-1 min-w-0 truncate money font-semibold text-ink" title={l.n_lot}>{l.n_lot}</span>
-                <span className="money text-ink-label flex-none">{l.date_peremption ? fmtDate(l.date_peremption) : '—'}</span>
-                {jours !== null && (
-                  <StatusPill tone={jours < 0 ? 'bad' : jours <= 60 ? 'warn' : 'ok'}>{jours < 0 ? 'Périmé' : `J-${jours}`}</StatusPill>
-                )}
-                <span className="money font-semibold text-ink w-14 text-right flex-none">{fmtQte(l.qte)}</span>
-              </li>
-            );
-          })}
-        </ul>
-        {enStock.length > LOTS_MAX && (
-          <Button variant="link" size="sm" className="mt-1.5" onClick={onOuvrir}>
-            + {enStock.length - LOTS_MAX} autre{enStock.length - LOTS_MAX > 1 ? 's' : ''} lot{enStock.length - LOTS_MAX > 1 ? 's' : ''}
-          </Button>
-        )}
+          <ul className="flex flex-col">
+            {premiers.map((l) => {
+              const jours = l.date_peremption ? joursAvant(l.date_peremption) : null;
+              return (
+                <li key={l.id} className="flex items-center gap-2 py-1.5 border-b border-line-soft text-sm last:border-b-0">
+                  <span className="flex-1 min-w-0 truncate money font-semibold text-ink" title={l.n_lot}>{l.n_lot}</span>
+                  <span className="money text-ink-label flex-none">{l.date_peremption ? fmtDate(l.date_peremption) : '—'}</span>
+                  {jours !== null && (
+                    <StatusPill tone={jours < 0 ? 'bad' : jours <= 60 ? 'warn' : 'ok'}>{jours < 0 ? 'Périmé' : `J-${jours}`}</StatusPill>
+                  )}
+                  <span className="money font-semibold text-ink w-14 text-right flex-none">{fmtQte(l.qte)}</span>
+                </li>
+              );
+            })}
+          </ul>
+          {enStock.length > LOTS_MAX && (
+            <Button variant="link" size="sm" className="mt-1.5" onClick={onOuvrir}>
+              + {enStock.length - LOTS_MAX} autre{enStock.length - LOTS_MAX > 1 ? 's' : ''} lot{enStock.length - LOTS_MAX > 1 ? 's' : ''}
+            </Button>
+          )}
         </>
       )}
     </section>

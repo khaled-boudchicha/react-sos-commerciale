@@ -53,18 +53,18 @@ export default function ApercuTiers({ sens, tiers, onOuvrir, onFermer }: {
     : String(tiers.nom ?? '');
 
   return enveloppe(
-    <div className="flex items-center gap-3 min-w-0">
-      <span className="w-9 h-9 flex-none rounded-md bg-brand-soft text-brand-text font-extrabold text-sm flex items-center justify-center" aria-hidden="true">
-        {(nom || tiers.code).slice(0, 2).toUpperCase()}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="font-bold text-md text-ink truncate" title={nom}>{nom || '—'}</div>
-        <div className="text-xs text-ink-muted money truncate">{tiers.code}</div>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="w-7 h-7 flex-none rounded-sm bg-brand-soft text-brand-text font-extrabold text-xs flex items-center justify-center" aria-hidden="true">
+          {(nom || tiers.code).slice(0, 2).toUpperCase()}
+        </span>
+        <span className="money text-sm font-semibold text-ink-label truncate" title={tiers.code}>{tiers.code}</span>
+        <span className="ml-auto flex items-center gap-1 flex-none">
+          <Button size="sm" icon="externalLink" onClick={onOuvrir} title="Ouvrir la fiche (double-clic ou Entrée dans la liste)">Ouvrir la fiche</Button>
+          <BoutonFermerApercu onFermer={onFermer} />
+        </span>
       </div>
-      <span className="flex items-center gap-1 flex-none">
-        <Button size="sm" icon="externalLink" onClick={onOuvrir} title="Ouvrir la fiche (double-clic ou Entrée dans la liste)">Ouvrir la fiche</Button>
-        <BoutonFermerApercu onFermer={onFermer} />
-      </span>
+      <div className="font-bold text-md text-ink line-clamp-2" title={nom}>{nom || '—'}</div>
     </div>,
     sens === 'client'
       ? <ContenuClient client={tiers as Client} onOuvrir={onOuvrir} />
@@ -118,7 +118,7 @@ function ContenuClient({ client, onOuvrir }: { client: Client; onOuvrir: () => v
                 <span>Plafond de crédit</span>
                 <Money value={plafond} className="font-semibold" />
               </div>
-              <div className="h-1.5 rounded-full bg-line-soft overflow-hidden" role="meter" aria-label="Utilisation du plafond"
+              <div className="h-1.5 rounded-full bg-line overflow-hidden" role="meter" aria-label="Utilisation du plafond"
                    aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part)}>
                 <div className={depasse ? 'h-full bg-danger-solid' : part >= 80 ? 'h-full bg-warning-solid' : 'h-full bg-success-solid'}
                      style={{ width: `${part}%` }} />
