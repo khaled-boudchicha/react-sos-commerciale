@@ -41,7 +41,7 @@ export default function TuilesArticles({ niveau, onArticle, onMasquer }: {
             );
           })}
         </div>
-        <button type="button" onClick={onMasquer} className="ml-auto h-[34px] px-3 text-sm leading-[1.45] font-bold text-brand-900 whitespace-nowrap">
+        <button type="button" onClick={onMasquer} className="ml-auto h-[34px] px-3 text-sm leading-[1.45] font-bold text-brand-text whitespace-nowrap">
           Masquer les tuiles
         </button>
       </div>
@@ -55,7 +55,7 @@ export default function TuilesArticles({ niveau, onArticle, onMasquer }: {
                     className="h-16 rounded-md border border-line bg-surface px-2.5 py-2 flex flex-col justify-between items-start text-left hover:border-brand-500 hover:bg-brand-50 active:translate-y-px">
               <span className="text-sm font-bold leading-[1.2] text-ink line-clamp-2">{a.designation}</span>
               <span className="flex w-full justify-between items-baseline">
-                <span className="money text-base leading-[1.45] font-extrabold text-brand-900">{fmtMoney(prixTtcUnitaire(ligneComptoir(a, niveau)))}</span>
+                <span className="money text-base leading-[1.45] font-extrabold text-brand-text">{fmtMoney(prixTtcUnitaire(ligneComptoir(a, niveau)))}</span>
                 {epuise && <span className="text-2xs leading-[1.45] font-bold" style={{ color: 'var(--pos-alert)' }}>épuisé</span>}
               </span>
             </button>

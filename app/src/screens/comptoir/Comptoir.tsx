@@ -305,7 +305,7 @@ export default function Comptoir() {
                 {t.retour && <Icon name="retour" size={14} strokeWidth={2.2} />}
                 Ticket {i + 1}
                 {n > 0 && (
-                  <span className={`money text-xs leading-[1.45] px-1.5 py-px rounded-md ${sel ? 'bg-white/[.22]' : 'bg-brand-50 text-brand-900'}`}>{n}</span>
+                  <span className={`money text-xs leading-[1.45] px-1.5 py-px rounded-md ${sel ? 'bg-white/[.22]' : 'bg-brand-50 text-brand-text'}`}>{n}</span>
                 )}
               </button>
             );
@@ -327,7 +327,7 @@ export default function Comptoir() {
             <Icon name="utilisateur" size={16} />Caissier : <b className="text-ink">{caissier}</b>
           </span>
           <span className="money text-md leading-[1.45] font-bold text-ink">{heure}</span>
-          <Link to="/ventes" className="h-9 px-3.5 rounded-md border border-line text-brand-900 font-bold flex items-center hover:border-brand-300">
+          <Link to="/ventes" className="h-9 px-3.5 rounded-md border border-line text-brand-text font-bold flex items-center hover:border-brand-300">
             Quitter la caisse
           </Link>
         </div>
@@ -387,7 +387,7 @@ export default function Comptoir() {
 
           <div data-comptoir-client className="flex-none rounded-xl bg-surface border border-line-soft px-3.5 py-3 flex flex-col gap-2.5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-brand-50 text-brand-900 flex items-center justify-center flex-none">
+              <div className="w-10 h-10 rounded-md bg-brand-50 text-brand-text flex items-center justify-center flex-none">
                 <Icon name="utilisateur" size={20} />
               </div>
               <div className="flex flex-col flex-1 min-w-0">
@@ -407,7 +407,7 @@ export default function Comptoir() {
                 </>
               ) : (
                 <button type="button" onClick={focusClient}
-                        className="h-[38px] px-3 rounded-[9px] border border-line bg-surface text-brand-900 font-bold text-[12.5px] flex items-center gap-2 hover:border-brand-300">
+                        className="h-[38px] px-3 rounded-[9px] border border-line bg-surface text-brand-text font-bold text-[12.5px] flex items-center gap-2 hover:border-brand-300">
                   Choisir <Kbd>F8</Kbd>
                 </button>
               )}
@@ -429,7 +429,7 @@ export default function Comptoir() {
           {!retour && (
             <div className="flex-none grid gap-2" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
               <button type="button" onClick={() => demanderValidation('avecTicket')} disabled={vide || creation || !peutImprimer}
-                      className="h-[52px] rounded-[11px] border border-brand-700 bg-brand-50 text-brand-900 font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
+                      className="h-[52px] rounded-[11px] border border-brand-700 bg-brand-50 text-brand-text font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
                 Encaisser + ticket <Kbd tone="brand">F12</Kbd>
               </button>
               <button type="button" onClick={() => demanderValidation('sansTicket')} disabled={vide || creation}

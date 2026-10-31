@@ -6,6 +6,9 @@
 
 export type PaletteId = 'classique' | 'ivoire' | 'ardoise' | 'sauge' | 'graphite' | 'bordeaux';
 
+/** Palette par défaut (validée le 31/10/2026) ; posée aussi dans index.html pour éviter un flash au démarrage. */
+export const PALETTE_DEFAUT: PaletteId = 'sauge';
+
 export type Palette = {
   id: PaletteId;
   libelle: string;
@@ -22,7 +25,7 @@ export const PALETTES: Palette[] = [
     apercu: { fond: 'rgb(243 239 230)', surface: 'rgb(250 247 240)', marque: 'rgb(36 80 224)', accent: 'rgb(246 185 59)' } },
   { id: 'ardoise', libelle: 'Ardoise', description: 'Gris bleuté doux et bleu profond, esprit SAP Fiori.',
     apercu: { fond: 'rgb(230 234 240)', surface: 'rgb(241 244 248)', marque: 'rgb(29 78 216)', accent: 'rgb(246 185 59)' } },
-  { id: 'sauge', libelle: 'Sauge', description: 'Vert pharmacie apaisant et émeraude, pour l’officine.',
+  { id: 'sauge', libelle: 'Sauge', description: 'Vert pharmacie apaisant et émeraude (palette par défaut).',
     apercu: { fond: 'rgb(233 239 234)', surface: 'rgb(245 248 244)', marque: 'rgb(11 114 84)', accent: 'rgb(246 185 59)' } },
   { id: 'graphite', libelle: 'Graphite', description: 'Gris neutre et indigo, esprit Windows 11.',
     apercu: { fond: 'rgb(231 231 234)', surface: 'rgb(243 243 245)', marque: 'rgb(67 56 202)', accent: 'rgb(246 185 59)' } },
@@ -53,7 +56,8 @@ export async function loadPalette(): Promise<PaletteId> {
   let v: unknown;
   try { v = await window.gc?.store.get(CLE); } catch { /* ignoré */ }
   if (!estPalette(v)) { try { v = localStorage.getItem(`gc.${CLE}`); } catch { /* ignoré */ } }
-  const id = estPalette(v) ? v : 'classique';
-  if (id !== 'classique') document.documentElement.dataset.palette = id;
+  const id = estPalette(v) ? v : PALETTE_DEFAUT;
+  if (id === 'classique') delete document.documentElement.dataset.palette;
+  else document.documentElement.dataset.palette = id;
   return id;
 }

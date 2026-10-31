@@ -74,6 +74,21 @@ Une seule source : `DOC_TONE` dans `components/ui/atoms.tsx`, utilisée par `Doc
 - `--focus-ring` : `0 0 0 2px surface, 0 0 0 4px brand-500` (sombre : `brand-300`).
 - Comptoir : `--pos-*` sont des alias des sémantiques v2 ; seul le mode retour garde sa gamme (`--pos-return*`).
 
+### 2.6 Palettes de couleurs (bascule)
+Six palettes au choix (Paramètres › Apparence, menu Compte, palette Ctrl+K), chacune **en clair et en sombre**, appliquées par
+l'attribut `data-palette` de `<html>` (`lib/apparence.ts`) et définies en fin de `styles/tokens.css`. Elles redéfinissent fonds,
+surfaces, bordures, textes, couleur de marque et dégradé ; les couleurs sémantiques (succès, alerte, danger…) sont communes.
+Contrastes AA vérifiés pour chaque palette et chaque mode.
+
+| Palette | Clair (fond · surface · marque) | Sombre (fond · surface · texte de marque) | Esprit |
+|---|---|---|---|
+| **Sauge** — *par défaut* | `#E9EFEA` · `#F5F8F4` · `#0B7254` | `#0C1410` · `#141F19` · `#5FD3A7` | vert pharmacie, émeraude |
+| Ivoire | `#F3EFE6` · `#FAF7F0` · `#2450E0` | `#14120E` · `#1D1A15` · `#8FA9F5` | papier chaud, bleu roi et or |
+| Ardoise | `#E6EAF0` · `#F1F4F8` · `#1D4ED8` | `#0D121A` · `#161D28` · `#8AB0FF` | gris bleuté, SAP Fiori |
+| Graphite | `#E7E7EA` · `#F3F3F5` · `#4338CA` | `#101012` · `#19191C` · `#A5A1F7` | gris neutre, indigo, Windows 11 |
+| Bordeaux | `#F2ECE6` · `#FAF6F2` · `#8E1F3F` | `#151011` · `#1F1719` · `#F08DA8` | crème, bordeaux et or |
+| Classique | `#F6F8FC` · `#FFFFFF` · `#2450E0` | `#0B1220` · `#111A2E` · `#7C9BF2` | charte v2 d'origine (blanc) |
+
 ## 3. Typographie
 
 Polices : **Plus Jakarta Sans** pour l'interface, **JetBrains Mono** (chiffres tabulaires, classe `.money`) pour les montants, codes et quantités.

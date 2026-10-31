@@ -100,7 +100,7 @@ export default function LignesComptoir({
         <span><b className="money text-ink">{lignes.length}</b> ligne{lignes.length > 1 ? 's' : ''} · <b className="money text-ink">{fmtQte(articles)}</b> article{articles > 1 ? 's' : ''}</span>
         <span>Remises lignes <b className="money text-ink">{fmtMoney(remisesTtc)}</b></span>
         {tuilesMasquees && (
-          <button type="button" onClick={onAfficherTuiles} className="font-bold text-brand-900">Afficher les tuiles</button>
+          <button type="button" onClick={onAfficherTuiles} className="font-bold text-brand-text">Afficher les tuiles</button>
         )}
         <span className="ml-auto flex gap-3.5 text-ink-muted">
           <span className="flex items-center gap-1.5"><Kbd>↑ ↓</Kbd> ligne</span>
