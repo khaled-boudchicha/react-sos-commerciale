@@ -3,7 +3,9 @@ import { useMutation, useQuery } from '@apollo/client';
 import { ECHEANCES, MARQUER_ECHEANCE_PAYEE } from '../api/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
-import { Bucket, PageHeader, SearchInput, Tabs } from '../components/ui/atoms';
+import { PageHeader, SearchInput, Tabs, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { KpiTile } from '../components/ui/Kpi';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import { useSession } from '../store/session';
@@ -64,35 +66,38 @@ export default function Echeances() {
     { key: 'echeance', header: 'Échéance', width: '110px', render: (e) => <span className="money">{fmtDate(e.date_echeance)}</span> },
     { key: 'retard', header: 'Retard', align: 'right', width: '90px', render: (e) => {
       const j = Number(e.jours_retard ?? 0);
-      return <span className="money" style={{ color: j > 60 ? 'var(--danger)' : j > 0 ? 'var(--warning)' : undefined }}>{j > 0 ? `${j} j` : 'à échoir'}</span>;
+      return <span className="money" style={{ color: j > 60 ? 'var(--danger-text)' : j > 0 ? 'var(--warning-text)' : undefined }}>{j > 0 ? `${j} j` : 'à échoir'}</span>;
     } },
     { key: 'numero', header: 'Pièce', width: '130px', render: (e) => <span className="money">{e.type_doc} {e.numero}</span> },
-    { key: 'client', header: 'Client', render: (e) => <><b>{e.raison}</b> <span className="text-ink-muted text-[11px]">{e.code_cli}</span></> },
+    { key: 'client', header: 'Client', render: (e) => <><b>{e.raison}</b> <span className="text-ink-muted text-xs">{e.code_cli}</span></> },
     { key: 'net', header: 'Montant', align: 'right', width: '120px', render: (e) => <span className="money">{fmtMoney(e.net_a_payer)}</span> },
-    { key: 'reste', header: 'Reste', align: 'right', width: '120px', render: (e) => <span className="money font-semibold" style={{ color: 'var(--danger)' }}>{fmtMoney(e.reste)}</span> },
+    { key: 'reste', header: 'Reste', align: 'right', width: '120px', render: (e) => <span className="money font-semibold" style={{ color: 'var(--danger-text)' }}>{fmtMoney(e.reste)}</span> },
     { key: 'action', header: '', width: '120px', render: (e) => (
-      <button onClick={() => setAPayer(e)}
-              className="rounded-md px-2.5 py-1 font-bold text-[11px] border border-line text-ink-label">
+      <Button size="xs" icon="check" onClick={() => setAPayer(e)}>
         Marquer payé
-      </button>
+      </Button>
     ) },
   ];
 
   return (
     <div className="flex flex-col gap-4 p-5">
-      <PageHeader title="Échéances clients">
-        <SearchInput value={search} onChange={setSearch} placeholder="Client, code…" />
-      </PageHeader>
+      <PageHeader title="Échéances clients" icon="dueDates"
+                  description="Pièces clients avec un reste à payer, échues ou à échoir." />
 
       {res && (
         <div className="grid grid-cols-3 gap-3">
-          <Bucket label="Total à régler" value={res.totaux.total_reste} tone="var(--text)" sub={`${res.total} pièce(s)`} />
-          <Bucket label="Échues" value={res.totaux.total_echu} tone="var(--danger)" />
-          <Bucket label="À échoir" value={res.totaux.total_a_echoir} tone="var(--warning)" />
+          <KpiTile label="Total à régler" value={fmtMoney(res.totaux.total_reste)} sub={`${res.total} pièce(s)`} icon="wallet" tone="brand" />
+          <KpiTile label="Échues" value={fmtMoney(res.totaux.total_echu)} icon="alert" tone="danger" valueTone="danger" />
+          <KpiTile label="À échoir" value={fmtMoney(res.totaux.total_a_echoir)} icon="clock" tone="warning" valueTone="warning" />
         </div>
       )}
 
-      <Tabs value={statut} onChange={setStatut} options={VUES} />
+      <Toolbar>
+        <Tabs value={statut} onChange={setStatut} options={VUES} label="Statut des échéances" />
+        <div className="ml-auto">
+          <SearchInput value={search} onChange={setSearch} placeholder="Client, code…" />
+        </div>
+      </Toolbar>
 
       <DataGrid titre="Pièces à régler" columns={columns} rows={lignes} rowKey={(e) => String(e.id)}
                 loading={loading} error={error?.message} />

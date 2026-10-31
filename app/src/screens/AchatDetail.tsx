@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { ACHAT, DELETE_ACHAT, COORDONNEES_SOCIETE } from '../api/queries';
 import { Achat, ACHAT_TYPE_CODE, LigneAchat } from '../api/types';
@@ -7,6 +7,10 @@ import { useDroits } from '../lib/droits';
 import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { DocBadge, PayStatus, Money, PageHeader } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList, TotalsPanel } from '../components/ui/Card';
+import { Alert, Skeleton } from '../components/ui/States';
+import { Menu, type MenuItem } from '../components/ui/Menu';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
 import TransformerMenu from '../components/document/TransformerMenu';
@@ -18,8 +22,6 @@ import type { DemandeImpression } from '../impression/demandes';
 import { demandeAchat } from '../impression/demandes';
 import RequireDroit from '../components/RequireDroit';
 import { useSession } from '../store/session';
-
-const btn = 'rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label';
 
 /** Champs de liaison éventuellement renvoyés par l'agent (mêmes formes qu'en vente). */
 type AchatDetailData = Achat & {
@@ -64,7 +66,7 @@ export default function AchatDetail() {
 
   const columns: Column<LigneAchat>[] = [
     { key: 'code', header: 'Code', width: '100px', sortAccessor: (l) => String(l.code_article ?? ''), render: (l) => <span className="money">{String(l.code_article ?? '')}</span> },
-    { key: 'designation', header: 'Désignation', render: (l) => <span><b>{String(l.designation ?? '')}</b>{l.n_lot ? <span className="text-ink-muted money text-[10.5px]"> · lot {String(l.n_lot)}</span> : null}</span> },
+    { key: 'designation', header: 'Désignation', render: (l) => <span><b>{String(l.designation ?? '')}</b>{l.n_lot ? <span className="text-ink-muted money text-xs"> · lot {String(l.n_lot)}</span> : null}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
     { key: 'pu', header: 'P.U. HT', align: 'right', width: '95px', sortAccessor: (l) => Number(l.prix_ht ?? 0), render: (l) => <Money value={l.prix_ht} /> },
     { key: 'remise', header: 'Rem. %', align: 'right', width: '70px', render: (l) => <span className="money">{fmtMoney(l.remise ?? 0, 1)}</span> },
@@ -78,45 +80,53 @@ export default function AchatDetail() {
     return <RequireDroit si={false}>{null}</RequireDroit>;
   }
 
+  const fournisseur = a ? (a.fournisseur ?? a.raison ?? a.code_four ?? a.code_cli ?? '—') : '';
+  const titre = a ? `${a.type_doc} ${a.numero}` : "Pièce d'achat";
+  const autres: MenuItem[] = [];
+  if (a && peutRetour) {
+    autres.push({ label: code === 'FA' ? 'Avoir' : 'Bon de retour', icon: 'return', hint: 'fournisseur', onSelect: () => setRetour(true) });
+  }
+  if (a && peutDoc('achat', code, 'creer')) {
+    autres.push({ label: 'Dupliquer', icon: 'copy', hint: 'mêmes lignes', onSelect: () => navigate(`/achats/nouvelle?type=${code}&from=${a.id}`) });
+  }
+
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={a ? `${a.type_doc} ${a.numero}` : "Pièce d'achat"}>
-        <Link to="/achats" className="text-[12px] font-bold text-brand-700">← Retour à la liste</Link>
-        {a && a.modifiable !== false && peutDoc('achat', code, 'modifier') && (
-          <button onClick={() => navigate(`/achats/nouvelle?edit=${a.id}`)} className={btn}>Modifier</button>
-        )}
+      <PageHeader title={titre} backTo="/achats" backLabel="Retour à la liste"
+                  breadcrumb={[{ label: 'Achats', to: '/achats' }, { label: titre }]}
+                  meta={a && (
+                    <>
+                      <DocBadge code={code} />
+                      {TYPES_AVEC_REGLEMENT.includes(code) && <PayStatus regler={Number(a.regler)} reste={Number(a.reste_a_payer)} />}
+                    </>
+                  )}>
         {a && (
           <TransformerMenu sens="achat" id={a.id} cibles={a.transformations_possibles ?? []} onDone={recharger} />
         )}
-        {a && peutRetour && (
-          <button onClick={() => setRetour(true)} className={btn}
-                  title="Créer un avoir ou un bon de retour fournisseur">
-            {code === 'FA' ? 'Avoir' : 'Bon de retour'}
-          </button>
-        )}
         {a && (
-          <button onClick={() => setPrintDoc(demandeAchat(a, societe))} className={btn}>Imprimer</button>
+          <Button icon="printer" onClick={() => setPrintDoc(demandeAchat(a, societe))}>Imprimer</Button>
         )}
-        {a && peutDoc('achat', code, 'creer') && (
-          <button onClick={() => navigate(`/achats/nouvelle?type=${code}&from=${a.id}`)}
-                  title="Créer une nouvelle pièce reprenant ces lignes" className={btn}>
-            Dupliquer
-          </button>
+        {autres.length > 0 && <Menu label="Plus" items={autres} />}
+        {a && a.modifiable !== false && peutDoc('achat', code, 'modifier') && (
+          <Button variant="primary" icon="edit" onClick={() => navigate(`/achats/nouvelle?edit=${a.id}`)}>Modifier</Button>
         )}
         {a && peutDoc('achat', code, 'supprimer') && (
-          <button onClick={() => setConfirm(true)}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px]"
-                  style={{ background: 'color-mix(in srgb, var(--danger) 12%, transparent)', color: 'var(--danger)' }}>
-            Supprimer
-          </button>
+          <>
+            <span className="h-6 w-px bg-line-soft" aria-hidden="true" />
+            <Button variant="danger" icon="trash" onClick={() => setConfirm(true)}>Supprimer</Button>
+          </>
         )}
       </PageHeader>
       {retour && a && (
         <RetourModal sens="achat" onClose={() => setRetour(false)}
                      source={{ id: a.id, numero: a.numero, type_doc: a.type_doc, code, lignes }} />
       )}
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error.message}</div>}
-      {delError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{delError}</div>}
+      {error && (
+        <Alert tone="danger" action={<Button size="sm" icon="refresh" onClick={() => refetch()}>Réessayer</Button>}>
+          {error.message}
+        </Alert>
+      )}
+      {delError && <Alert tone="danger">{delError}</Alert>}
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       {confirm && a && (
         <ConfirmDialog
@@ -126,20 +136,22 @@ export default function AchatDetail() {
           onConfirm={handleDelete} onCancel={() => setConfirm(false)}
         />
       )}
-      {loading && !a && <div className="text-[12px] text-ink-muted">Chargement…</div>}
-
-      {a && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3 flex items-center gap-5 flex-wrap text-[12px]">
-          <DocBadge code={code} />
-          <Field label="Fournisseur"><b>{a.fournisseur ?? a.raison ?? a.code_four ?? a.code_cli ?? '—'}</b></Field>
-          <Field label="Date">{fmtDate(a.date)}</Field>
-          <Field label="Mode">{a.mode_payement ?? '—'}</Field>
-          {a.user_name && <Field label="Par">{a.user_name}</Field>}
-          <span className="ml-auto">{TYPES_AVEC_REGLEMENT.includes(code) && <PayStatus regler={Number(a.regler)} reste={Number(a.reste_a_payer)} />}</span>
-        </div>
+      {loading && !a && (
+        <Card><Skeleton lines={2} height={14} /></Card>
       )}
 
-      <div className="grid grid-cols-[1fr_270px] gap-3.5 items-start">
+      {a && (
+        <Card>
+          <DescriptionList columns={4} items={[
+            { label: 'Fournisseur', value: fournisseur },
+            { label: 'Date', value: fmtDate(a.date) },
+            { label: 'Mode de paiement', value: a.mode_payement },
+            ...(a.user_name ? [{ label: 'Saisie par', value: a.user_name }] : []),
+          ]} />
+        </Card>
+      )}
+
+      <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">
         <div className="flex flex-col gap-3.5 min-w-0">
           <DataGrid complet columns={columns} rows={lignes} rowKey={(l) => l.id} loading={loading}
                     emptyMessage="Aucune ligne."
@@ -148,9 +160,7 @@ export default function AchatDetail() {
             <LiensPiece base="/achats" codes={ACHAT_TYPE_CODE} retours={a.retours} pieceOrigine={a.piece_origine} />
           )}
           {a && TYPES_RETOUR.includes(code) && (
-            <div className="text-[11.5px] text-ink-muted bg-surface border border-line-soft rounded-md px-4 py-3">
-              Cet avoir / retour vient en déduction du solde du fournisseur.
-            </div>
+            <Alert tone="info" compact>Cet avoir / retour vient en déduction du solde du fournisseur.</Alert>
           )}
           {a && TYPES_AVEC_REGLEMENT.includes(code) && (
             <ReglementsPiece sens="achat" pieceId={a.id} numero={a.numero} reglements={a.reglements ?? []}
@@ -158,33 +168,33 @@ export default function AchatDetail() {
           )}
         </div>
         {a && (
-          <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden">
-            <Row label="Total HT" value={a.total_ht} />
-            <Row label={`Remise globale${Number(a.remise) ? ` (${fmtQte(a.remise)} %)` : ''}`} value={-(Number(a.remise_montant ?? 0))} neg />
-            <Row label="Total TTC" value={a.total_ttc} />
-            <div className="px-4 py-3 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
-              <span>Net à payer</span><span className="money text-[15px]">{fmtMoney(a.net_a_payer)} DA</span>
-            </div>
-            <Row label="Réglé" value={a.regler} />
-            <Row label="Reste" value={a.reste_a_payer} danger={Number(a.reste_a_payer) > 0} />
-          </div>
+          <TotalsPanel
+            rows={[
+              { label: 'Total HT', value: Number(a.total_ht ?? 0) },
+              { label: `Remise globale${Number(a.remise) ? ` (${fmtQte(a.remise)} %)` : ''}`, value: -(Number(a.remise_montant ?? 0)) },
+              { label: 'Total TTC', value: Number(a.total_ttc ?? 0) },
+            ]}
+            total={{ label: 'Net à payer', value: Number(a.net_a_payer ?? 0) }}
+            after={(
+              <div className="flex flex-col gap-1.5 text-base text-ink-label">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span>Réglé</span><Money value={a.regler} className="font-semibold" />
+                </div>
+                <div className="flex items-baseline justify-between gap-4">
+                  <span>Reste</span>
+                  <Money value={a.reste_a_payer} className="font-semibold" tone={Number(a.reste_a_payer) > 0 ? 'danger' : undefined} />
+                </div>
+              </div>
+            )}
+          />
         )}
       </div>
-      {a?.observation && <div className="text-[12px] text-ink-muted">Note : {a.observation}</div>}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <span><span className="text-[10px] font-bold uppercase text-ink-muted mr-1.5">{label}</span>{children}</span>;
-}
-
-function Row({ label, value, neg, danger }: { label: string; value: unknown; neg?: boolean; danger?: boolean }) {
-  const v = Number(value ?? 0);
-  return (
-    <div className="flex justify-between px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft">
-      <span>{label}</span>
-      <span className="money" style={{ color: danger || (neg && v < 0) ? 'var(--danger)' : undefined }}>{fmtMoney(v)}</span>
+      {a?.observation && (
+        <Card padding="sm">
+          <span className="text-xs font-semibold text-ink-muted mr-1.5">Note</span>
+          <span className="text-sm text-ink-label">{a.observation}</span>
+        </Card>
+      )}
     </div>
   );
 }

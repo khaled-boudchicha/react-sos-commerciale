@@ -1,40 +1,75 @@
-/* Gestion Commerciale Desktop — Design Tokens (source: docs/01-CHARTE-GRAPHIQUE.md)
-   Générés pour usage direct (Tailwind theme.extend ou CSS vars). Zéro hex ailleurs. */
+/* Gestion Commerciale Desktop — Design Tokens v2 (source : docs/01-CHARTE-GRAPHIQUE.md)
+   Source unique des couleurs, rayons, ombres, durées et couches. Zéro hex ailleurs.
+
+   Règle des sémantiques (v2) : chaque famille a quatre rôles —
+     *-solid  aplat sous texte blanc       *-text  texte / icône sur surface ou *-soft
+     *-soft   fond doux (badges, bandeaux) *-line  bordure
+   Les anciens noms (--success, --warning, --danger, --info, --teal, --violet, --orange)
+   restent des alias d'aplat : ils sont lus par le paquet @softly/report et les graphiques. */
 
 :root {
-  /* Marque */
+  color-scheme: light;
+
+  /* ── Marque ─────────────────────────────────────────────── */
   --brand-50:  #EEF3FE;
   --brand-100: #DCE6FD;
   --brand-300: #7C9BF2;
   --brand-500: #3B66F5;
   --brand-700: #2450E0;
   --brand-900: #1E3FB5;
+  --brand-text: #2450E0;   /* liens, texte et icônes de marque sur surface */
+  --brand-soft: #EEF3FE;   /* fond de sélection / élément actif */
+  --brand-line: #7C9BF2;   /* bordure d'élément sélectionné */
   --gradient-hero: linear-gradient(135deg, #3B66F5 0%, #2450E0 55%, #1E3FB5 100%);
 
-  /* Accent or (logo) */
+  /* ── Accent or (logo) ───────────────────────────────────── */
   --gold-400: #F6B93B;
   --gold-600: #E89B0C;
+  --gold-ink: #3A2A05;     /* texte sur aplat or */
+  --gold-text: #8A5A00;    /* texte or sur surface */
 
-  /* Neutres froids — mode clair */
-  --bg:            #F6F8FC;
-  --surface:       #FFFFFF;
-  --surface-raised:#FFFFFF;
-  --line-soft:     #EDF1F8;
-  --line:          #C9D3E4;
-  --text-muted:    #7C8AA5;
-  --text-label:    #42536F;
-  --text:          #0F1A2E;
+  /* ── Neutres froids ─────────────────────────────────────── */
+  --bg:             #F6F8FC;
+  --surface:        #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: #FBFCFE;
+  --surface-hover:  #F3F6FB;
+  --surface-active: #EEF3FE;
+  --line-soft:      #EDF1F8;
+  --line:           #C9D3E4;
+  --line-strong:    #9AA9C2;
+  --overlay:        rgb(8 20 40 / .5);
 
-  /* Sémantiques */
-  --success: #16A34A;
-  --warning: #D97706;
-  --danger:  #DC2626;
-  --info:    #0891B2;
-  --teal:    #14B8A6;
-  --violet:  #8B5CF6;
-  --orange:  #F97316;
+  /* ── Texte (contrastes AA vérifiés sur --surface et --bg) ─ */
+  --text:             #0F1A2E;
+  --text-label:       #42536F;
+  --text-muted:       #5F6D87;   /* v1 : #7C8AA5 (3,48:1, hors AA) */
+  --text-placeholder: #8A96AD;   /* placeholders uniquement */
+  --text-inverse:     #FFFFFF;
+  --text-secondary:   var(--text-muted);
 
-  /* Documents */
+  /* ── Sémantiques ────────────────────────────────────────── */
+  --success-solid: #15803D; --success-text: #15803D; --success-soft: #E8F7EE; --success-line: #A7E3BD;
+  --warning-solid: #B45309; --warning-text: #B45309; --warning-soft: #FDF3E4; --warning-line: #F3C98A;
+  --danger-solid:  #DC2626; --danger-text:  #B91C1C; --danger-soft:  #FDEBEB; --danger-line:  #F2B8B8;
+  --danger-hover:  #B91C1C;
+  --info-solid:    #0E7490; --info-text:    #0E7490; --info-soft:    #E0F5FA; --info-line:    #9ADCEB;
+  --teal-solid:    #14B8A6; --teal-text:    #0F766E; --teal-soft:    #E4F7F4; --teal-line:    #99DED4;
+  --violet-solid:  #8B5CF6; --violet-text:  #6D28D9; --violet-soft:  #F1EBFD; --violet-line:  #CDB8F7;
+  --orange-solid:  #F97316; --orange-text:  #C2410C; --orange-soft:  #FEF0E5; --orange-line:  #F3B58C;
+  --neutral-solid: #5F6D87; --neutral-text: #42536F; --neutral-soft: #EDF1F8; --neutral-line: #C9D3E4;
+  --brand-solid:   #2450E0;
+
+  /* Alias historiques (aplats) */
+  --success: var(--success-solid);
+  --warning: var(--warning-solid);
+  --danger:  var(--danger-solid);
+  --info:    var(--info-solid);
+  --teal:    var(--teal-solid);
+  --violet:  var(--violet-solid);
+  --orange:  var(--orange-solid);
+
+  /* ── Documents ──────────────────────────────────────────── */
   --doc-fa:  var(--brand-700);
   --doc-bl:  var(--teal);
   --doc-bc:  var(--violet);
@@ -43,61 +78,109 @@
   --doc-achat: var(--orange);
   --doc-reglement: var(--success);
 
-  /* Ombres */
+  /* ── État de connexion (pastilles, y compris sur dégradé) ─ */
+  --status-online:  #22C55E;
+  --status-offline: #EF4444;
+
+  /* ── Graphiques ─────────────────────────────────────────── */
+  --chart-1: #2450E0; --chart-2: #B45309; --chart-3: #0D9488;
+  --chart-4: #9333EA; --chart-5: #DB2777; --chart-6: #65A30D;
+  --chart-neutral: #64748B;
+
+  /* ── Ombres ─────────────────────────────────────────────── */
   --shadow-soft:   0 1px 3px rgb(15 26 46 / .06);
   --shadow-card:   0 4px 12px rgb(15 26 46 / .08);
   --shadow-lifted: 0 12px 32px rgb(15 26 46 / .16);
+  --shadow-modal:  0 24px 64px rgb(8 20 40 / .35);
 
-  /* Rayons */
-  --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+  /* ── Rayons ─────────────────────────────────────────────── */
+  --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 20px;
 
-  /* Typo */
+  /* ── Typo ───────────────────────────────────────────────── */
   --font-ui: "Plus Jakarta Sans", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Densité tables */
+  /* ── Densité / contrôles ────────────────────────────────── */
   --row-compact: 32px;
   --row-comfortable: 40px;
+  --control-sm: 28px; --control-md: 34px; --control-lg: 40px; --control-xl: 48px;
 
-  /* Focus */
-  --focus-ring: 0 0 0 2px var(--brand-300);
+  /* ── Mouvement ──────────────────────────────────────────── */
+  --dur-fast: 100ms; --dur-base: 150ms; --dur-slow: 250ms;
+  --ease: cubic-bezier(.2, .8, .2, 1);
 
-  /* ── Module comptoir (docs maquette « Vente au comptoir ») ──
-     Contraste ≥ 4,5:1 : texte secondaire et fonds pleins sous texte blanc assombris. */
-  --text-secondary: #5B6A86;
-  --surface-sunken: #FBFCFE;
-  --pos-cash:        #15803D;   /* unique action d'encaissement */
-  --pos-ok-soft:     #ECFDF3;
-  --pos-ok-line:     #A7E3BD;
+  /* ── Focus (anneau ≥ 3:1, décalé de la surface) ─────────── */
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-500);
+
+  /* ── Module comptoir (maquette « Vente au comptoir ») ──
+     Alias des sémantiques v2 ; seul le mode retour garde sa propre gamme. */
+  --pos-cash:        var(--success-solid);   /* unique action d'encaissement */
+  --pos-ok-soft:     var(--success-soft);
+  --pos-ok-line:     var(--success-line);
   --pos-ok-text:     #166534;
   --pos-return:      #C2410C;   /* mode retour, jamais ailleurs */
   --pos-return-deep: #9A3412;
   --pos-return-soft: #FFF4EC;
   --pos-return-line: #F3B58C;
-  --pos-alert:       #B91C1C;   /* stock insuffisant, annuler */
-  --pos-alert-soft:  #FEF2F2;
-  --pos-alert-line:  #F2B8B8;
-  --pos-amber:       #B45309;   /* remise, reste dû */
-  --pos-overlay:     rgb(8 20 40 / .5);
+  --pos-alert:       #B91C1C;   /* stock insuffisant, annuler (aplat et texte : valeur fixe) */
+  --pos-alert-soft:  var(--danger-soft);
+  --pos-alert-line:  var(--danger-line);
+  --pos-amber:       var(--warning-text);    /* remise, reste dû */
+  --pos-overlay:     var(--overlay);
 }
 
 [data-theme="dark"] {
-  --bg:            #0B1220;
-  --surface:       #111A2E;
-  --surface-raised:#16213A;
-  --line-soft:     #1C2942;
-  --line:          #31415F;
-  --text-muted:    #8093B0;
-  --text-label:    #B7C3D9;
-  --text:          #E9EEF7;
-  --shadow-soft: none; --shadow-card: none; --shadow-lifted: 0 12px 32px rgb(0 0 0 / .5);
-  --text-secondary: #9AABC6;
+  color-scheme: dark;
+
+  --brand-50:  #17223D;
+  --brand-100: #1D2C52;
+  --brand-300: #4F6ECB;
+  --brand-text: #7C9BF2;
+  --brand-soft: #17223D;
+  --brand-line: #4F6ECB;
+
+  --gold-600: #F6B93B;
+  --gold-text: #F6B93B;
+
+  --bg:             #0B1220;
+  --surface:        #111A2E;
+  --surface-raised: #16213A;
   --surface-sunken: #0E1627;
-  --pos-ok-soft:     #0F2A1C;
-  --pos-ok-line:     #1F5A36;
+  --surface-hover:  #182338;
+  --surface-active: #17223D;
+  --line-soft:      #1C2942;
+  --line:           #31415F;
+  --line-strong:    #4A5B7D;
+  --overlay:        rgb(0 0 0 / .62);
+
+  --text:             #E9EEF7;
+  --text-label:       #B7C3D9;
+  --text-muted:       #8093B0;
+  --text-placeholder: #6B7D9C;
+
+  --success-text: #4ADE80; --success-soft: #122B1E; --success-line: #1F5A36;
+  --warning-text: #FBBF24; --warning-soft: #2E2312; --warning-line: #6B4A12;
+  --danger-text:  #F87171; --danger-soft:  #2F1616; --danger-line:  #6B1F1F;
+  --info-text:    #22D3EE; --info-soft:    #0E2A33; --info-line:    #155E6E;
+  --teal-text:    #2DD4BF; --teal-soft:    #0F2A27; --teal-line:    #1B5A52;
+  --violet-text:  #A78BFA; --violet-soft:  #221A38; --violet-line:  #4C3A80;
+  --orange-text:  #FB923C; --orange-soft:  #2E1D10; --orange-line:  #7C3514;
+  --neutral-solid: #8093B0; --neutral-text: #B7C3D9; --neutral-soft: #1C2942; --neutral-line: #31415F;
+
+  --status-online:  #4ADE80;
+  --status-offline: #F87171;
+
+  --chart-1: #7C9BF2; --chart-2: #FBBF24; --chart-3: #2DD4BF;
+  --chart-4: #C4B5FD; --chart-5: #F472B6; --chart-6: #A3E635;
+  --chart-neutral: #8093B0;
+
+  --shadow-soft: none; --shadow-card: none;
+  --shadow-lifted: 0 12px 32px rgb(0 0 0 / .5);
+  --shadow-modal:  0 24px 64px rgb(0 0 0 / .7);
+
+  --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-300);
+
   --pos-ok-text:     #86EFAC;
   --pos-return-soft: #2A1709;
   --pos-return-line: #7C3514;
-  --pos-alert-soft:  #2A1010;
-  --pos-alert-line:  #6B1F1F;
 }

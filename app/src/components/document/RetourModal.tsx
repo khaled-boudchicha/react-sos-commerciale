@@ -6,7 +6,11 @@ import { useDroits } from '../../lib/droits';
 import { useSession } from '../../store/session';
 import { fmtMoney, fmtQte, isoToday } from '../../lib/format';
 import { useToast } from '../ui/Toast';
-import { bandeauDanger } from './prefillPiece';
+import Dialog from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { Field, Select, TextInput, CONTROL } from '../ui/Field';
+import { Alert } from '../ui/States';
+import { cn } from '../ui/cn';
 
 type LigneSource = {
   id: number; code_article?: string; designation?: string; qte?: number;
@@ -75,88 +79,82 @@ export default function RetourModal({ sens, source, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[720px] max-h-full flex flex-col bg-surface border border-line-soft rounded-lg shadow-lifted">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-line-soft flex-none">
-          <div>
-            <div className="font-extrabold text-[15px]">Retour sur {source.type_doc} {source.numero}</div>
-            <div className="text-[11px] text-ink-muted">Saisissez les quantités retournées ; les lignes à 0 sont ignorées.</div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
-
-        <div className="px-5 py-4 overflow-auto flex flex-col gap-3">
-          {error && <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>}
-
-          <div className="grid grid-cols-3 gap-3">
-            <label className="text-[11px] font-bold text-ink-label">Type de pièce
-              <select value={typeDoc} onChange={(e) => setTypeDoc(e.target.value as 'FAV' | 'BRT')}
-                      className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-                {typesPermis.includes('FAV') && <option value="FAV">Avoir</option>}
-                {typesPermis.includes('BRT') && <option value="BRT">Bon de retour</option>}
-              </select>
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">Date
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">Observation
-              <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            </label>
-          </div>
-
-          <div className="border border-line-soft rounded-md overflow-hidden">
-            <table className="w-full text-[12px]">
-              <thead>
-                <tr className="bg-bg text-[10.5px] uppercase text-ink-muted">
-                  <th className="text-left px-3 py-2">Article</th>
-                  <th className="text-right px-3 py-2 w-[80px]">Qté</th>
-                  <th className="text-right px-3 py-2 w-[90px]">Retourné</th>
-                  <th className="text-right px-3 py-2 w-[120px]">
-                    <button onClick={toutRetourner} className="normal-case font-bold text-brand-700">Tout retourner</button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {source.lignes.map((l) => {
-                  const max = maxLigne(l);
-                  return (
-                    <tr key={l.id} className="border-t border-line-soft">
-                      <td className="px-3 py-1.5">
-                        <b>{l.designation}</b> <span className="money text-[10.5px] text-ink-muted">{l.code_article}</span>
-                      </td>
-                      <td className="px-3 py-1.5 text-right money">{fmtQte(l.qte)}</td>
-                      <td className="px-3 py-1.5 text-right money text-ink-muted">{fmtQte(l.qte_retournee ?? 0)}</td>
-                      <td className="px-3 py-1.5 text-right">
-                        <input type="number" min="0" max={max} step="any" disabled={max <= 0}
-                               value={qtes[l.id] ?? 0}
-                               onChange={(e) => setQtes((q) => ({ ...q, [l.id]: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                               title={`Maximum ${fmtQte(max)}`}
-                               className="w-[90px] border border-line rounded-sm px-2 py-1 bg-surface text-ink money text-right disabled:opacity-50" />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-line-soft flex-none">
-          <span className="text-[12px] text-ink-label mr-auto">
-            {choisies.length} ligne(s) · ≈ <b className="money">{fmtMoney(montant)} DA</b> TTC
-          </span>
-          <button onClick={onClose} disabled={loading}
-                  className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">
-            Annuler
-          </button>
-          <button onClick={() => void valider()} disabled={loading || choisies.length === 0 || typesPermis.length === 0}
-                  className="px-5 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-60">
+    <Dialog
+      title={`Retour sur ${source.type_doc} ${source.numero}`}
+      subtitle="Saisissez les quantités retournées ; les lignes à 0 sont ignorées."
+      icon="return" iconTone="danger" size="lg" closeOnOverlay={false} onClose={onClose}
+      footerStart={(
+        <span className="text-sm text-ink-label">
+          {choisies.length} ligne(s) · ≈ <b className="money text-ink">{fmtMoney(montant)} DA</b> TTC
+        </span>
+      )}
+      footer={(
+        <>
+          <Button onClick={onClose} disabled={loading}>Annuler</Button>
+          <Button variant="primary" icon="check" loading={loading}
+                  onClick={() => void valider()} disabled={loading || choisies.length === 0 || typesPermis.length === 0}>
             {loading ? 'Création…' : `Créer ${typeDoc === 'FAV' ? "l'avoir" : 'le bon de retour'}`}
-          </button>
+          </Button>
+        </>
+      )}
+    >
+      <div className="flex flex-col gap-4">
+        {error && <Alert tone="danger" compact>{error}</Alert>}
+
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Type de pièce" required>
+            <Select value={typeDoc} onChange={(e) => setTypeDoc(e.target.value as 'FAV' | 'BRT')}>
+              {typesPermis.includes('FAV') && <option value="FAV">Avoir</option>}
+              {typesPermis.includes('BRT') && <option value="BRT">Bon de retour</option>}
+            </Select>
+          </Field>
+          <Field label="Date" required>
+            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Observation">
+            <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+          </Field>
+        </div>
+
+        <div className="border border-line-soft rounded-md overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-sunken text-2xs font-bold uppercase tracking-wider text-ink-label">
+                <th className="text-left px-3 py-2">Article</th>
+                <th className="text-right px-3 py-2 w-[80px]">Qté</th>
+                <th className="text-right px-3 py-2 w-[90px]">Retourné</th>
+                <th className="text-right px-3 py-1 w-[130px]">
+                  <Button size="xs" variant="link" icon="return" onClick={toutRetourner} className="normal-case tracking-normal">
+                    Tout retourner
+                  </Button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {source.lignes.map((l) => {
+                const max = maxLigne(l);
+                return (
+                  <tr key={l.id} className="border-t border-line-soft">
+                    <td className="px-3 py-1.5">
+                      <b>{l.designation}</b> <span className="money text-xs text-ink-muted">{l.code_article}</span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right money">{fmtQte(l.qte)}</td>
+                    <td className="px-3 py-1.5 text-right money text-ink-muted">{fmtQte(l.qte_retournee ?? 0)}</td>
+                    <td className="px-3 py-1.5 text-right">
+                      <input type="number" min="0" max={max} step="any" disabled={max <= 0}
+                             value={qtes[l.id] ?? 0}
+                             onChange={(e) => setQtes((q) => ({ ...q, [l.id]: Math.max(0, parseFloat(e.target.value) || 0) }))}
+                             title={`Maximum ${fmtQte(max)}`}
+                             aria-label={`Quantité retournée — ${l.designation ?? l.code_article ?? ''}`}
+                             className={cn(CONTROL, 'h-control-sm px-2 text-sm w-[90px] money text-right')} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

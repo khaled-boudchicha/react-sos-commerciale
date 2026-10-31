@@ -10,7 +10,8 @@ import Journal from './JournalVentes';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeBordereau } from '../impression/demandes';
-import { DocBadge, PayStatus, Money, Tabs, PeriodPicker, PageHeader } from '../components/ui/atoms';
+import { DocBadge, DOC_TONE, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
 import GrouperBLModal from '../components/document/GrouperBLModal';
@@ -86,7 +87,7 @@ export default function Ventes() {
     { key: 'ttc', header: 'Net à payer', align: 'right', width: '120px', field: 'net_a_payer', render: (v) => <Money value={v.net_a_payer ?? v.total_ttc} /> },
     { key: 'regler', header: 'Réglé', align: 'right', width: '110px', field: 'regler', render: (v) => <Money value={v.regler} /> },
     { key: 'reste', header: 'Reste', align: 'right', width: '110px', field: 'reste_a_payer', render: (v) => (
-      <span className="money font-medium" style={{ color: Number(v.reste_a_payer) > 0 ? 'var(--danger)' : undefined }}>{fmtMoney(v.reste_a_payer)}</span>
+      <span className="money font-medium" style={{ color: Number(v.reste_a_payer) > 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(v.reste_a_payer)}</span>
     ) },
     { key: 'statut', header: 'Statut', width: '86px', render: (v) => isAvoir ? null : <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} /> },
   ];
@@ -103,40 +104,49 @@ export default function Ventes() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Documents de vente">
+      <PageHeader title="Documents de vente" icon="invoice">
         {vue === 'documents' && (
-          <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
-        )}
-        {vue === 'documents' && (
-        <button onClick={() => void imprimerBordereau()} disabled={bordereauEnCours}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
-          {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
-        </button>
+          <Button icon="printer" onClick={() => void imprimerBordereau()} loading={bordereauEnCours}
+                  title="Imprimer le bordereau des pièces de la période">
+            {bordereauEnCours ? 'Préparation…' : 'Bordereau'}
+          </Button>
         )}
         {vue === 'documents' && peutDoc('vente', 'FA', 'creer') && (
-          <button onClick={() => setGrouper(true)}
-                  title="Regrouper les bons de livraison d'un client en une facture"
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
+          <Button icon="layers" onClick={() => setGrouper(true)}
+                  title="Regrouper les bons de livraison d'un client en une facture">
             Facturer des BL
-          </button>
+          </Button>
         )}
         {vue === 'documents' && peutCreer && (
-        <button onClick={() => navigate(`/ventes/nouvelle${peutDoc('vente', type, 'creer') ? `?type=${type}` : ''}`)}
-                className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Nouvelle pièce
-        </button>
+          <Button variant="primary" icon="plus"
+                  onClick={() => navigate(`/ventes/nouvelle${peutDoc('vente', type, 'creer') ? `?type=${type}` : ''}`)}>
+            Nouvelle pièce
+          </Button>
         )}
       </PageHeader>
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       {grouper && <GrouperBLModal onClose={() => setGrouper(false)} />}
-      {peutJournal && (
-        <Tabs value={vue} onChange={setVue}
-              options={[{ code: 'documents' as const, label: 'Documents' }, { code: 'journal' as const, label: 'Journal (lignes)' }]} />
+      {(peutJournal || vue === 'documents') && (
+        <Toolbar>
+          {peutJournal && (
+            <Tabs value={vue} onChange={setVue} label="Vue"
+                  options={[
+                    { code: 'documents' as const, label: 'Documents', icon: 'invoice' as const },
+                    { code: 'journal' as const, label: 'Journal (lignes)', icon: 'journal' as const },
+                  ]} />
+          )}
+          {vue === 'documents' && (
+            <div className="ml-auto">
+              <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+            </div>
+          )}
+        </Toolbar>
       )}
       {vue === 'journal' && peutJournal && <Journal sens="vente" />}
       {vue === 'documents' && (
       <>
-      <Tabs value={type} onChange={setType} options={typesVisibles} />
+      <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
+            options={typesVisibles.map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
       <DataGrid
         exportCsv={{ nom: `ventes-${type.toLowerCase()}`, columns: csvDocs }}
         columns={columns} rowKey={(v) => v.id}
@@ -146,7 +156,7 @@ export default function Ventes() {
           _label: `${r?.total ?? 0} pièce(s)`,
           ttc: <Money value={totalDistant(r, 'net_a_payer')} />,
           regler: <Money value={totalDistant(r, 'regler')} />,
-          reste: <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(totalDistant(r, 'reste_a_payer'))}</span>,
+          reste: <span className="money" style={{ color: 'var(--danger-text)' }}>{fmtMoney(totalDistant(r, 'reste_a_payer'))}</span>,
         })}
       />
       </>

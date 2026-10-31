@@ -7,6 +7,10 @@ import { D, useDroits } from '../lib/droits';
 import DataGrid, { Column } from './ui/DataGrid';
 import ConfirmDialog from './ui/ConfirmDialog';
 import { useToast } from './ui/Toast';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { Alert } from './ui/States';
+import { TextInput } from './ui/Field';
 
 type Mouvement = {
   date: string | null; origine: 'vente' | 'achat' | 'entree' | 'sortie' | 'production'; piece_id: number;
@@ -61,53 +65,50 @@ export default function FicheStockPanel({ articleId }: { articleId: number }) {
     { key: 'nature', header: 'Mouvement', width: '160px', render: (m) => <span className="font-semibold text-ink-label">{m.nature}</span> },
     { key: 'numero', header: 'N°', width: '120px', render: (m) => {
       const lien = lienPiece(m);
-      return lien ? <Link to={lien} className="money text-brand-700 hover:underline" onClick={(e) => e.stopPropagation()}>{m.numero ?? m.piece_id}</Link>
+      return lien ? <Link to={lien} className="money text-brand-text hover:underline" onClick={(e) => e.stopPropagation()}>{m.numero ?? m.piece_id}</Link>
         : <span className="money">{m.numero ?? '—'}</span>;
     } },
     { key: 'tiers', header: 'Tiers / motif', render: (m) => <span>{m.tiers?.trim() || '—'}</span> },
     { key: 'lot', header: 'Lot', width: '100px', render: (m) => <span className="money text-ink-muted">{m.lot || ''}</span> },
-    { key: 'entree', header: 'Entrée', align: 'right', width: '85px', render: (m) => (m.entree ? <span className="money" style={{ color: 'var(--success)' }}>+{fmtQte(m.entree)}</span> : null) },
-    { key: 'sortie', header: 'Sortie', align: 'right', width: '85px', render: (m) => (m.sortie ? <span className="money" style={{ color: 'var(--danger)' }}>−{fmtQte(m.sortie)}</span> : null) },
-    { key: 'stock', header: 'Stock', align: 'right', width: '85px', render: (m) => <span className="money font-bold" style={{ color: m.stock < 0 ? 'var(--danger)' : undefined }}>{fmtQte(m.stock)}</span> },
+    { key: 'entree', header: 'Entrée', align: 'right', width: '85px', render: (m) => (m.entree ? <span className="money" style={{ color: 'var(--success-text)' }}>+{fmtQte(m.entree)}</span> : null) },
+    { key: 'sortie', header: 'Sortie', align: 'right', width: '85px', render: (m) => (m.sortie ? <span className="money" style={{ color: 'var(--danger-text)' }}>−{fmtQte(m.sortie)}</span> : null) },
+    { key: 'stock', header: 'Stock', align: 'right', width: '85px', render: (m) => <span className="money font-bold" style={{ color: m.stock < 0 ? 'var(--danger-text)' : undefined }}>{fmtQte(m.stock)}</span> },
   ];
 
   return (
     <div className="flex flex-col gap-2">
       {f && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3 grid grid-cols-5 gap-4 text-[12px]">
+        <Card padding="sm" className="grid grid-cols-5 gap-4 text-sm px-4">
           <Info label={debut ? 'Stock au début de la période' : 'Point de départ'}>
             <span className="money font-bold">{fmtQte(f.ouverture)}</span>
-            <div className="text-[10.5px] text-ink-muted">{f.depart.libelle}{f.depart.date ? ` · ${fmtDate(f.depart.date)}` : ''}</div>
+            <div className="text-xs text-ink-muted">{f.depart.libelle}{f.depart.date ? ` · ${fmtDate(f.depart.date)}` : ''}</div>
           </Info>
-          <Info label="Entrées"><span className="money font-bold" style={{ color: 'var(--success)' }}>+{fmtQte(f.total_entrees)}</span></Info>
-          <Info label="Sorties"><span className="money font-bold" style={{ color: 'var(--danger)' }}>−{fmtQte(f.total_sorties)}</span></Info>
-          <Info label="Stock selon les mouvements"><span className="money font-extrabold text-[14px]">{fmtQte(f.stock_calcule)}</span></Info>
+          <Info label="Entrées"><span className="money font-bold" style={{ color: 'var(--success-text)' }}>+{fmtQte(f.total_entrees)}</span></Info>
+          <Info label="Sorties"><span className="money font-bold" style={{ color: 'var(--danger-text)' }}>−{fmtQte(f.total_sorties)}</span></Info>
+          <Info label="Stock selon les mouvements"><span className="money font-extrabold text-md">{fmtQte(f.stock_calcule)}</span></Info>
           <Info label="Stock enregistré">
-            <span className="money font-extrabold text-[14px]" style={{ color: ecart ? 'var(--warning)' : undefined }}>{fmtQte(f.article.stock_actuel)}</span>
-            {ecart !== 0 && <div className="text-[10.5px]" style={{ color: 'var(--warning)' }}>écart {ecart > 0 ? '+' : ''}{fmtQte(ecart)}</div>}
+            <span className="money font-extrabold text-md" style={{ color: ecart ? 'var(--warning-text)' : undefined }}>{fmtQte(f.article.stock_actuel)}</span>
+            {ecart !== 0 && <div className="text-xs font-semibold" style={{ color: 'var(--warning-text)' }}>écart {ecart > 0 ? '+' : ''}{fmtQte(ecart)}</div>}
           </Info>
-        </div>
+        </Card>
       )}
       {f && ecart !== 0 && (
-        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-md text-[12px]"
-             style={{ background: 'color-mix(in srgb, var(--warning) 12%, var(--surface))', border: '1px solid color-mix(in srgb, var(--warning) 35%, transparent)' }}>
-          <span className="flex-1">
-            Le stock enregistré ({fmtQte(f.article.stock_actuel)}) ne correspond pas aux mouvements ({fmtQte(f.stock_calcule)}) :
-            il n&apos;a pas été recalculé depuis certaines opérations.
-          </span>
-          {peut('stock', D.stock.modifierArticle) && (
-            <button onClick={() => setConfirmer(true)} className="rounded-md px-3 py-1.5 font-bold text-white bg-brand-700">Recalculer le stock</button>
-          )}
-        </div>
+        <Alert tone="warning" compact
+               action={peut('stock', D.stock.modifierArticle) && (
+                 <Button size="sm" variant="primary" icon="refresh" onClick={() => setConfirmer(true)}>Recalculer le stock</Button>
+               )}>
+          Le stock enregistré ({fmtQte(f.article.stock_actuel)}) ne correspond pas aux mouvements ({fmtQte(f.stock_calcule)}) :
+          il n&apos;a pas été recalculé depuis certaines opérations.
+        </Alert>
       )}
       <DataGrid<Mouvement>
         complet
         titre="Fiche de stock"
         actions={(
-          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-ink-label">
-            Du <input type="date" value={debut} onChange={(e) => setDebut(e.target.value)} className="border border-line rounded-sm px-1.5 py-0.5 bg-surface text-ink" />
-            au <input type="date" value={fin} onChange={(e) => setFin(e.target.value)} className="border border-line rounded-sm px-1.5 py-0.5 bg-surface text-ink" />
-            {(debut || fin) && <button onClick={() => { setDebut(''); setFin(''); }} className="text-brand-700 font-bold">Tout</button>}
+          <span className="inline-flex items-center gap-1.5 text-xs text-ink-label">
+            Du <TextInput type="date" size="sm" value={debut} onChange={(e) => setDebut(e.target.value)} aria-label="Du" className="!w-auto" />
+            au <TextInput type="date" size="sm" value={fin} onChange={(e) => setFin(e.target.value)} aria-label="Au" className="!w-auto" />
+            {(debut || fin) && <Button variant="link" size="sm" onClick={() => { setDebut(''); setFin(''); }}>Tout</Button>}
           </span>
         )}
         columns={colonnes}
@@ -147,7 +148,7 @@ export default function FicheStockPanel({ articleId }: { articleId: number }) {
 function Info({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase text-ink-muted mb-0.5">{label}</div>
+      <div className="text-2xs font-bold uppercase tracking-wide text-ink-muted mb-0.5">{label}</div>
       <div>{children}</div>
     </div>
   );

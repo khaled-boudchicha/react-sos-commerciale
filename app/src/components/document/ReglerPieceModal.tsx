@@ -4,7 +4,10 @@ import { ADD_REGLEMENT_CLIENT, ADD_REGLEMENT_FOURNISSEUR, SOLDES_COMPTES } from 
 import { useSession } from '../../store/session';
 import { useDroits } from '../../lib/droits';
 import { fmtMoney, isoToday } from '../../lib/format';
-import { bandeauDanger } from './prefillPiece';
+import Dialog from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { Field, Select, TextInput } from '../ui/Field';
+import { Alert } from '../ui/States';
 
 const MODES = gql`
   query ModesPayementPiece { modesPayement }
@@ -79,66 +82,52 @@ export default function ReglerPieceModal({ sens, pieceId, numero, reste, onClose
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[460px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="font-extrabold text-[15px]">{verbe} — pièce {numero}</div>
-            <div className="text-[11px] text-ink-muted">Reste à payer : <span className="money">{fmtMoney(reste)} DA</span></div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
-
-        {error && <div className="text-[12px] rounded-md px-3 py-2 mb-3" style={bandeauDanger}>{error}</div>}
-
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <label className="text-[11px] font-bold text-ink-label">Montant (DA)
-            <input type="number" min="0" step="0.01" autoFocus value={montant}
-                   onChange={(e) => setMontant(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-[14px] font-normal" />
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Mode de paiement
-            <select value={mode} onChange={(e) => setMode(e.target.value)}
-                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-              <option value="Espece">Espèces</option>
-              {modes.map((m: any, i) => {
-                const v = String(m.nom ?? m.name ?? m.mode ?? m);
-                return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
-              })}
-            </select>
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">N° chèque / pièce
-            <input value={numCheque} onChange={(e) => setNumCheque(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
-          <label className="text-[11px] font-bold text-ink-label col-span-2">Caisse / compte
-            <select value={compteId} onChange={(e) => setCompteId(e.target.value)}
-                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-              <option value="">— aucun —</option>
-              {comptes.map((c) => <option key={c.compte_id} value={String(c.compte_id)}>{c.compte}</option>)}
-            </select>
-          </label>
-          <label className="text-[11px] font-bold text-ink-label col-span-2">Observation
-            <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
-        </div>
-
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} disabled={loading}
-                  className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">
-            Annuler
-          </button>
-          <button onClick={() => void valider()} disabled={loading}
-                  className="px-5 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-60">
+    <Dialog
+      title={`${verbe} — pièce ${numero}`}
+      subtitle={<>Reste à payer : <span className="money">{fmtMoney(reste)} DA</span></>}
+      icon={sens === 'vente' ? 'cash' : 'wallet'} iconTone="success" width={480}
+      closeOnOverlay={false} onClose={onClose}
+      footer={(
+        <>
+          <Button onClick={onClose} disabled={loading}>Annuler</Button>
+          <Button variant="primary" icon="check" loading={loading} onClick={() => void valider()} disabled={loading}>
             {loading ? 'Enregistrement…' : verbe}
-          </button>
-        </div>
+          </Button>
+        </>
+      )}
+    >
+      {error && <Alert tone="danger" compact className="mb-3">{error}</Alert>}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Montant (DA)" required>
+          <TextInput type="number" min="0" step="0.01" autoFocus value={montant} size="lg" mono align="right"
+                     onChange={(e) => setMontant(e.target.value)} />
+        </Field>
+        <Field label="Date" required>
+          <TextInput type="date" value={date} size="lg" onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Mode de paiement">
+          <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+            <option value="Espece">Espèces</option>
+            {modes.map((m: any, i) => {
+              const v = String(m.nom ?? m.name ?? m.mode ?? m);
+              return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
+            })}
+          </Select>
+        </Field>
+        <Field label="N° chèque / pièce">
+          <TextInput value={numCheque} onChange={(e) => setNumCheque(e.target.value)} />
+        </Field>
+        <Field label="Caisse / compte" className="col-span-2">
+          <Select value={compteId} onChange={(e) => setCompteId(e.target.value)}>
+            <option value="">— aucun —</option>
+            {comptes.map((c) => <option key={c.compte_id} value={String(c.compte_id)}>{c.compte}</option>)}
+          </Select>
+        </Field>
+        <Field label="Observation" className="col-span-2">
+          <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+        </Field>
       </div>
-    </div>
+    </Dialog>
   );
 }

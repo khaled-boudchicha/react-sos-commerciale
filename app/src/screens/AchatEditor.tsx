@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ACHAT, UPDATE_ACHAT, ADD_REGLEMENT_FOURNISSEUR } from '../api/queries';
 import { Achat, ACHAT_TYPE_CODE, Article, Fournisseur, TYPES_ACHAT } from '../api/types';
 import { useDroits } from '../lib/droits';
 import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
-import { DocBadge, PageHeader, Tabs } from '../components/ui/atoms';
+import { DocBadge, DOC_TONE, PageHeader, Tabs } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Field, Select, TextInput } from '../components/ui/Field';
+import { Card, TotalsPanel } from '../components/ui/Card';
+import { Alert, Skeleton } from '../components/ui/States';
 import ArticleSearch from '../components/ArticleSearch';
 import FournisseurSearch from '../components/FournisseurSearch';
 import LignesTable from '../components/document/LignesTable';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
-import { bandeauDanger, lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
+import { lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import RemiseGlobale from '../components/document/RemiseGlobale';
 import { TYPES_AVEC_REGLEMENT } from '../components/document/ReglementsPiece';
@@ -194,123 +198,106 @@ export default function AchatEditor() {
   } else if (permis.length === 0) {
     blocage = 'Accès refusé : vous n’avez le droit de créer aucun type de pièce d’achat.';
   }
+  const fil = [{ label: 'Achats', to: '/achats' }, { label: titre }];
   if (blocage || !type) {
     return (
       <div className="flex flex-col gap-3.5">
-        <PageHeader title={titre}>
-          <Link to={retour} className="text-[12px] font-bold text-brand-700">← Retour</Link>
-        </PageHeader>
+        <PageHeader title={titre} backTo={retour} breadcrumb={fil} />
         {blocage
-          ? <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{blocage}</div>
-          : <div className="text-[12px] text-ink-muted">Chargement…</div>}
+          ? <Alert tone="danger">{blocage}</Alert>
+          : <Card><Skeleton lines={3} /></Card>}
       </div>
     );
   }
 
+  const paye = parseFloat(montantPaye) || 0;
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={titre}>
-        <Link to={retour} className="text-[12px] font-bold text-brand-700">← Annuler</Link>
-      </PageHeader>
+      <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={fil}
+                  meta={<DocBadge code={type === 'FA' ? 'BR' : type} />} />
 
       {/* En modification, le type est figé */}
-      <Tabs value={type} onChange={setType}
-            options={enEdition ? TYPES_ACHAT.filter((t) => t.code === type) : permis} />
+      <Tabs value={type} onChange={setType} variant="underline" label="Type de pièce"
+            options={(enEdition ? TYPES_ACHAT.filter((t) => t.code === type) : permis).map((t) => ({ ...t, tone: DOC_TONE[t.code] }))} />
       {!affecteStock && (
-        <div className="text-[11px] text-ink-muted">Ce type de document n'affecte pas le stock (seuls Facture d'achat et Bon de réception le font).</div>
+        <Alert tone="info" compact>Ce type de document n'affecte pas le stock (seuls Facture d'achat et Bon de réception le font).</Alert>
       )}
 
-      {error && (
-        <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>
-      )}
+      {error && <Alert tone="danger">{error}</Alert>}
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 grid grid-cols-[2fr_1fr_1fr_1fr] gap-3">
-        <label className="text-[11px] font-bold text-ink-label">Fournisseur
-          <div className="mt-1 font-normal"><FournisseurSearch value={fournisseur} onSelect={setFournisseur} /></div>
+      <Card className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-3 items-start">
+        <label className="flex flex-col gap-1 min-w-0">
+          <span className="text-xs font-semibold text-ink-label">Fournisseur</span>
+          <FournisseurSearch value={fournisseur} onSelect={setFournisseur} />
         </label>
-        <label className="text-[11px] font-bold text-ink-label">Date
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                 className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-        </label>
-        <label className="text-[11px] font-bold text-ink-label">Mode de paiement
-          <select value={mode} onChange={(e) => setMode(e.target.value)}
-                  className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
+        <Field label="Date" required>
+          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Field label="Mode de paiement">
+          <Select value={mode} onChange={(e) => setMode(e.target.value)}>
             <option value="Espece">Espèces</option>
             {modes.map((m: any, i) => {
               const v = String(m.nom ?? m.name ?? m.mode ?? m);
               return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
             })}
-          </select>
-        </label>
+          </Select>
+        </Field>
         <RemiseGlobale pct={remiseGlobale} onPct={setRemiseGlobale} baseTtc={totaux.net + totaux.remGlob} />
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-[1fr_280px] gap-3.5 items-start">
-        <div className="flex flex-col gap-2.5">
+      <div className="grid grid-cols-[1fr_300px] gap-3.5 items-start">
+        <div className="flex flex-col gap-2.5 min-w-0">
           <ArticleSearch onSelect={addArticle} autoFocus />
           <LignesTable sens="achat" lignes={lignes} patch={patchLigne} remove={removeLigne} />
-          <label className="text-[11px] font-bold text-ink-label">Note
-            <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
+          <Field label="Note">
+            <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+          </Field>
         </div>
 
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-hidden sticky top-4">
-          <TotRow label="Total HT" value={totaux.ht} />
-          <TotRow label="Remises lignes" value={-totaux.remLignes} />
-          <TotRow label="TVA" value={totaux.tva} />
-          <TotRow label={`Remise globale (${fmtQte(remiseGlobale)} %)`} value={-totaux.remGlob} />
-          <div className="px-4 py-3.5 flex justify-between items-center text-white font-extrabold" style={{ background: 'var(--gradient-hero)' }}>
-            <span>Net à payer</span>
-            <span className="money text-[16px]">{fmtMoney(totaux.net)} DA</span>
-          </div>
-          <div className="p-3 flex flex-col gap-2">
-            {payable && (<>
-              <label className="text-[11px] font-bold text-ink-label">
-                Montant payé (paiement immédiat)
-                <div className="flex gap-1.5 mt-1">
-                  <input type="number" min="0" step="0.01" value={montantPaye}
-                         onChange={(e) => setMontantPaye(e.target.value)} placeholder="0,00"
-                         className="flex-1 min-w-0 border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right font-normal" />
-                  <button onClick={() => setMontantPaye(String(totaux.net))}
-                          className="px-3 rounded-sm border border-line text-[11px] font-bold text-ink-label">Tout</button>
-                </div>
-              </label>
-              {(parseFloat(montantPaye) || 0) > 0 && (
-                <div className="flex justify-between items-center px-1 text-[12px] font-bold"
-                     style={{ color: totaux.net - (parseFloat(montantPaye) || 0) > 0.009 ? 'var(--warning)' : 'var(--success)' }}>
-                  <span>Reste à payer</span>
-                  <span className="money text-[14px]">{fmtMoney(Math.max(0, totaux.net - (parseFloat(montantPaye) || 0)))} DA</span>
-                </div>
+        <TotalsPanel className="sticky top-4"
+          rows={[
+            { label: 'Total HT', value: totaux.ht },
+            { label: 'Remises lignes', value: -totaux.remLignes },
+            { label: 'TVA', value: totaux.tva },
+            { label: `Remise globale (${fmtQte(remiseGlobale)} %)`, value: -totaux.remGlob },
+          ]}
+          total={{ label: 'Net à payer', value: totaux.net }}
+          after={(
+            <div className="flex flex-col gap-2.5">
+              {payable && (<>
+                <Field label="Montant payé" hint="paiement immédiat">
+                  <div className="flex gap-1.5">
+                    <TextInput type="number" min="0" step="0.01" value={montantPaye} mono align="right"
+                               onChange={(e) => setMontantPaye(e.target.value)} placeholder="0,00" className="flex-1 min-w-0" />
+                    <Button onClick={() => setMontantPaye(String(totaux.net))}>Tout</Button>
+                  </div>
+                </Field>
+                {paye > 0 && (
+                  <div className="flex justify-between items-baseline px-1 text-sm font-bold"
+                       style={{ color: totaux.net - paye > 0.009 ? 'var(--warning-text)' : 'var(--success-text)' }}>
+                    <span>Reste à payer</span>
+                    <span className="money text-md">{fmtMoney(Math.max(0, totaux.net - paye))} DA</span>
+                  </div>
+                )}
+              </>)}
+              <Button variant="primary" size="lg" block icon="save" onClick={() => void save()}
+                      disabled={lignes.length === 0} loading={saving}>
+                {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
+              </Button>
+              {payable && (
+                <Button variant="accent" size="lg" block kbd="F10" icon="cash"
+                        onClick={() => { setMontantPaye(String(totaux.net)); void save(totaux.net); }}
+                        disabled={saving || lignes.length === 0}>
+                  Payer tout
+                </Button>
               )}
-            </>)}
-            <button onClick={() => void save()} disabled={saving || lignes.length === 0}
-                    className="rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-50">
-              {saving ? 'Enregistrement…' : enEdition ? 'Enregistrer les modifications' : 'Enregistrer la pièce'}
-            </button>
-            {payable && (
-              <button onClick={() => { setMontantPaye(String(totaux.net)); void save(totaux.net); }}
-                      disabled={saving || lignes.length === 0}
-                      className="rounded-md py-2.5 font-bold disabled:opacity-50"
-                      style={{ background: 'var(--gold-400)', color: '#3A2A05' }}>
-                Payer tout · F10
-              </button>
-            )}
-            <div className="text-[10.5px] text-ink-muted text-center flex items-center justify-center gap-1.5">
-              <DocBadge code={type === 'FA' ? 'BR' : type} /> {affecteStock ? 'entre en stock' : 'sans impact stock'}
+              <div className="text-xs text-ink-muted text-center flex items-center justify-center gap-1.5">
+                <DocBadge code={type === 'FA' ? 'BR' : type} /> {affecteStock ? 'entre en stock' : 'sans impact stock'}
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        />
       </div>
-    </div>
-  );
-}
-
-function TotRow({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="flex justify-between px-4 py-2 text-[12px] text-ink-label border-b border-dashed border-line-soft">
-      <span>{label}</span>
-      <span className="money" style={{ color: value < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(value)}</span>
     </div>
   );
 }

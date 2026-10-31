@@ -6,6 +6,18 @@ import { Client, Article, Fournisseur } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import { useDebouncedValue } from '../lib/useDebounce';
 import { D, useDroits } from '../lib/droits';
+import { Icon, IconBadge, Kbd, type IconName, type Tone } from './ui/Icon';
+import { Spinner } from './ui/Button';
+import { EmptyState } from './ui/States';
+
+/** Icône et teinte par groupe de résultats. */
+const GROUPES: Record<string, { icon: IconName; tone: Tone }> = {
+  'Aller à': { icon: 'arrowRight', tone: 'brand' },
+  'Créer': { icon: 'plus', tone: 'success' },
+  Clients: { icon: 'users', tone: 'violet' },
+  Fournisseurs: { icon: 'building', tone: 'orange' },
+  Articles: { icon: 'package', tone: 'teal' },
+};
 
 type Item = {
   id: string;
@@ -129,45 +141,57 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   let dernierGroupe = '';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]"
-         style={{ background: 'rgb(15 26 46 / .45)' }} onClick={onClose}>
-      <div className="w-[620px] max-h-[70vh] bg-surface border border-line-soft rounded-lg shadow-lifted flex flex-col overflow-hidden"
+    <div className="fixed inset-0 z-modal flex items-start justify-center pt-[12vh] animate-fade-in"
+         style={{ background: 'var(--overlay)' }} onClick={onClose}>
+      <div role="dialog" aria-modal="true" aria-label="Recherche globale"
+           className="w-[640px] max-w-[calc(100vw-32px)] max-h-[70vh] bg-raised border border-line-soft rounded-lg shadow-modal flex flex-col overflow-hidden animate-pop-in"
            onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-line-soft">
-          <span className="text-ink-muted">🔍</span>
+        <div className="flex items-center gap-3 px-4 h-[54px] border-b border-line-soft">
+          <Icon name="search" size={20} className="text-brand-text" />
           <input ref={inputRef} value={term} onChange={(e) => setTerm(e.target.value)} onKeyDown={onKey}
                  placeholder="Rechercher un client, un article, une action…"
-                 className="flex-1 bg-transparent text-ink text-[14px] outline-none" />
-          {loading && <span className="text-[11px] text-ink-muted">…</span>}
-          <span className="font-mono text-[10px] border border-line rounded px-1.5 text-ink-muted">Échap</span>
+                 role="combobox" aria-expanded="true" aria-controls="palette-liste" aria-activedescendant={`palette-${hi}`}
+                 aria-autocomplete="list"
+                 className="flex-1 bg-transparent text-ink text-md outline-none placeholder:text-ink-placeholder" />
+          {loading && <Spinner size={16} className="text-brand-text" />}
+          <Kbd>Échap</Kbd>
         </div>
 
-        <div ref={listRef} className="overflow-auto">
+        <div ref={listRef} id="palette-liste" role="listbox" aria-label="Résultats" className="overflow-auto py-1.5">
           {items.length === 0 && (
-            <div className="px-4 py-6 text-center text-[12.5px] text-ink-muted">Aucun résultat.</div>
+            <EmptyState size="sm" icon="search" title="Aucun résultat"
+                        description={term.trim().length < 2 ? 'Tapez au moins deux caractères pour chercher clients, fournisseurs et articles.' : `Rien ne correspond à « ${term.trim()} ».`} />
           )}
           {items.map((it, i) => {
             const nouveauGroupe = it.groupe !== dernierGroupe;
             dernierGroupe = it.groupe;
+            const g = GROUPES[it.groupe] ?? GROUPES['Aller à'];
             return (
               <div key={it.id}>
                 {nouveauGroupe && (
-                  <div className="px-4 pt-2.5 pb-1 text-[9.5px] font-bold uppercase tracking-wider text-ink-muted">
+                  <div className="px-4 pt-2.5 pb-1 text-2xs font-bold uppercase tracking-wider text-ink-muted">
                     {it.groupe}
                   </div>
                 )}
-                <button data-idx={i} onMouseEnter={() => setHi(i)} onClick={it.action}
-                        className={`w-full text-left px-4 py-2 flex items-center gap-3 ${i === hi ? 'bg-brand-50' : ''}`}>
+                <button data-idx={i} id={`palette-${i}`} role="option" aria-selected={i === hi}
+                        onMouseEnter={() => setHi(i)} onClick={it.action}
+                        className={`w-[calc(100%-12px)] mx-1.5 text-left px-2.5 py-1.5 flex items-center gap-3 rounded-md transition-colors duration-fast ${i === hi ? 'bg-brand-soft' : ''}`}>
+                  <IconBadge name={g.icon} tone={g.tone} size="sm" />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold truncate">{it.titre}</span>
-                    {it.sous && <span className="block text-[10.5px] text-ink-muted truncate money">{it.sous}</span>}
+                    <span className={`block text-base font-semibold truncate ${i === hi ? 'text-brand-text' : 'text-ink'}`}>{it.titre}</span>
+                    {it.sous && <span className="block text-xs text-ink-muted truncate money">{it.sous}</span>}
                   </span>
-                  {it.droite && <span className="money text-[11px] text-ink-muted flex-none">{it.droite}</span>}
-                  {i === hi && <span className="font-mono text-[10px] text-ink-muted flex-none">↵</span>}
+                  {it.droite && <span className="money text-xs text-ink-label flex-none">{it.droite}</span>}
+                  {i === hi && <Kbd>Entrée</Kbd>}
                 </button>
               </div>
             );
           })}
+        </div>
+        <div className="flex items-center gap-4 px-4 h-9 border-t border-line-soft bg-sunken text-xs text-ink-muted">
+          <span className="inline-flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> naviguer</span>
+          <span className="inline-flex items-center gap-1"><Kbd>Entrée</Kbd> ouvrir</span>
+          <span className="inline-flex items-center gap-1"><Kbd>Échap</Kbd> fermer</span>
         </div>
       </div>
     </div>

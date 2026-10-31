@@ -16,7 +16,10 @@ import { ArticlesResult, Article } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import DataGrid, { Column, DataGridDistant } from '../components/ui/DataGrid';
 import { ExportColumn } from '../lib/export';
-import { Money, Tabs, PageHeader, SearchInput, StatusPill } from '../components/ui/atoms';
+import { Badge, Money, Tabs, PageHeader, StatusPill, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { SearchField } from '../components/ui/Field';
+import { SectionTitle } from '../components/ui/Card';
 
 const VUES = [
   { code: 'tous', label: 'Articles' },
@@ -102,11 +105,14 @@ export default function Stock() {
     { key: 'pmp', header: 'PMP', align: 'right', width: '95px', field: 'pmp', render: (a) => <Money value={a.pmp} /> },
     { key: 'pv', header: 'P.V. TTC', align: 'right', width: '95px', field: 'prix_vente_ttc', render: (a) => <Money value={a.prix_vente_ttc} /> },
     { key: 'margep', header: 'Marge %', align: 'right', width: '80px', field: 'margep', render: (a) => (
-      <span className="money" style={{ color: Number(a.margep) < 0 ? 'var(--danger)' : undefined }}>{fmtMoney(a.margep, 1)}</span>
+      <Money value={a.margep} digits={1} />
     ) },
     { key: 'qte', header: 'Stock', align: 'right', width: '85px', field: 'qte_reale', type: 'number', render: (a) => {
       const q = Number(a.qte_reale ?? 0), min = Number(a.stock_min ?? 0);
-      return <span className="money font-semibold" style={{ color: q <= 0 ? 'var(--danger)' : q <= min ? 'var(--warning)' : undefined }}>{fmtQte(q)}</span>;
+      if (q <= 0 || q <= min) {
+        return <Badge tone={q <= 0 ? 'danger' : 'warning'} shape="square" size="md" className="money">{fmtQte(q)}</Badge>;
+      }
+      return <span className="money font-semibold">{fmtQte(q)}</span>;
     } },
     { key: 'etat', header: 'État', width: '90px', render: (a) => {
       const q = Number(a.qte_reale ?? 0), min = Number(a.stock_min ?? 0);
@@ -130,35 +136,28 @@ export default function Stock() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Articles & stock">
-        <SearchInput value={search} onChange={setSearch} placeholder="Code, désignation, code-barres…" />
-        <button onClick={() => void printEtat()} disabled={printing}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+      <PageHeader title="Articles & stock" icon="package">
+        <Button icon="printer" onClick={() => void printEtat()} loading={printing}>
           {printing ? 'Préparation…' : "Imprimer l'état du stock"}
-        </button>
+        </Button>
         {peut('stock', D.stock.inventaire) && (
-          <button onClick={() => navigate('/stock/inventaires')}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Inventaires
-          </button>
+          <Button icon="inventory" onClick={() => navigate('/stock/inventaires')}>Inventaires</Button>
         )}
         {peutUn('stock', [D.stock.bonEntree, D.stock.bonSortie]) && (
-          <button onClick={() => navigate('/stock/mouvements')}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Mouvements
-          </button>
+          <Button icon="movements" onClick={() => navigate('/stock/mouvements')}>Mouvements</Button>
         )}
         {peut('stock', D.stock.creerArticle) && (
-          <button onClick={crud.openCreate}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-            ＋ Nouvel article
-          </button>
+          <Button variant="primary" icon="plus" onClick={crud.openCreate}>Nouvel article</Button>
         )}
       </PageHeader>
       {crud.modals}
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
-      <Tabs value={vue} onChange={setVue}
-            options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
+      <Toolbar>
+        <Tabs value={vue} onChange={setVue} label="Vue"
+              options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
+        <SearchField value={search} onChange={setSearch} placeholder="Code, désignation, code-barres…"
+                     label="Rechercher un article" className="ml-auto" />
+      </Toolbar>
       {vue === 'peremption' ? <PeremptionPanel /> : (
         <>
           <DataGrid columns={columns} rowKey={(a) => a.id}
@@ -189,15 +188,13 @@ function MatricePrix({ values }: { values: Record<string, unknown> }) {
   ];
   return (
     <section>
-      <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-muted mb-2">
-        Aperçu des marges (calcul automatique)
-      </h3>
+      <SectionTitle>Aperçu des marges (calcul automatique)</SectionTitle>
       <div className="border border-line-soft rounded-md overflow-hidden">
-        <table className="w-full text-[12px] border-collapse">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr>
               {['Tarif', 'P.V. HT', 'P.V. TTC', 'Marge', 'Marge %'].map((h, i) => (
-                <th key={h} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-1.5 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
+                <th key={h} className={`text-2xs font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-1.5 ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -212,15 +209,15 @@ function MatricePrix({ values }: { values: Record<string, unknown> }) {
                   <td className="px-3 py-1.5 font-semibold">{t.label}</td>
                   <td className="px-3 py-1.5 text-right money">{fmtMoney(t.ht)}</td>
                   <td className="px-3 py-1.5 text-right money">{fmtMoney(ttc)}</td>
-                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger)' : 'var(--success)' }}>{fmtMoney(marge)}</td>
-                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger)' : undefined }}>{fmtQte(margep)} %</td>
+                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger-text)' : 'var(--success-text)' }}>{fmtMoney(marge)}</td>
+                  <td className="px-3 py-1.5 text-right money" style={{ color: neg ? 'var(--danger-text)' : undefined }}>{fmtQte(margep)} %</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-      <div className="text-[10.5px] text-ink-muted mt-1">
+      <div className="text-xs text-ink-muted mt-1">
         La marge % est calculée par rapport au prix d'achat HT. Le serveur enregistre les 4 prix et recalcule TTC/marges.
       </div>
     </section>

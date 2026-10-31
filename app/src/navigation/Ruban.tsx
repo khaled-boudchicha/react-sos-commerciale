@@ -227,7 +227,7 @@ function BarreTitre({ session, executer, lancer, ouvrirFichier, droits }: {
       <div className="flex items-center gap-2 flex-none text-[11.5px] font-semibold">
         <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 h-[24px]" style={{ background: 'rgb(255 255 255 / .14)' }}
               title={`${session.online ? 'Agent connecté' : 'Agent hors ligne'} — ${session.agent}`}>
-          <span className="w-2 h-2 rounded-full" style={{ background: session.online ? '#4ADE80' : '#F87171', boxShadow: '0 0 0 2px rgb(255 255 255 / .25)' }} />
+          <span className="w-2 h-2 rounded-full" style={{ background: session.online ? 'var(--status-online)' : 'var(--status-offline)', boxShadow: '0 0 0 2px rgb(255 255 255 / .25)' }} />
           <span className="hidden xl:inline">{session.online ? 'Connecté' : 'Hors ligne'}</span>
         </span>
         <button onClick={() => executer('dossier')} className="inline-flex items-center gap-1.5 rounded-md px-2 h-[26px] hover:bg-white/15" title="Changer de dossier">
@@ -320,7 +320,7 @@ function ToucheAcces({ lettre, petit }: { lettre: string; petit?: boolean }) {
 
 function InfoBulle({ cmd, x, y }: { cmd: Commande; x: number; y: number }) {
   return (
-    <div className="fixed z-[80] w-[270px] rounded-md bg-surface border border-line-soft p-3 pointer-events-none" role="tooltip"
+    <div className="fixed z-tooltip w-[270px] rounded-md bg-surface border border-line-soft p-3 pointer-events-none" role="tooltip"
          style={{ left: Math.max(8, x), top: y, boxShadow: 'var(--shadow-lifted)' }}>
       <div className="flex items-center gap-2">
         <span className="w-6 h-6 rounded-[6px] inline-flex items-center justify-center flex-none" style={{ color: COULEUR_TON[cmd.ton], background: teinte(COULEUR_TON[cmd.ton], 12) }}>

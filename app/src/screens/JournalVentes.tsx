@@ -6,7 +6,8 @@ import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/u
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeJournal } from '../impression/demandes';
-import { PeriodPicker, SearchInput } from '../components/ui/atoms';
+import { PeriodPicker, SearchInput, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
 
 type LigneJournal = Record<string, any> & { id: string };
 
@@ -60,7 +61,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
       render: (l) => <span>{l.raison ?? l.fournisseur ?? l.code_cli ?? l.code_four ?? '—'}</span> },
     { key: 'code_article', header: 'Code', width: '100px', field: 'code_article', render: (l) => <span className="money">{l.code_article}</span> },
     { key: 'designation', header: 'Désignation', field: 'designation', render: (l) => <b>{l.designation}</b> },
-    { key: 'n_lot', header: 'Lot', width: '90px', field: 'n_lot', render: (l) => <span className="text-ink-muted money text-[11px]">{l.n_lot ?? '—'}</span> },
+    { key: 'n_lot', header: 'Lot', width: '90px', field: 'n_lot', render: (l) => <span className="text-ink-muted money text-xs">{l.n_lot ?? '—'}</span> },
     { key: 'qte', header: 'Qté', align: 'right', width: '70px', field: 'qte', type: 'number', render: (l) => <span className="money">{fmtQte(l.qte)}</span> },
     { key: 'prix_ht', header: 'P.U. HT', align: 'right', width: '100px', field: 'prix_ht', render: (l) => <span className="money">{fmtMoney(l.prix_ht)}</span> },
     { key: 'total_ttc', header: 'Total TTC', align: 'right', width: '115px', field: 'total_ttc',
@@ -68,7 +69,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
     ...(vente ? [{
       key: 'total_marge', header: 'Marge', align: 'right' as const, width: '110px', field: 'total_marge',
       render: (l: LigneJournal) => (
-        <span className="money" style={{ color: Number(l.total_marge) < 0 ? 'var(--danger)' : 'var(--success)' }}>
+        <span className="money" style={{ color: Number(l.total_marge) < 0 ? 'var(--danger-text)' : 'var(--success-text)' }}>
           {fmtMoney(l.total_marge)}
         </span>
       ),
@@ -77,14 +78,13 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3 flex-wrap">
+      <Toolbar>
         <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
         <SearchInput value={article} onChange={setArticle} placeholder="Filtrer par code article…" />
-        <button onClick={() => void imprimerJournal()} disabled={printing}
-                className="ml-auto rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+        <Button icon="printer" onClick={() => void imprimerJournal()} loading={printing} className="ml-auto">
           {printing ? 'Préparation…' : 'Imprimer le journal'}
-        </button>
-      </div>
+        </Button>
+      </Toolbar>
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={colonnes} rowKey={(l, i) => l.id ?? i}
                 distant={distant} cleEtat={vente ? 'journal-ventes' : 'journal-achats'}

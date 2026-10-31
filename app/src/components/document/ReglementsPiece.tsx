@@ -7,6 +7,7 @@ import { fmtDate, fmtMoney } from '../../lib/format';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import DataGrid from '../ui/DataGrid';
 import { useToast } from '../ui/Toast';
+import { Button, IconButton } from '../ui/Button';
 import ReglerPieceModal from './ReglerPieceModal';
 
 /**
@@ -59,7 +60,7 @@ export default function ReglementsPiece({ sens, pieceId, numero, reglements, res
         complet
         titre={<>Règlements <span className="text-ink-muted font-bold">({reglements.length})</span></>}
         actions={reste > 0.009 ? (
-          <button onClick={() => setAjout(true)} className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">{verbe}</button>
+          <Button size="sm" variant="success" icon={sens === 'vente' ? 'cash' : 'wallet'} onClick={() => setAjout(true)}>{verbe}</Button>
         ) : undefined}
         rows={reglements}
         rowKey={(r) => r.id}
@@ -68,15 +69,15 @@ export default function ReglementsPiece({ sens, pieceId, numero, reglements, res
         columns={[
           { key: 'date', header: 'Date', width: '95px', render: (r) => fmtDate(r.date) },
           { key: 'mode_payement', header: 'Mode', width: '150px', render: (r) => (
-            <>{r.mode_payement ?? '—'}{r.num_cheque ? <span className="text-ink-muted money text-[10.5px]"> · n° {r.num_cheque}</span> : null}</>
+            <>{r.mode_payement ?? '—'}{r.num_cheque ? <span className="text-ink-muted money text-xs"> · n° {r.num_cheque}</span> : null}</>
           ) },
           { key: 'observation', header: 'Observation', render: (r) => (
             <span className="text-ink-muted">{r.depuis_avance ? <span className="font-bold mr-1">Avance</span> : null}{r.observation ?? ''}</span>
           ) },
           { key: 'montant', header: 'Montant', align: 'right', width: '120px', render: (r) => <span className="money font-medium">{fmtMoney(r.montant)}</span> },
           ...(peutSupprimer ? [{ key: '_suppr', header: '', width: '44px', align: 'right' as const, render: (r: ReglementPiece) => (
-            <button onClick={(e) => { e.stopPropagation(); setASupprimer(r); }} title="Supprimer ce règlement"
-                    className="font-bold" style={{ color: 'var(--danger)' }}>✕</button>
+            <IconButton icon="trash" label="Supprimer ce règlement" tone="danger" size="xs"
+                        onClick={(e) => { e.stopPropagation(); setASupprimer(r); }} />
           ) }] : []),
         ]}
       />

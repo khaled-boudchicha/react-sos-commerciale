@@ -6,8 +6,16 @@ import {
   depuisPrixTtc, depuisRemiseMontant,
 } from './lignesDocument';
 import LotCell from './LotCell';
+import { Button, IconButton } from '../ui/Button';
+import { Checkbox } from '../ui/Field';
+import { Icon } from '../ui/Icon';
+import { EmptyState } from '../ui/States';
+import { cn } from '../ui/cn';
 
-const cellNum = 'w-full bg-transparent text-right money text-[12px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface';
+/** Cellule éditable : discrète au repos, contour au survol, champ plein au focus. */
+const cellEdit = 'w-full h-control-sm bg-transparent text-ink border border-transparent rounded-sm transition-colors duration-fast '
+  + 'hover:border-line focus:border-brand-500 focus:bg-surface';
+const cellNum = cn(cellEdit, 'text-right money text-sm px-2');
 
 /** Nombre édité sans imposer un 0 collant : champ vide toléré pendant la saisie. */
 function num(v: string): number { return parseFloat(v) || 0; }
@@ -28,12 +36,14 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
 
   return (
     <div className="bg-surface border border-line-soft rounded-md shadow-soft">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-line-soft">
-        <span className="text-[11px] font-bold text-ink-muted">{lignes.length} ligne(s)</span>
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-line-soft">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-muted">
+          <Icon name="list" size={14} />{lignes.length} ligne(s)
+        </span>
         <SelecteurColonnes sens={sens} visibles={visibles} basculer={basculer} reinitialiser={reinitialiser} />
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px] border-collapse">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr>
               <Th>Article</Th>
@@ -54,21 +64,26 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
           </thead>
           <tbody>
             {lignes.length === 0 && (
-              <tr><td colSpan={nbCol} className="px-3 py-8 text-center text-ink-muted">
-                Recherchez un article ci-dessus, ou scannez un code-barres. Entrée pour l'ajouter.
+              <tr><td colSpan={nbCol}>
+                <EmptyState size="sm" icon="package" title="Aucune ligne"
+                            description="Recherchez un article ci-dessus, ou scannez un code-barres. Entrée pour l'ajouter." />
               </td></tr>
             )}
             {lignes.map((l) => (
-              <tr key={l.key} className="border-b border-line-soft last:border-b-0">
+              <tr key={l.key} className="border-b border-line-soft last:border-b-0 hover:bg-hover transition-colors duration-fast">
                 <td className="px-3 py-1">
                   <b>{l.designation}</b>
-                  <span className="money text-[10.5px] text-ink-muted"> · {l.code_article}</span>
+                  <span className="money text-xs text-ink-muted"> · {l.code_article}</span>
                   {l.stock !== undefined && (() => {
                     const rupture = sens === 'vente' && l.qte > l.stock!;
                     return (
-                      <span className={`text-[10.5px] ml-1 ${rupture ? 'font-semibold' : 'text-ink-muted'}`}
-                            style={rupture ? { color: 'var(--danger)' } : undefined}>
-                        · stock {fmtQte(l.stock)}{rupture ? ' ⚠ dépasse le stock' : ''}
+                      <span className={cn('text-xs ml-1', rupture ? 'font-semibold text-danger-text' : 'text-ink-muted')}>
+                        · stock {fmtQte(l.stock)}
+                        {rupture && (
+                          <span className="inline-flex items-center gap-0.5 ml-1 align-text-bottom">
+                            <Icon name="alert" size={12} />dépasse le stock
+                          </span>
+                        )}
                       </span>
                     );
                   })()}
@@ -82,7 +97,7 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
                               const prix = l.prixTiers?.[t - 1];
                               patch(l.key, { tarif: t, ...(prix ? { prix_ht: prix } : {}) });
                             }}
-                            className="w-full bg-transparent text-[11px] px-1 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface">
+                            className={cn(cellEdit, 'text-xs px-1 cursor-pointer')}>
                       {[1, 2, 3, 4].map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </td>
@@ -121,7 +136,7 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
                 {vis('peremption') && (
                   <td className="w-[130px]"><input type="date" value={l.date_peremption ?? ''}
                     onChange={(e) => patch(l.key, { date_peremption: e.target.value })}
-                    className="w-full bg-transparent text-[11px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface" /></td>
+                    className={cn(cellEdit, 'text-xs px-2')} /></td>
                 )}
 
                 {vis('total_ht') && (
@@ -130,9 +145,8 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
 
                 <td className="w-[110px] text-right money font-semibold px-3">{fmtMoney(totalTtcLigne(l))}</td>
 
-                <td className="w-[34px] text-center">
-                  <button onClick={() => remove(l.key)} title="Supprimer la ligne"
-                          className="text-ink-muted hover:text-[color:var(--danger)] font-bold">✕</button>
+                <td className="w-[36px] text-center">
+                  <IconButton icon="trash" label="Supprimer la ligne" tone="danger" size="xs" onClick={() => remove(l.key)} />
                 </td>
               </tr>
             ))}
@@ -147,7 +161,8 @@ function round2(n: number): number { return Math.round(n * 100) / 100; }
 
 function Th({ children, right }: { children?: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-2 ${right ? 'text-right' : 'text-left'}`}>
+    <th className={cn('text-2xs font-bold uppercase tracking-wider text-ink-label bg-sunken border-b border-line-soft px-3 py-2 whitespace-nowrap',
+      right ? 'text-right' : 'text-left')}>
       {children}
     </th>
   );
@@ -168,24 +183,23 @@ function SelecteurColonnes({ sens, visibles, basculer, reinitialiser }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOuvert((v) => !v)}
-              title="Choisir les colonnes affichées"
-              className="rounded-md px-2.5 py-1 text-[11px] font-semibold border border-line-soft bg-surface hover:bg-surface-alt">
-        ⚙ Colonnes
-      </button>
+      <Button size="xs" variant="ghost" icon="columns" iconRight="chevronDown" onClick={() => setOuvert((v) => !v)}
+              title="Choisir les colonnes affichées" aria-haspopup="true" aria-expanded={ouvert}
+              className={ouvert ? '!bg-hover !text-ink' : undefined}>
+        Colonnes
+      </Button>
       {ouvert && (
-        <div className="absolute right-0 mt-1 z-20 w-56 bg-surface border border-line-soft rounded-md shadow-lifted p-2">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-ink-muted px-1 pb-1">Colonnes affichées</div>
+        <div role="group" aria-label="Colonnes affichées"
+             className="absolute right-0 mt-1 z-dropdown w-60 bg-raised border border-line-soft rounded-md shadow-lifted py-1 animate-pop-in">
+          <div className="px-3 pt-2 pb-1 text-2xs font-bold uppercase tracking-wider text-ink-muted">Colonnes affichées</div>
           {colonnesPour(sens).map((c) => (
-            <label key={c.id} className="flex items-center gap-2 px-1 py-1 text-[12px] cursor-pointer hover:bg-surface-alt rounded-sm">
-              <input type="checkbox" checked={visibles.has(c.id)} onChange={() => basculer(c.id)} />
-              {c.label}
-            </label>
+            <Checkbox key={c.id} label={c.label} checked={visibles.has(c.id)} onChange={() => basculer(c.id)}
+                      className="w-full px-3 py-1.5 hover:bg-hover" />
           ))}
-          <button type="button" onClick={reinitialiser}
-                  className="mt-1 w-full text-left px-1 py-1 text-[11px] font-semibold text-brand-700 hover:underline">
-            Réinitialiser
-          </button>
+          <div className="my-1 border-t border-line-soft" role="separator" />
+          <div className="px-3 py-1">
+            <Button size="xs" variant="link" icon="refresh" onClick={reinitialiser}>Réinitialiser</Button>
+          </div>
         </div>
       )}
     </div>

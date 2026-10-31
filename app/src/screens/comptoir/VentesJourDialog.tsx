@@ -53,7 +53,7 @@ export default function VentesJourDialog({ onReimprimer, onClose }: {
                 <td className="text-right money font-bold">{fmtMoney(v.net_a_payer)}</td>
                 <td className="text-right money" style={{ color: Number(v.reste_a_payer) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(v.regler)}</td>
                 <td className="text-right whitespace-nowrap pl-2">
-                  <button onClick={() => onReimprimer(v.id)} className="text-[11.5px] font-bold text-brand-700 mr-3">Réimprimer</button>
+                  <button onClick={() => onReimprimer(v.id)} className="text-[11.5px] font-bold text-brand-text mr-3">Réimprimer</button>
                   <button onClick={() => { onClose(); navigate(`/ventes/${v.id}`); }} className="text-[11.5px] font-bold text-ink-label">Ouvrir →</button>
                 </td>
               </tr>

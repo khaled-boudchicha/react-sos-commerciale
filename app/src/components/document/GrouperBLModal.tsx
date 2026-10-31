@@ -7,7 +7,11 @@ import { useSession } from '../../store/session';
 import { fmtDate, fmtMoney, isoToday } from '../../lib/format';
 import ClientSearch from '../ClientSearch';
 import { useToast } from '../ui/Toast';
-import { bandeauDanger } from './prefillPiece';
+import Dialog from '../ui/Dialog';
+import { Button } from '../ui/Button';
+import { Field, TextInput } from '../ui/Field';
+import { Alert, EmptyState, Loading } from '../ui/States';
+import { cn } from '../ui/cn';
 
 /**
  * « Facturer des BL » : regroupe plusieurs bons de livraison d'un même client
@@ -71,83 +75,81 @@ export default function GrouperBLModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-6" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[640px] max-h-full flex flex-col bg-surface border border-line-soft rounded-lg shadow-lifted">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-line-soft flex-none">
-          <div>
-            <div className="font-extrabold text-[15px]">Facturer des bons de livraison</div>
-            <div className="text-[11px] text-ink-muted">Les BL cochés sont regroupés en une facture unique pour le client.</div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
-
-        <div className="px-5 py-4 overflow-auto flex flex-col gap-3">
-          {error && <div className="text-[12px] rounded-md px-3 py-2" style={bandeauDanger}>{error}</div>}
-          <label className="text-[11px] font-bold text-ink-label">Client
-            <div className="mt-1 font-normal"><ClientSearch value={client} onSelect={choisirClient} /></div>
-          </label>
-
-          {client && (
-            <div className="border border-line-soft rounded-md overflow-hidden">
-              <table className="w-full text-[12px]">
-                <thead>
-                  <tr className="bg-bg text-[10.5px] uppercase text-ink-muted">
-                    <th className="px-3 py-2 w-[36px]">
-                      <input type="checkbox" checked={tousCoches} disabled={bls.length === 0}
-                             onChange={() => setSelection(tousCoches ? new Set() : new Set(bls.map((b) => b.id)))} />
-                    </th>
-                    <th className="text-left px-2 py-2">N° BL</th>
-                    <th className="text-left px-2 py-2 w-[100px]">Date</th>
-                    <th className="text-right px-3 py-2 w-[130px]">Net à payer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && <tr><td colSpan={4} className="px-3 py-3 text-ink-muted">Chargement…</td></tr>}
-                  {!loading && bls.length === 0 && (
-                    <tr><td colSpan={4} className="px-3 py-3 text-ink-muted">Aucun bon de livraison à facturer pour ce client.</td></tr>
-                  )}
-                  {bls.map((b) => (
-                    <tr key={b.id} className="border-t border-line-soft cursor-pointer" onClick={() => basculer(b.id)}>
-                      <td className="px-3 py-1.5 text-center">
-                        <input type="checkbox" checked={selection.has(b.id)} onChange={() => basculer(b.id)}
-                               onClick={(e) => e.stopPropagation()} />
-                      </td>
-                      <td className="px-2 py-1.5 money font-bold">{b.numero}</td>
-                      <td className="px-2 py-1.5">{fmtDate(b.date)}</td>
-                      <td className="px-3 py-1.5 text-right money">{fmtMoney(b.net_a_payer)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <div className="grid grid-cols-[160px_1fr] gap-3">
-            <label className="text-[11px] font-bold text-ink-label">Date de la facture
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            </label>
-            <label className="text-[11px] font-bold text-ink-label">Observation
-              <input value={observation} onChange={(e) => setObservation(e.target.value)}
-                     className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-            </label>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-line-soft flex-none">
-          <span className="text-[12px] text-ink-label mr-auto">
-            {selection.size} BL · <b className="money">{fmtMoney(total)} DA</b>
-          </span>
-          <button onClick={onClose} disabled={saving}
-                  className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px] disabled:opacity-60">
-            Annuler
-          </button>
-          <button onClick={() => void valider()} disabled={saving || selection.size === 0}
-                  className="px-5 py-2 rounded-md bg-brand-700 text-white font-bold text-[12px] disabled:opacity-60">
+    <Dialog
+      title="Facturer des bons de livraison"
+      subtitle="Les BL cochés sont regroupés en une facture unique pour le client."
+      icon="invoice" size="md" width={640} closeOnOverlay={false} onClose={onClose}
+      footerStart={(
+        <span className="text-sm text-ink-label">
+          {selection.size} BL · <b className="money text-ink">{fmtMoney(total)} DA</b>
+        </span>
+      )}
+      footer={(
+        <>
+          <Button onClick={onClose} disabled={saving}>Annuler</Button>
+          <Button variant="primary" icon="check" loading={saving}
+                  onClick={() => void valider()} disabled={saving || selection.size === 0}>
             {saving ? 'Création…' : 'Créer la facture'}
-          </button>
+          </Button>
+        </>
+      )}
+    >
+      <div className="flex flex-col gap-4">
+        {error && <Alert tone="danger" compact>{error}</Alert>}
+        <Field label="Client" required>
+          <ClientSearch value={client} onSelect={choisirClient} />
+        </Field>
+
+        {client && (
+          <div className="border border-line-soft rounded-md overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-sunken text-2xs font-bold uppercase tracking-wider text-ink-label">
+                  <th className="px-3 py-2 w-[36px]">
+                    <input type="checkbox" checked={tousCoches} disabled={bls.length === 0} aria-label="Tout cocher"
+                           className="h-4 w-4 cursor-pointer accent-[var(--brand-700)]"
+                           onChange={() => setSelection(tousCoches ? new Set() : new Set(bls.map((b) => b.id)))} />
+                  </th>
+                  <th className="text-left px-2 py-2">N° BL</th>
+                  <th className="text-left px-2 py-2 w-[100px]">Date</th>
+                  <th className="text-right px-3 py-2 w-[130px]">Net à payer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && <tr><td colSpan={4} className="px-3 py-3"><Loading /></td></tr>}
+                {!loading && bls.length === 0 && (
+                  <tr><td colSpan={4}>
+                    <EmptyState size="sm" icon="delivery" title="Aucun bon de livraison à facturer pour ce client." />
+                  </td></tr>
+                )}
+                {bls.map((b) => (
+                  <tr key={b.id} onClick={() => basculer(b.id)}
+                      className={cn('border-t border-line-soft cursor-pointer transition-colors duration-fast',
+                        selection.has(b.id) ? 'bg-brand-soft' : 'hover:bg-hover')}>
+                    <td className="px-3 py-1.5 text-center">
+                      <input type="checkbox" checked={selection.has(b.id)} onChange={() => basculer(b.id)}
+                             onClick={(e) => e.stopPropagation()} aria-label={`BL ${b.numero}`}
+                             className="h-4 w-4 cursor-pointer accent-[var(--brand-700)]" />
+                    </td>
+                    <td className="px-2 py-1.5 money font-bold">{b.numero}</td>
+                    <td className="px-2 py-1.5">{fmtDate(b.date)}</td>
+                    <td className="px-3 py-1.5 text-right money">{fmtMoney(b.net_a_payer)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="grid grid-cols-[170px_1fr] gap-3">
+          <Field label="Date de la facture" required>
+            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Observation">
+            <TextInput value={observation} onChange={(e) => setObservation(e.target.value)} />
+          </Field>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

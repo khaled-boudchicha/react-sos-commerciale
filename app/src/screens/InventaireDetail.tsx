@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@apollo/client';
 import { INVENTAIRE, UPDATE_LIGNE_INVENTAIRE, CLOTURER_INVENTAIRE, COORDONNEES_SOCIETE } from '../api/queries';
-import { fmtDate, fmtMoney, fmtQte } from '../lib/format';
-import { PageHeader, StatusPill } from '../components/ui/atoms';
+import { fmtDate, fmtQte } from '../lib/format';
+import { Badge, Money, PageHeader, StatusPill, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList, TotalsPanel } from '../components/ui/Card';
+import { Checkbox, SearchField } from '../components/ui/Field';
+import { Alert, EmptyState, Loading, Skeleton } from '../components/ui/States';
+import { Menu } from '../components/ui/Menu';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
@@ -87,83 +92,83 @@ export default function InventaireDetail() {
   });
   const nbEcarts = (inv?.lignes ?? []).filter((l) => Math.abs(l.ecart) > 0.0001).length;
 
+  const titre = inv?.designation || `Inventaire #${id}`;
+  const ecartTone = (v: number) => (v < 0 ? 'var(--danger-text)' : v > 0 ? 'var(--success-text)' : undefined);
+
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title={inv?.designation || `Inventaire #${id}`}>
-        <Link to="/stock/inventaires" className="text-[12px] font-bold text-brand-700">← Inventaires</Link>
+      <PageHeader title={titre} backTo="/stock/inventaires" backLabel="Retour aux inventaires"
+                  breadcrumb={[{ label: 'Stock', to: '/stock' }, { label: 'Inventaires', to: '/stock/inventaires' }, { label: titre }]}
+                  meta={inv && (closed ? <StatusPill tone="ok">Clôturé</StatusPill> : <StatusPill tone="warn">Brouillon</StatusPill>)}>
         {inv && (
-          <button onClick={() => imprimer(true)}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Feuille de comptage
-          </button>
-        )}
-        {inv && (
-          <button onClick={() => imprimer(false)}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Imprimer l'état
-          </button>
+          <Menu label="Imprimer" width={220} items={[
+            { label: 'Feuille de comptage', icon: 'printer', hint: 'vierge', onSelect: () => imprimer(true) },
+            { label: "Imprimer l'état", icon: 'printer', onSelect: () => imprimer(false) },
+          ]} />
         )}
         {inv && !closed && (
-          <button onClick={() => setConfirmCloture(true)}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-            Clôturer l'inventaire
-          </button>
+          <Button variant="primary" icon="lock" onClick={() => setConfirmCloture(true)}>Clôturer l'inventaire</Button>
         )}
       </PageHeader>
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
-      {error && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{error}</div>}
-      {qError && <div className="text-[12px]" style={{ color: 'var(--danger)' }}>{qError.message}</div>}
+      {error && <Alert tone="danger">{error}</Alert>}
+      {qError && (
+        <Alert tone="danger" action={<Button size="sm" icon="refresh" onClick={() => refetch()}>Réessayer</Button>}>
+          {qError.message}
+        </Alert>
+      )}
+      {loading && !inv && <Card><Skeleton lines={2} /></Card>}
 
       {inv && (
-        <div className="bg-surface border border-line-soft rounded-md shadow-soft px-4 py-3.5 flex items-center gap-6 flex-wrap">
-          <Head label="Date">{fmtDate(inv.date)}</Head>
-          <Head label="Articles"><span className="money">{inv.nb_articles ?? lignes.length}</span></Head>
-          <Head label="Écarts"><span className="money" style={{ color: nbEcarts ? 'var(--warning)' : undefined }}>{nbEcarts}</span></Head>
-          <Head label="Valeur théorique"><span className="money">{fmtMoney(inv.valeur_theorique)}</span></Head>
-          <Head label="Valeur comptée"><span className="money">{fmtMoney(inv.valeur_reale)}</span></Head>
-          <div className="ml-auto text-right">
-            <div className="text-[10px] font-bold uppercase text-ink-muted">Écart de valorisation</div>
-            <div className="money text-[19px] font-extrabold"
-                 style={{ color: Number(inv.ecart_valeur) < 0 ? 'var(--danger)' : Number(inv.ecart_valeur) > 0 ? 'var(--success)' : undefined }}>
-              {fmtMoney(inv.ecart_valeur)} DA
-            </div>
-          </div>
-          {closed ? <StatusPill tone="ok">Clôturé</StatusPill> : <StatusPill tone="warn">Brouillon</StatusPill>}
+        <div className="grid grid-cols-[1fr_300px] gap-3.5 items-stretch">
+          <Card className="flex items-center">
+            <DescriptionList columns={3} className="w-full" items={[
+              { label: 'Date', value: fmtDate(inv.date) },
+              { label: 'Articles', value: inv.nb_articles ?? lignes.length, mono: true },
+              { label: 'Écarts', value: nbEcarts
+                ? <Badge tone="warning" size="md" className="money">{nbEcarts}</Badge>
+                : <span className="money">{nbEcarts}</span> },
+            ]} />
+          </Card>
+          <TotalsPanel
+            rows={[
+              { label: 'Valeur théorique', value: Number(inv.valeur_theorique ?? 0) },
+              { label: 'Valeur comptée', value: Number(inv.valeur_reale ?? 0) },
+              { label: <b className="text-ink">Écart de valorisation (DA)</b>, value: Number(inv.ecart_valeur ?? 0),
+                tone: Number(inv.ecart_valeur) > 0 ? 'success' : undefined },
+            ]}
+          />
         </div>
       )}
 
-      <div className="flex items-center gap-3">
-        <input value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Filtrer par code ou désignation…"
-               className="border border-line rounded-sm px-3 py-1.5 bg-surface text-ink text-[12px] min-w-[280px]" />
-        <label className="text-[12px] font-semibold text-ink-label flex items-center gap-1.5">
-          <input type="checkbox" checked={ecartsOnly} onChange={(e) => setEcartsOnly(e.target.checked)} />
-          Écarts seulement
-        </label>
-        {!closed && <span className="text-[11px] text-ink-muted ml-auto">Saisissez la quantité comptée — enregistrée en quittant la case (ou Entrée).</span>}
-      </div>
+      <Toolbar>
+        <SearchField value={filtre} onChange={setFiltre} placeholder="Filtrer par code ou désignation…" width={300} />
+        <Checkbox checked={ecartsOnly} onChange={(e) => setEcartsOnly(e.target.checked)} label="Écarts seulement" />
+        {!closed && <span className="text-xs text-ink-muted ml-auto">Saisissez la quantité comptée — enregistrée en quittant la case (ou Entrée).</span>}
+      </Toolbar>
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft overflow-x-auto">
-        <table className="w-full text-[12px] border-collapse">
+      <Card padding="none" className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
           <thead>
             <tr>
               {['Code', 'Désignation', 'Dépôt', 'Théorique', 'Compté', 'Écart', 'PMP', 'Valeur comptée'].map((h, i) => (
-                <th key={h} className={`text-[10px] font-bold uppercase tracking-wider text-ink-muted bg-bg border-b border-line-soft px-3 py-2 ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={h} className={`text-2xs font-bold uppercase tracking-wider text-ink-muted bg-sunken border-b border-line-soft px-3 py-2 ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading && lignes.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-6 text-center text-ink-muted">Chargement…</td></tr>
+              <tr><td colSpan={8} className="px-3 py-6 text-center"><Loading /></td></tr>
             )}
             {!loading && lignes.length === 0 && (
-              <tr><td colSpan={8} className="px-3 py-8 text-center text-ink-muted">Aucune ligne.</td></tr>
+              <tr><td colSpan={8}><EmptyState size="sm" icon="inventory" title="Aucune ligne." /></td></tr>
             )}
             {lignes.map((l) => {
               const draft = drafts[l.id];
               const shown = draft !== undefined ? draft : String(l.qte_reale);
               return (
-                <tr key={l.id} className="border-b border-line-soft last:border-b-0">
+                <tr key={l.id} className="border-b border-line-soft last:border-b-0 hover:bg-hover">
                   <td className="px-3 py-1 money">{l.code_article}</td>
                   <td className="px-3 py-1"><b>{l.designation}</b>{l.unite ? <span className="text-ink-muted"> · {l.unite}</span> : null}</td>
                   <td className="px-3 py-1 text-ink-muted">{l.depot ?? '—'}</td>
@@ -173,25 +178,25 @@ export default function InventaireDetail() {
                       <div className="text-right money font-semibold">{fmtQte(l.qte_reale)}</div>
                     ) : (
                       <input type="number" step="any" value={shown}
+                             aria-label={`Quantité comptée ${l.code_article}`}
                              disabled={!!saving[l.id]}
                              onChange={(e) => setDrafts((d) => ({ ...d, [l.id]: e.target.value }))}
                              onBlur={(e) => void commit(l, e.target.value)}
                              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                             className="w-full bg-transparent text-right money text-[12px] px-2 py-1.5 border border-transparent rounded-sm focus:border-brand-500 focus:bg-surface disabled:opacity-50" />
+                             className="w-full bg-transparent text-right money text-sm px-2 py-1.5 border border-line-soft rounded-sm hover:border-line focus:border-brand-500 focus:bg-surface disabled:opacity-50" />
                     )}
                   </td>
-                  <td className="px-3 py-1 text-right money font-semibold"
-                      style={{ color: l.ecart < 0 ? 'var(--danger)' : l.ecart > 0 ? 'var(--success)' : undefined }}>
+                  <td className="px-3 py-1 text-right money font-semibold" style={{ color: ecartTone(l.ecart) }}>
                     {l.ecart > 0 ? '+' : ''}{fmtQte(l.ecart)}
                   </td>
-                  <td className="px-3 py-1 text-right money">{fmtMoney(l.prix_pmp)}</td>
-                  <td className="px-3 py-1 text-right money">{fmtMoney(l.valeur_reale)}</td>
+                  <td className="px-3 py-1 text-right"><Money value={l.prix_pmp} /></td>
+                  <td className="px-3 py-1 text-right"><Money value={l.valeur_reale} /></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {confirmCloture && (
         <ConfirmDialog
@@ -200,15 +205,6 @@ export default function InventaireDetail() {
           confirmLabel="Clôturer" loading={cloturing}
           onConfirm={doCloture} onCancel={() => setConfirmCloture(false)} />
       )}
-    </div>
-  );
-}
-
-function Head({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] font-bold uppercase text-ink-muted">{label}</div>
-      <div className="text-[13px] font-semibold">{children}</div>
     </div>
   );
 }

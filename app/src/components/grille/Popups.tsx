@@ -1,4 +1,7 @@
 import { ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../ui/Button';
+import { TextInput } from '../ui/Field';
+import { Icon } from '../ui/Icon';
 import { OperateurFiltre } from './types';
 
 /**
@@ -24,7 +27,7 @@ export function Flottant({ ancre, onFermer, largeur = 240, children }: {
     return () => { clearTimeout(t); document.removeEventListener('mousedown', clic); document.removeEventListener('keydown', touche, true); };
   }, [onFermer]);
   return (
-    <div ref={ref} className="fixed z-[60] bg-surface border border-line-soft rounded-md shadow-lifted text-[12px]"
+    <div ref={ref} className="fixed z-popover bg-raised text-ink border border-line-soft rounded-md shadow-lifted text-sm overflow-hidden animate-fade-in"
          style={{ left: pos.left, top: pos.top, width: largeur }}>
       {children}
     </div>
@@ -47,12 +50,12 @@ export function FiltreEntete({ ancre, valeurs, retenues, onAppliquer, onFermer }
   return (
     <Flottant ancre={ancre} onFermer={onFermer} largeur={260}>
       <div className="p-2 border-b border-line-soft">
-        <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…"
-               className="w-full border border-line rounded-sm px-2 py-1.5 bg-surface text-ink" />
+        <TextInput size="sm" leading="search" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Rechercher…"
+                   aria-label="Rechercher une valeur" />
       </div>
       <div className="max-h-64 overflow-auto py-1">
-        <label className="flex items-center gap-2 px-3 py-1 font-bold text-ink-label hover:bg-line-soft">
-          <input type="checkbox" checked={tout} onChange={() => setCoches((s) => {
+        <label className="flex items-center gap-2 px-3 py-1 font-semibold text-ink-label hover:bg-hover cursor-pointer">
+          <input type="checkbox" className="accent-[var(--brand-700)]" checked={tout} onChange={() => setCoches((s) => {
             const n = new Set(s);
             visibles.forEach((v) => (tout ? n.delete(v.cle ?? v.texte) : n.add(v.cle ?? v.texte)));
             return n;
@@ -60,23 +63,23 @@ export function FiltreEntete({ ancre, valeurs, retenues, onAppliquer, onFermer }
           (Tout sélectionner)
         </label>
         {visibles.map((v) => (
-          <label key={v.cle ?? v.texte} className="flex items-center gap-2 px-3 py-1 hover:bg-line-soft">
-            <input type="checkbox" checked={coches.has(v.cle ?? v.texte)} onChange={() => setCoches((s) => {
+          <label key={v.cle ?? v.texte} className="flex items-center gap-2 px-3 py-1 hover:bg-hover cursor-pointer">
+            <input type="checkbox" className="accent-[var(--brand-700)]" checked={coches.has(v.cle ?? v.texte)} onChange={() => setCoches((s) => {
               const k = v.cle ?? v.texte;
               const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n;
             })} />
-            <span className="flex-1 truncate">{v.texte || '(vide)'}</span>
-            <span className="text-ink-muted money text-[10.5px]">{v.nombre}</span>
+            <span className={`flex-1 truncate ${v.texte ? '' : 'italic text-ink-muted'}`}>{v.texte || '(vide)'}</span>
+            <span className="text-ink-muted money text-xs">{v.nombre}</span>
           </label>
         ))}
         {visibles.length === 0 && <div className="px-3 py-2 text-ink-muted">Aucune valeur.</div>}
       </div>
-      <div className="flex gap-2 p-2 border-t border-line-soft">
-        <button onClick={() => { onAppliquer(null); onFermer(); }} className="flex-1 border border-line rounded-sm py-1.5 font-bold text-ink-label">Effacer</button>
-        <button onClick={() => {
+      <div className="flex gap-2 p-2 border-t border-line-soft bg-sunken">
+        <Button size="sm" className="flex-1" onClick={() => { onAppliquer(null); onFermer(); }}>Effacer</Button>
+        <Button size="sm" variant="primary" className="flex-1" onClick={() => {
           onAppliquer(coches.size === valeurs.length ? null : [...coches]);
           onFermer();
-        }} className="flex-1 rounded-sm py-1.5 font-bold text-white bg-brand-700">OK</button>
+        }}>OK</Button>
       </div>
     </Flottant>
   );
@@ -93,19 +96,21 @@ export function SelecteurColonnes({ ancre, colonnes, masquees, onBasculer, onRei
 }) {
   return (
     <Flottant ancre={ancre} onFermer={onFermer} largeur={240}>
-      <div className="px-3 py-2 font-bold border-b border-line-soft">Colonnes</div>
+      <div className="flex items-center gap-2 px-3 py-2 font-bold text-ink border-b border-line-soft">
+        <Icon name="columns" size={16} className="text-ink-muted" />Colonnes
+      </div>
       <div className="max-h-72 overflow-auto py-1">
         {colonnes.map((c) => (
-          <label key={c.champ} className={`flex items-center gap-2 px-3 py-1 hover:bg-line-soft ${c.masquable ? '' : 'opacity-50'}`}>
-            <input type="checkbox" disabled={!c.masquable} checked={!masquees.includes(c.champ)} onChange={() => onBasculer(c.champ)} />
+          <label key={c.champ} className={`flex items-center gap-2 px-3 py-1 hover:bg-hover ${c.masquable ? 'cursor-pointer' : 'opacity-50'}`}>
+            <input type="checkbox" className="accent-[var(--brand-700)]" disabled={!c.masquable} checked={!masquees.includes(c.champ)} onChange={() => onBasculer(c.champ)} />
             {c.titre}
           </label>
         ))}
       </div>
-      <div className="p-2 border-t border-line-soft">
-        <button onClick={() => { onReinitialiser(); onFermer(); }} className="w-full border border-line rounded-sm py-1.5 font-bold text-ink-label">
+      <div className="p-2 border-t border-line-soft bg-sunken">
+        <Button size="sm" block icon="refresh" onClick={() => { onReinitialiser(); onFermer(); }}>
           Rétablir la disposition par défaut
-        </button>
+        </Button>
       </div>
     </Flottant>
   );
@@ -122,8 +127,8 @@ export function MenuContextuel({ ancre, entrees, onFermer }: { ancre: DOMRect; e
           <div key={i}>
             {e.separateur && <div className="my-1 border-t border-line-soft" />}
             <button disabled={e.desactive} onClick={() => { e.action(); onFermer(); }}
-                    className="w-full text-left px-3 py-1.5 hover:bg-line-soft disabled:opacity-40 flex items-center gap-2">
-              <span className="w-3 text-brand-700">{e.actif ? '✓' : ''}</span>{e.libelle}
+                    className="w-full text-left px-3 py-1.5 hover:bg-hover disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 text-ink">
+              <span className="w-4 inline-flex justify-center text-brand-text">{e.actif ? <Icon name="check" size={14} /> : null}</span>{e.libelle}
             </button>
           </div>
         ))}

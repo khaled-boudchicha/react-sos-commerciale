@@ -1,5 +1,10 @@
 import { Fragment, KeyboardEvent as KE, MouseEvent as ME, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import Dialog from '../ui/Dialog';
+import { Button, IconButton } from '../ui/Button';
+import { CONTROL, SearchField, Select } from '../ui/Field';
+import { Icon } from '../ui/Icon';
+import { Alert, EmptyState, Loading, LoadingOverlay } from '../ui/States';
 import PrintPreview from '../../print/engine/PrintPreview';
 import { PrintDocument } from '../../print/engine/types';
 import { isoDate } from '../../lib/format';
@@ -322,7 +327,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
                     onFermer={() => setFlottant(null)} />);
     // Mode distant : valeurs et effectifs calculés par le serveur (GROUP BY)
     if (distant.actif) {
-      setFlottant(<Flottant ancre={ancre} onFermer={() => setFlottant(null)} largeur={260}><div className="p-3 text-ink-muted">Chargement…</div></Flottant>);
+      setFlottant(<Flottant ancre={ancre} onFermer={() => setFlottant(null)} largeur={260}><Loading className="p-3" /></Flottant>);
       distant.valeursEntete(c.champ, c).then(ouvrir).catch((err) => {
         setFlottant(null);
         setErreurEdition(err?.message ?? 'Valeurs indisponibles.');
@@ -343,13 +348,16 @@ export default function Grille<T>(props: GrilleProps<T>) {
             <button key={op} onClick={() => {
               actions.filtrer(c.champ, { operateur: op, valeur: courant?.valeur, valeur2: courant?.valeur2 });
               setFlottant(null);
-            }} className="w-full text-left px-3 py-1.5 hover:bg-line-soft flex gap-2">
+            }} className="w-full text-left px-3 py-1.5 hover:bg-hover flex items-center gap-2 text-ink">
               <span className="w-6 text-center money text-ink-muted">{SYMBOLES_OPERATEURS[op]}</span>
-              <span className={(courant?.operateur ?? operateurDefaut(c.type)) === op ? 'font-bold text-brand-700' : ''}>{LIBELLES_OPERATEURS[op]}</span>
+              <span className={(courant?.operateur ?? operateurDefaut(c.type)) === op ? 'font-bold text-brand-text' : ''}>{LIBELLES_OPERATEURS[op]}</span>
             </button>
           ))}
           <div className="border-t border-line-soft my-1" />
-          <button onClick={() => { actions.filtrer(c.champ, null); setFlottant(null); }} className="w-full text-left px-3 py-1.5 hover:bg-line-soft">Réinitialiser</button>
+          <button onClick={() => { actions.filtrer(c.champ, null); setFlottant(null); }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-hover flex items-center gap-2 text-ink-label">
+            <span className="w-6 inline-flex justify-center text-ink-muted"><Icon name="refresh" size={14} /></span>Réinitialiser
+          </button>
         </div>
       </Flottant>,
     );
@@ -447,7 +455,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
   function editeur(c: ColonneGrille<T>, valeur: unknown, changer: (v: unknown) => void, valider2: () => void, annuler: () => void, ligne: T, autoFocus = false) {
     if (c.editeur) return c.editeur({ valeur, ligne, changer, valider: valider2, annuler });
     const touches = (e: KE) => { if (e.key === 'Enter') { e.preventDefault(); valider2(); } if (e.key === 'Escape') { e.preventDefault(); annuler(); } };
-    const cls = 'w-full border border-brand-500 rounded-sm px-1.5 py-0.5 bg-surface text-ink text-[12px] outline-none';
+    const cls = 'w-full border border-brand-500 rounded-sm px-1.5 py-0.5 bg-surface text-ink text-sm outline-none';
     if (c.choix) return (
       <select autoFocus={autoFocus} value={String(valeur ?? '')} onKeyDown={touches}
               onChange={(e) => changer(c.choix!.find((x) => String(x.valeur) === e.target.value)?.valeur ?? e.target.value)} className={cls}>
@@ -472,16 +480,28 @@ export default function Grille<T>(props: GrilleProps<T>) {
   }
 
   const alignement = (c: ColonneGrille<T>) => c.alignement ?? (estNum(c.type) ? 'right' : c.type === 'boolean' ? 'center' : 'left');
+  // Fonds de ligne (jetons v2, thémés clair / sombre) : sélection = surface-active, ligne active = brand-soft,
+  // alternance = surface-sunken. Les cellules figées lisent `--fond-ligne` (défini sur le <tr>) pour suivre le survol.
   const fondLigne = (i: number, estActive: boolean, estSel: boolean) =>
-    estSel ? 'var(--brand-50)' : estActive && ligneActive ? 'color-mix(in srgb, var(--brand-500) 10%, var(--surface))'
-      : lignesAlternees && i % 2 ? 'color-mix(in srgb, var(--line-soft) 45%, var(--surface))' : 'var(--surface)';
+    estSel ? 'var(--surface-active)' : estActive && ligneActive ? 'var(--brand-soft)'
+      : lignesAlternees && i % 2 ? 'var(--surface-sunken)' : 'var(--surface)';
+  /** Liseré de début de ligne : sélection (brand-line) ou ligne active (brand-500, plus marqué). */
+  const lisereLigne = (estActive: boolean, estSel: boolean): React.CSSProperties => {
+    const couleur = estActive && ligneActive ? 'var(--brand-500)' : estSel ? 'var(--brand-line)' : null;
+    return couleur ? { boxShadow: `inset ${rtl ? -3 : 3}px 0 0 ${couleur}` } : {};
+  };
 
   function rendreLigne(ligne: T, indexPage: number) {
     const k = cleDe(ligne);
     const enEdition = ligneEditee && ligneEditee.cle === k;
     const estSel = selectionnees.has(k);
     const estActive = active === k;
-    const fond = fondLigne(indexPage, estActive, estSel);
+    // Le fond réel est porté par `--fond-ligne` : il vaut le fond calculé, ou --surface-hover au survol
+    // (hors ligne sélectionnée / active), et les cellules figées le lisent aussi.
+    const fondCalcule = fondLigne(indexPage, estActive, estSel);
+    const fond = 'var(--fond-ligne)';
+    const survolable = !estSel && !(estActive && ligneActive);
+    const lisere = lisereLigne(estActive, estSel);
     const supprimee = lot.supprimees.includes(k);
     const nouvelle = String(k).startsWith(CLE_NOUVELLE);
     const modifs = lot.modifiees[String(k)];
@@ -489,12 +509,12 @@ export default function Grille<T>(props: GrilleProps<T>) {
       <Fragment key={String(k)}>
         <tr data-index={indexPage} onClick={(e) => cliquerLigne(e, ligne)}
             onDoubleClick={() => { if (modeEdition === 'ligne' || modeEdition === 'formulaire') { if (edition?.modification !== false) commencerModification(ligne); } else props.surDoubleClicLigne?.(ligne); }}
-            className={`${supprimee ? 'line-through opacity-50' : ''} ${bordures ? '' : 'border-b border-line-soft'} ${props.surClicLigne ? 'cursor-pointer' : ''} hover:brightness-[0.98]`}
-            style={{ background: fond, height: defilementVirtuel ? hauteurLigne : undefined, ...(props.styleLigne?.(ligne) ?? {}) }}>
-          {etat.groupes.map((g) => <td key={g} style={{ width: 18 }} />)}
+            className={`${supprimee ? 'line-through opacity-50' : ''} ${bordures ? '' : 'border-b border-line-soft'} ${props.surClicLigne ? 'cursor-pointer' : ''} [--fond-ligne:var(--fond-base)] ${survolable ? 'hover:[--fond-ligne:var(--surface-hover)]' : ''}`}
+            style={{ '--fond-base': fondCalcule, background: fond, height: defilementVirtuel ? hauteurLigne : undefined, ...(props.styleLigne?.(ligne) ?? {}) } as React.CSSProperties}>
+          {etat.groupes.map((g, gi) => <td key={g} style={{ width: 18, ...(gi === 0 ? lisere : {}) }} />)}
           {aSelection && (
-            <td className="text-center" style={{ width: L_SELECTION, position: 'sticky', left: 0, zIndex: 2, background: fond }} onClick={(e) => e.stopPropagation()}>
-              <input type="checkbox" checked={estSel} onChange={(e) => {
+            <td className="text-center" style={{ width: L_SELECTION, position: 'sticky', left: 0, zIndex: 2, background: fond, ...(etat.groupes.length ? {} : lisere) }} onClick={(e) => e.stopPropagation()}>
+              <input type="checkbox" className="accent-[var(--brand-700)] align-middle" aria-label="Sélectionner la ligne" checked={estSel} onChange={(e) => {
                 const s = new Set(selectionnees);
                 if ((e.nativeEvent as MouseEvent).shiftKey && derniereCliquee.current != null) {
                   const ordre = triees.map(cleDe);
@@ -507,9 +527,10 @@ export default function Grille<T>(props: GrilleProps<T>) {
             </td>
           )}
           {aDetail && (
-            <td className="text-center" style={{ width: L_DETAIL }}>
-              <button onClick={(e) => { e.stopPropagation(); setDetails((d) => { const n = new Set(d); if (n.has(k)) n.delete(k); else n.add(k); return n; }); }}
-                      className="text-ink-muted hover:text-brand-700 w-5" title="Détail">{details.has(k) ? '▾' : '▸'}</button>
+            <td className="text-center" style={{ width: L_DETAIL, ...(etat.groupes.length || aSelection ? {} : lisere) }}>
+              <IconButton size="xs" icon={details.has(k) ? 'chevronDown' : 'chevronRight'} label="Détail" aria-expanded={details.has(k)}
+                          onClick={(e) => { e.stopPropagation(); setDetails((d) => { const n = new Set(d); if (n.has(k)) n.delete(k); else n.add(k); return n; }); }}
+                          className="!h-5 !w-5 align-middle text-ink-muted hover:!text-brand-text" />
             </td>
           )}
           {visibles.map((c, ci) => {
@@ -529,20 +550,21 @@ export default function Grille<T>(props: GrilleProps<T>) {
                   className={`px-2.5 py-1.5 ${retourLigne ? 'whitespace-normal' : 'whitespace-nowrap overflow-hidden text-ellipsis'} ${estNum(c.type) ? 'money' : ''} ${bordures ? 'border border-line-soft' : ''}`}
                   style={{
                     textAlign: alignement(c), ...styleFige(c, fond),
+                    ...(ci === 0 && !etat.groupes.length && !aSelection && !aDetail ? lisere : {}),
                     outline: focusIci ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2,
-                    background: modifiee || (nouvelle && modeEdition === 'lot') ? 'color-mix(in srgb, var(--success) 12%, var(--surface))' : styleFige(c, fond).background,
+                    background: modifiee || (nouvelle && modeEdition === 'lot') ? 'var(--success-soft)' : styleFige(c, fond).background,
                   }}>
                 {enEdition && editable ? (
                   <>
                     {editeur(c, ligneEditee!.valeurs[c.champ], (v) => setLigneEditee((le) => le && ({ ...le, valeurs: { ...le.valeurs, [c.champ]: v } })),
                       () => void enregistrerLigne(), () => setLigneEditee(null), ligne, ci === visibles.findIndex((x) => x.editable !== false && !x.valeur))}
-                    {ligneEditee!.erreurs[c.champ] && <div className="text-[10.5px]" style={{ color: 'var(--danger)' }}>{ligneEditee!.erreurs[c.champ]}</div>}
+                    {ligneEditee!.erreurs[c.champ] && <div className="text-xs font-semibold text-danger-text">{ligneEditee!.erreurs[c.champ]}</div>}
                   </>
                 ) : enCellule ? (
                   <>
                     {editeur(c, celluleEditee!.valeur, (v) => setCelluleEditee((ce) => ce && ({ ...ce, valeur: v, erreur: undefined })),
                       () => void validerCellule(), () => setCelluleEditee(null), ligne, true)}
-                    {celluleEditee!.erreur && <div className="text-[10.5px]" style={{ color: 'var(--danger)' }}>{celluleEditee!.erreur}</div>}
+                    {celluleEditee!.erreur && <div className="text-xs font-semibold text-danger-text">{celluleEditee!.erreur}</div>}
                   </>
                 ) : contenuCellule(c, ligne)}
               </td>
@@ -550,29 +572,31 @@ export default function Grille<T>(props: GrilleProps<T>) {
           })}
           {aCommandes && (
             <td className="text-center whitespace-nowrap" style={{ width: L_COMMANDES, position: 'sticky', right: 0, zIndex: 2, background: fond }} onClick={(e) => e.stopPropagation()}>
-              {enEdition ? (
-                <>
-                  <button onClick={() => void enregistrerLigne()} disabled={enCours} className="px-1.5 font-bold text-brand-700" title="Enregistrer">✓</button>
-                  <button onClick={() => setLigneEditee(null)} className="px-1.5 text-ink-muted" title="Annuler">✕</button>
-                </>
-              ) : (
-                <>
-                  {edition?.modification !== false && modeEdition !== 'lot' && modeEdition !== 'cellule' && (
-                    <button onClick={() => commencerModification(ligne)} className="px-1.5 text-ink-muted hover:text-brand-700" title="Modifier">✎</button>
-                  )}
-                  {edition?.suppression !== false && (
-                    <button onClick={() => void supprimer(ligne)} className="px-1.5 hover:opacity-80" style={{ color: 'var(--danger)' }}
-                            title={supprimee ? 'Rétablir' : 'Supprimer'}>{supprimee ? '↺' : '🗑'}</button>
-                  )}
-                </>
-              )}
+              <span className="inline-flex items-center justify-center gap-0.5 align-middle">
+                {enEdition ? (
+                  <>
+                    <IconButton size="xs" icon="check" tone="brand" label="Enregistrer" onClick={() => void enregistrerLigne()} disabled={enCours} />
+                    <IconButton size="xs" icon="close" label="Annuler" onClick={() => setLigneEditee(null)} />
+                  </>
+                ) : (
+                  <>
+                    {edition?.modification !== false && modeEdition !== 'lot' && modeEdition !== 'cellule' && (
+                      <IconButton size="xs" icon="edit" label="Modifier" onClick={() => commencerModification(ligne)} className="text-ink-muted hover:!text-brand-text" />
+                    )}
+                    {edition?.suppression !== false && (
+                      <IconButton size="xs" icon={supprimee ? 'return' : 'trash'} tone="danger" label={supprimee ? 'Rétablir' : 'Supprimer'}
+                                  onClick={() => void supprimer(ligne)} />
+                    )}
+                  </>
+                )}
+              </span>
             </td>
           )}
         </tr>
         {aDetail && details.has(k) && (
           <tr>
             <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + 1 + (aCommandes ? 1 : 0)}
-                className="px-4 py-3 border-b border-line-soft" style={{ background: 'color-mix(in srgb, var(--line-soft) 60%, var(--surface))' }}>
+                className="px-4 py-3 border-b border-line-soft bg-sunken">
               {detail!(ligne)}
             </td>
           </tr>
@@ -596,11 +620,12 @@ export default function Grille<T>(props: GrilleProps<T>) {
     return (
       <tr key={n.cle} data-index={indexPage} className="border-b border-line-soft cursor-pointer select-none"
           onClick={() => { actions.basculerGroupe(n.cle); setFocus({ index: indexPage, col: focus.col }); }}
-          style={{ background: 'color-mix(in srgb, var(--brand-100) 45%, var(--surface))', height: defilementVirtuel ? hauteurLigne : undefined,
-                   outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}>
+          style={{ background: 'var(--brand-soft)', height: defilementVirtuel ? hauteurLigne : undefined,
+                   outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}
+          aria-expanded={!replie}>
         <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0) + (aCommandes ? 1 : 0)}
-            className="px-2.5 py-1.5 font-bold text-[12px] text-ink" style={{ paddingInlineStart: 10 + n.niveau * 18 }}>
-          <span className="inline-block w-4 text-brand-700">{replie ? '▸' : '▾'}</span>
+            className="px-2.5 py-1.5 font-bold text-sm text-ink" style={{ paddingInlineStart: 10 + n.niveau * 18 }}>
+          <span className="inline-flex w-4 align-middle -mt-0.5 text-brand-text"><Icon name={replie ? 'chevronRight' : 'chevronDown'} size={14} /></span>
           {col?.titre ?? n.champ} : {n.texte}
           <span className="text-ink-muted font-normal"> ({n.nombre ?? n.lignes.length})</span>
           {resumesTexte}
@@ -616,9 +641,9 @@ export default function Grille<T>(props: GrilleProps<T>) {
           style={{ height: defilementVirtuel ? hauteurLigne : undefined,
                    outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}>
         <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0) + (aCommandes ? 1 : 0)}
-            className="px-2.5 py-1.5 text-[11.5px]" style={{ paddingInlineStart: 28 + el.niveau * 18 }}>
+            className="px-2.5 py-1.5 text-xs" style={{ paddingInlineStart: 28 + el.niveau * 18 }}>
           {el.action
-            ? <button onClick={el.action} className="font-bold text-brand-700 hover:underline">{el.texte}</button>
+            ? <button onClick={el.action} className="font-bold text-brand-text hover:underline">{el.texte}</button>
             : <span className="text-ink-muted">{el.texte}</span>}
         </td>
       </tr>
@@ -669,51 +694,58 @@ export default function Grille<T>(props: GrilleProps<T>) {
   }
   const debutColonnesSysteme = etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0);
 
-  const thBase = 'px-2.5 py-2 text-[10.5px] font-bold uppercase tracking-wide text-ink-muted bg-surface border-b border-line-soft select-none';
+  const thBase = 'px-2.5 py-2 text-xs font-semibold text-ink-label bg-sunken border-b border-line select-none';
+  /** Fond des cellules d'en-tête / de pied figées (identique à `bg-sunken`). */
+  const FOND_ENTETE = 'var(--surface-sunken)';
 
   return (
     <div dir={rtl ? 'rtl' : 'ltr'} className="bg-surface border border-line-soft rounded-md shadow-soft flex flex-col min-w-0"
          style={{ height: hauteur }}>
       {/* Barre d'outils */}
       <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-line-soft">
-        {titre && <div className="font-bold text-[13px] text-ink mr-2">{titre}</div>}
+        {titre && <div className="font-bold text-base text-ink mr-2">{titre}</div>}
         {barreOutils}
         <div className="ms-auto flex items-center gap-1.5 flex-wrap">
           {lotModifie && (
             <>
-              <span className="text-[11px] text-ink-muted">Modifications en attente</span>
-              <button onClick={() => void enregistrerLot()} disabled={enCours} className="rounded-sm px-2.5 py-1 font-bold text-[11.5px] text-white bg-brand-700 disabled:opacity-50">Enregistrer</button>
-              <button onClick={() => setLot({ modifiees: {}, ajoutees: [], supprimees: [] })} className="rounded-sm px-2.5 py-1 font-bold text-[11.5px] border border-line text-ink-label">Annuler</button>
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning-text">
+                <Icon name="alertCircle" size={14} />Modifications en attente
+              </span>
+              <Button size="sm" variant="primary" icon="save" onClick={() => void enregistrerLot()} disabled={enCours}>Enregistrer</Button>
+              <Button size="sm" variant="ghost" onClick={() => setLot({ modifiees: {}, ajoutees: [], supprimees: [] })}>Annuler</Button>
             </>
           )}
           {edition?.ajout !== false && edition && (
-            <button onClick={commencerAjout} className="rounded-sm px-2.5 py-1 font-bold text-[11.5px] text-white bg-brand-700" title="Ajouter une ligne">＋ Ajouter</button>
+            <Button size="sm" variant={lotModifie ? 'secondary' : 'primary'} icon="plus" onClick={commencerAjout} title="Ajouter une ligne">Ajouter</Button>
           )}
           {etat.groupes.length > 0 && (
             <>
-              {!distant.actif && <button onClick={actions.toutDeplier} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Tout déplier">⊞</button>}
-              <button onClick={actions.toutReplier} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Tout replier">⊟</button>
+              {!distant.actif && <IconButton size="sm" variant="secondary" icon="plus" label="Tout déplier" onClick={actions.toutDeplier} />}
+              <IconButton size="sm" variant="secondary" icon="minus" label="Tout replier" onClick={actions.toutReplier} />
             </>
           )}
           {rechercheGlobale && (
-            <input value={etat.recherche} onChange={(e) => actions.rechercher(e.target.value)} placeholder="Rechercher…"
-                   className="border border-line rounded-sm px-2.5 py-1 bg-surface text-ink text-[12px] w-48" />
+            <SearchField size="sm" width={200} value={etat.recherche} onChange={(v) => actions.rechercher(v)}
+                         placeholder="Rechercher…" label="Rechercher dans la liste" />
           )}
           {ligneFiltre === 'bascule' && (
-            <button onClick={() => setFiltresOuverts((o) => !o)} title="Afficher la ligne de filtre"
-                    className={`rounded-sm px-2 py-1 text-[11.5px] border ${filtresOuverts ? 'border-brand-500 text-brand-700' : 'border-line text-ink-label'}`}>
-              ⏷ Filtres{Object.keys(etat.filtres).length ? ` (${Object.keys(etat.filtres).length})` : ''}
-            </button>
+            <Button size="sm" icon="filter" pressed={filtresOuverts} onClick={() => setFiltresOuverts((o) => !o)} title="Afficher la ligne de filtre">
+              Filtres{Object.keys(etat.filtres).length ? ` (${Object.keys(etat.filtres).length})` : ''}
+            </Button>
           )}
           {selecteurColonnes && (
-            <button onClick={(e) => setFlottant(
+            <Button size="sm" icon="columns" title="Colonnes" onClick={(e) => setFlottant(
               <SelecteurColonnes ancre={e.currentTarget.getBoundingClientRect()}
                                  colonnes={colonnes.map((c) => ({ champ: c.champ, titre: c.titre ?? c.champ, masquable: c.masquable !== false }))}
                                  masquees={etat.masquees} onBasculer={actions.basculerVisibilite} onReinitialiser={actions.reinitialiser}
                                  onFermer={() => setFlottant(null)} />,
-            )} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Colonnes">☰ Colonnes</button>
+            )}>Colonnes</Button>
           )}
-          {opts && <button onClick={menuExport} className="rounded-sm px-2 py-1 text-[11.5px] border border-line text-ink-label" title="Exporter" disabled={exportEnCours}>{exportEnCours ? 'Export…' : '⬇ Exporter'}</button>}
+          {opts && (
+            <Button size="sm" icon="download" iconRight="chevronDown" onClick={menuExport} title="Exporter" disabled={exportEnCours} loading={exportEnCours}>
+              {exportEnCours ? 'Export…' : 'Exporter'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -722,19 +754,27 @@ export default function Grille<T>(props: GrilleProps<T>) {
         <div onDragOver={(e) => { if (e.dataTransfer.types.includes(TYPE_DND)) { e.preventDefault(); setSurvolGroupes(true); } }}
              onDragLeave={() => setSurvolGroupes(false)}
              onDrop={(e) => { const champ = e.dataTransfer.getData(TYPE_DND); setSurvolGroupes(false); setGlisseEnTete(false); if (champ && colonnes.find((c) => c.champ === champ)?.groupable !== false) actions.grouper(champ); }}
-             className="flex items-center gap-1.5 flex-wrap px-3 py-1.5 border-b border-line-soft min-h-[34px] text-[11.5px]"
-             style={{ background: survolGroupes ? 'var(--brand-50)' : 'color-mix(in srgb, var(--line-soft) 40%, var(--surface))' }}>
-          {etat.groupes.length === 0 && <span className="text-ink-muted">Glissez un en-tête de colonne ici pour grouper par cette colonne</span>}
+             className={`flex items-center gap-1.5 flex-wrap px-3 py-1.5 border-b border-line-soft min-h-[34px] text-xs ${survolGroupes ? 'bg-brand-soft' : 'bg-sunken'}`}
+             style={survolGroupes ? { boxShadow: 'inset 0 0 0 1px var(--brand-line)' } : undefined}>
+          {etat.groupes.length === 0 && (
+            <span className="inline-flex items-center gap-1.5 text-ink-muted"><Icon name="layers" size={14} />Glissez un en-tête de colonne ici pour grouper par cette colonne</span>
+          )}
           {etat.groupes.map((g, i) => {
             const c = colonnes.find((x) => x.champ === g);
             const t = etat.tri.find((x) => x.champ === g);
             return (
               <Fragment key={g}>
-                {i > 0 && <span className="text-ink-muted">›</span>}
+                {i > 0 && <Icon name="chevronRight" size={14} className="text-ink-muted" />}
                 <span draggable onDragStart={(e) => e.dataTransfer.setData(TYPE_DND, g)}
-                      className="inline-flex items-center gap-1 border border-line rounded-sm bg-surface px-2 py-0.5 font-semibold text-ink cursor-grab">
-                  <button onClick={() => actions.trier(g, 'simple')} title="Trier les groupes">{c?.titre ?? g}{t ? (t.sens === 'asc' ? ' ▲' : ' ▼') : ''}</button>
-                  <button onClick={() => actions.degrouper(g)} className="text-ink-muted hover:text-ink" title="Retirer">✕</button>
+                      className="inline-flex items-center gap-1 h-6 border border-brand-line rounded-sm bg-brand-soft ps-2 pe-0.5 font-semibold text-brand-text cursor-grab">
+                  <button onClick={() => actions.trier(g, 'simple')} title="Trier les groupes" className="inline-flex items-center gap-1">
+                    {c?.titre ?? g}
+                    {t && <Icon name={t.sens === 'asc' ? 'arrowUp' : 'arrowDown'} size={12} label={t.sens === 'asc' ? 'croissant' : 'décroissant'} />}
+                  </button>
+                  <button onClick={() => actions.degrouper(g)} title="Retirer" aria-label={`Retirer le groupe ${c?.titre ?? g}`}
+                          className="inline-flex items-center justify-center h-5 w-5 rounded-xs text-ink-muted hover:text-ink hover:bg-hover">
+                    <Icon name="close" size={12} />
+                  </button>
                 </span>
               </Fragment>
             );
@@ -743,16 +783,14 @@ export default function Grille<T>(props: GrilleProps<T>) {
       )}
 
       {erreurEdition && (
-        <div className="px-3 py-1.5 text-[12px] flex items-center gap-2" style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>
-          {erreurEdition}<button className="ms-auto" onClick={() => setErreurEdition(null)}>✕</button>
-        </div>
+        <Alert tone="danger" compact onClose={() => setErreurEdition(null)} className="mx-3 my-2">{erreurEdition}</Alert>
       )}
 
       {/* Tableau */}
       <div ref={corpsRef} tabIndex={0} onKeyDown={clavier}
            onScroll={(e) => defilementVirtuel && setScroll({ haut: e.currentTarget.scrollTop, hauteur: e.currentTarget.clientHeight })}
            className="flex-1 overflow-auto outline-none relative min-h-[120px]">
-        <table className="text-[12px] text-ink" style={{ tableLayout: 'fixed', width: Math.max(largeurTotale, 0), minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+        <table className="text-sm text-ink" style={{ tableLayout: 'fixed', width: Math.max(largeurTotale, 0), minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
           <colgroup>
             {etat.groupes.map((g) => <col key={g} style={{ width: 18 }} />)}
             {aSelection && <col style={{ width: L_SELECTION }} />}
@@ -774,7 +812,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
               {etat.groupes.map((g) => <th key={g} className={thBase} />)}
               {aSelection && (
                 <th className={`${thBase} text-center`} style={{ position: 'sticky', left: 0, zIndex: 4 }}>
-                  <input type="checkbox" checked={toutCoche} ref={(el) => { if (el) el.indeterminate = partielCoche; }}
+                  <input type="checkbox" className="accent-[var(--brand-700)] align-middle" aria-label="Tout sélectionner" checked={toutCoche} ref={(el) => { if (el) el.indeterminate = partielCoche; }}
                          title={toutSelectionner === 'page' ? 'Toute la page' : 'Toutes les lignes filtrées'}
                          onChange={() => {
                            const s = new Set(selectionnees);
@@ -803,20 +841,28 @@ export default function Grille<T>(props: GrilleProps<T>) {
                       onContextMenu={(e) => menuEntete(e, c)}
                       onClick={(e) => { if (c.triable === false) return; actions.trier(c.champ, e.ctrlKey || e.metaKey ? 'retrait' : e.shiftKey ? 'ajout' : 'simple'); }}
                       className={`${thBase} relative group ${c.triable === false ? '' : 'cursor-pointer hover:text-ink'}`}
-                      style={{ textAlign: alignement(c), ...styleFige(c, 'var(--surface)'), zIndex: positions[c.champ] ? 4 : undefined }}
+                      style={{ textAlign: alignement(c), ...styleFige(c, FOND_ENTETE), zIndex: positions[c.champ] ? 4 : undefined }}
+                      aria-sort={tri && etat.tri.length === 1 ? (tri.sens === 'asc' ? 'ascending' : 'descending') : undefined}
                       title="Clic : trier · Maj+clic : tri multiple · Ctrl+clic : retirer · Clic droit : menu">
-                    <span className="inline-flex items-center gap-1 max-w-full">
+                    <span className="inline-flex items-center gap-1 max-w-full align-middle">
                       <span className="truncate">{c.titre ?? c.champ}</span>
-                      {tri && <span className="text-brand-700">{tri.sens === 'asc' ? '▲' : '▼'}{etat.tri.length > 1 ? <sub>{t + 1}</sub> : null}</span>}
+                      {tri && (
+                        <span className="inline-flex items-center text-brand-text">
+                          <Icon name={tri.sens === 'asc' ? 'arrowUp' : 'arrowDown'} size={12} label={tri.sens === 'asc' ? 'Tri croissant' : 'Tri décroissant'} />
+                          {etat.tri.length > 1 ? <sub className="text-2xs font-bold">{t + 1}</sub> : null}
+                        </span>
+                      )}
                       {c.filtreEntete !== false && (
-                        <button onClick={(e) => ouvrirFiltreEntete(e, c)} title="Filtrer par valeurs"
-                                className={`px-0.5 ${filtreEnt ? 'text-brand-700' : 'text-ink-muted opacity-0 group-hover:opacity-100'}`}>⏷</button>
+                        <button onClick={(e) => ouvrirFiltreEntete(e, c)} title="Filtrer par valeurs" aria-label={`Filtrer ${c.titre ?? c.champ} par valeurs`}
+                                className={`inline-flex flex-none items-center justify-center h-5 w-5 rounded-xs hover:bg-hover focus-visible:opacity-100 ${filtreEnt ? 'text-brand-text bg-brand-soft' : 'text-ink-muted opacity-0 group-hover:opacity-100'}`}>
+                          <Icon name="filter" size={12} />
+                        </button>
                       )}
                     </span>
                     {redimensionnementColonnes && c.redimensionnable !== false && (
                       <span onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); redim.current = { champ: c.champ, x: e.clientX, l: largeurEff(c) }; document.body.style.cursor = 'col-resize'; }}
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute top-0 h-full w-1.5 cursor-col-resize hover:bg-brand-300" style={{ [rtl ? 'left' : 'right']: 0 }} />
+                            className="absolute top-0 h-full w-1.5 cursor-col-resize hover:bg-brand-line" style={{ [rtl ? 'left' : 'right']: 0 }} />
                     )}
                   </th>
                 );
@@ -834,14 +880,14 @@ export default function Grille<T>(props: GrilleProps<T>) {
                     const videF = (suivant.valeur === undefined || suivant.valeur === '' || suivant.valeur === null) && suivant.operateur !== 'vide' && suivant.operateur !== 'non_vide';
                     actions.filtrer(c.champ, videF && !f ? null : suivant);
                   };
-                  const cls = 'min-w-0 w-full border border-line rounded-sm px-1.5 py-0.5 bg-surface text-ink font-normal text-[11.5px]';
+                  const cls = `${CONTROL} min-w-0 h-6 px-1.5 font-normal text-xs`;
                   const type = c.type === 'date' ? 'date' : estNum(c.type) ? 'number' : 'text';
                   return (
                     <th key={c.champ} className="px-1.5 py-1 bg-surface border-b border-line-soft font-normal" style={styleFige(c, 'var(--surface)')}>
                       {c.filtrable === false ? null : (
                         <div className="flex items-center gap-1">
-                          <button onClick={(e) => ouvrirOperateur(e, c)} title={LIBELLES_OPERATEURS[op]}
-                                  className={`w-6 flex-none text-center money text-[11px] rounded-sm ${f ? 'text-brand-700 font-bold' : 'text-ink-muted'}`}>
+                          <button onClick={(e) => ouvrirOperateur(e, c)} title={LIBELLES_OPERATEURS[op]} aria-label={`Opérateur : ${LIBELLES_OPERATEURS[op]}`}
+                                  className={`w-6 h-6 flex-none text-center money text-xs rounded-sm hover:bg-hover ${f ? 'text-brand-text font-bold bg-brand-soft' : 'text-ink-muted'}`}>
                             {SYMBOLES_OPERATEURS[op]}
                           </button>
                           {op === 'vide' || op === 'non_vide' ? null : c.type === 'boolean' ? (
@@ -887,83 +933,79 @@ export default function Grille<T>(props: GrilleProps<T>) {
           {resumes?.length ? (
             <tfoot className="sticky bottom-0 z-[3]">
               <tr className="font-bold">
-                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-surface border-t border-line" />}
+                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-sunken border-t border-line" />}
                 {visibles.map((c) => {
                   const rs = resumes.filter((r) => (r.afficherDans ?? r.colonne) === c.champ);
                   return (
-                    <td key={c.champ} className="px-2.5 py-2 bg-surface border-t border-line whitespace-nowrap money text-[11.5px]"
-                        style={{ textAlign: alignement(c), ...styleFige(c, 'var(--surface)') }}>
+                    <td key={c.champ} className="px-2.5 py-2 bg-sunken border-t border-line whitespace-nowrap money text-xs"
+                        style={{ textAlign: alignement(c), ...styleFige(c, FOND_ENTETE) }}>
                       {rs.map((r, i) => <div key={i}>{valeurResume(r, triees, distant.actif ? distant.resumes : undefined)}</div>)}
                     </td>
                   );
                 })}
-                {aCommandes && <td className="bg-surface border-t border-line" style={{ position: 'sticky', right: 0 }} />}
+                {aCommandes && <td className="bg-sunken border-t border-line" style={{ position: 'sticky', right: 0 }} />}
               </tr>
             </tfoot>
           ) : props.pied && nbResultat > 0 ? (
             <tfoot className="sticky bottom-0 z-[3]">
               <tr className="font-bold">
-                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-surface border-t border-line" />}
+                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} className="bg-sunken border-t border-line" />}
                 {visibles.map((c, i) => (
-                  <td key={c.champ} className="px-2.5 py-2 bg-surface border-t border-line whitespace-nowrap text-[11.5px]"
-                      style={{ textAlign: alignement(c), ...styleFige(c, 'var(--surface)') }}>
+                  <td key={c.champ} className="px-2.5 py-2 bg-sunken border-t border-line whitespace-nowrap text-xs"
+                      style={{ textAlign: alignement(c), ...styleFige(c, FOND_ENTETE) }}>
                     {i === 0 && props.pied!._label !== undefined ? props.pied!._label : props.pied![c.champ]}
                   </td>
                 ))}
-                {aCommandes && <td className="bg-surface border-t border-line" style={{ position: 'sticky', right: 0 }} />}
+                {aCommandes && <td className="bg-sunken border-t border-line" style={{ position: 'sticky', right: 0 }} />}
               </tr>
             </tfoot>
           ) : null}
         </table>
         {!chargement && !distant.chargement && elementsPage.length === 0 && !ligneEditee?.nouvelle && (
-          <div className="py-10 text-center text-[12px] text-ink-muted">{erreur ?? distant.erreur ?? messageVide}</div>
+          (erreur ?? distant.erreur)
+            ? <div className="sticky left-0 p-4 max-w-full"><Alert tone="danger">{erreur ?? distant.erreur}</Alert></div>
+            : <div className="sticky left-0 max-w-full"><EmptyState icon="inbox" size="sm" title={messageVide} /></div>
         )}
         {distant.erreur && elementsPage.length > 0 && (
-          <div className="px-3 py-1.5 text-[12px]" style={{ color: 'var(--danger)' }}>{distant.erreur}</div>
+          <div className="sticky left-0 px-3 py-2 max-w-full"><Alert tone="danger" compact>{distant.erreur}</Alert></div>
         )}
-        {(chargement || distant.chargement) && (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'color-mix(in srgb, var(--surface) 60%, transparent)' }}>
-            <span className="text-[12px] font-bold text-ink-label bg-surface border border-line-soft rounded-md px-3 py-2 shadow-soft">Chargement…</span>
-          </div>
-        )}
+        {(chargement || distant.chargement) && <LoadingOverlay />}
       </div>
 
       {/* Panneau des filtres actifs */}
       {panneauFiltre && filtresActifs.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-t border-line-soft text-[11.5px]">
-          <span className="text-brand-700">⏷</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 border-t border-line-soft text-xs bg-brand-soft">
+          <Icon name="filter" size={14} className="text-brand-text" />
           <span className="flex-1 truncate text-ink-label" title={filtresActifs.join(' et ')}>{filtresActifs.join(' et ')}</span>
-          <button onClick={actions.effacerFiltres} className="font-bold text-brand-700">Effacer les filtres</button>
+          <Button size="xs" variant="link" icon="close" onClick={actions.effacerFiltres}>Effacer les filtres</Button>
         </div>
       )}
 
       {/* Pagination */}
       {pagine && (
-        <div className="flex items-center gap-2 px-3 py-1.5 border-t border-line-soft text-[11.5px] text-ink-label flex-wrap">
+        <div className="flex items-center gap-2 px-3 py-1.5 border-t border-line-soft text-xs text-ink-label flex-wrap">
           <span>Lignes par page</span>
-          <select value={etat.taillePage} onChange={(e) => actions.taillePage(Number(e.target.value))}
-                  className="border border-line rounded-sm px-1.5 py-0.5 bg-surface text-ink">
+          <Select size="sm" value={etat.taillePage} onChange={(e) => actions.taillePage(Number(e.target.value))}
+                  aria-label="Lignes par page" className="!w-auto">
             {taillesPage.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          </Select>
           <span className="ms-auto">
             Page {page + 1} sur {pages} ({nbResultat} ligne{nbResultat > 1 ? 's' : ''}{!distant.actif && triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''})
           </span>
-          <div className="flex gap-0.5">
-            {[['«', 0], ['‹', page - 1]].map(([s, p]) => (
-              <button key={String(s)} disabled={page === 0} onClick={() => actions.page(Number(p))} className="px-2 py-0.5 rounded-sm border border-line disabled:opacity-40">{s}</button>
-            ))}
-            {pagesVisibles(page, pages).map((p, i) => (p < 0 ? <span key={`e${i}`} className="px-1">…</span> : (
-              <button key={p} onClick={() => actions.page(p)}
-                      className={`px-2 py-0.5 rounded-sm border ${p === page ? 'bg-brand-700 text-white border-brand-700' : 'border-line'}`}>{p + 1}</button>
+          <nav className="flex items-center gap-0.5" aria-label="Pagination">
+            <IconButton size="sm" variant="secondary" icon="chevronsLeft" label="Première page" disabled={page === 0} onClick={() => actions.page(0)} />
+            <IconButton size="sm" variant="secondary" icon="chevronLeft" label="Page précédente" disabled={page === 0} onClick={() => actions.page(page - 1)} />
+            {pagesVisibles(page, pages).map((p, i) => (p < 0 ? <span key={`e${i}`} className="px-1 text-ink-muted">…</span> : (
+              <Button key={p} size="sm" variant={p === page ? 'primary' : 'ghost'} onClick={() => actions.page(p)}
+                      aria-current={p === page ? 'page' : undefined} className="min-w-[28px] !px-1.5 money">{p + 1}</Button>
             )))}
-            {[['›', page + 1], ['»', pages - 1]].map(([s, p]) => (
-              <button key={String(s)} disabled={page >= pages - 1} onClick={() => actions.page(Number(p))} className="px-2 py-0.5 rounded-sm border border-line disabled:opacity-40">{s}</button>
-            ))}
-          </div>
+            <IconButton size="sm" variant="secondary" icon="chevronRight" label="Page suivante" disabled={page >= pages - 1} onClick={() => actions.page(page + 1)} />
+            <IconButton size="sm" variant="secondary" icon="chevronsRight" label="Dernière page" disabled={page >= pages - 1} onClick={() => actions.page(pages - 1)} />
+          </nav>
         </div>
       )}
       {!pagine && (
-        <div className="px-3 py-1.5 border-t border-line-soft text-[11.5px] text-ink-muted">
+        <div className="px-3 py-1.5 border-t border-line-soft text-xs text-ink-muted">
           {nbResultat} ligne{nbResultat > 1 ? 's' : ''}{!distant.actif && triees.length !== donneesAffichees.length ? ` sur ${donneesAffichees.length}` : ''}{selectionnees.size ? ` · ${selectionnees.size} sélectionnée(s)` : ''}
         </div>
       )}
@@ -975,27 +1017,34 @@ export default function Grille<T>(props: GrilleProps<T>) {
                        onConfirm={() => void supprimer(aSupprimer)} onCancel={() => setASupprimer(null)} />
       )}
       {formulaire && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-          <div className="w-[560px] max-h-[90vh] flex flex-col bg-surface border border-line-soft rounded-lg shadow-lifted">
-            <div className="px-5 py-3.5 border-b border-line-soft font-extrabold text-[15px]">{formulaire.ligne ? 'Modifier la ligne' : 'Nouvelle ligne'}</div>
-            <div className="p-5 grid grid-cols-2 gap-3 overflow-auto">
-              {colonnes.filter((c) => c.editable !== false && !c.valeur).map((c, i) => (
-                <label key={c.champ} className="text-[11px] font-bold text-ink-label">
-                  {c.titre ?? c.champ}{c.validation?.some((r) => r.type === 'requis') ? ' *' : ''}
-                  <div className="mt-1 font-normal">
-                    {editeur(c, formulaire.valeurs[c.champ], (v) => setFormulaire((f) => f && ({ ...f, valeurs: { ...f.valeurs, [c.champ]: v }, erreurs: { ...f.erreurs, [c.champ]: '' } })),
-                      () => void enregistrerFormulaire(), () => setFormulaire(null), (formulaire.ligne ?? {}) as T, i === 0)}
-                  </div>
-                  {formulaire.erreurs[c.champ] && <div className="text-[10.5px] font-normal" style={{ color: 'var(--danger)' }}>{formulaire.erreurs[c.champ]}</div>}
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2 justify-end px-5 py-3 border-t border-line-soft">
-              <button onClick={() => setFormulaire(null)} className="px-4 py-2 rounded-md border border-line text-ink-label font-bold text-[12px]">Annuler</button>
-              <button onClick={() => void enregistrerFormulaire()} disabled={enCours} className="px-4 py-2 rounded-md font-bold text-[12px] text-white bg-brand-700 disabled:opacity-50">Enregistrer</button>
-            </div>
+        <Dialog title={formulaire.ligne ? 'Modifier la ligne' : 'Nouvelle ligne'} size="md" closeOnOverlay={false}
+                icon={formulaire.ligne ? 'edit' : 'plus'} onClose={() => setFormulaire(null)}
+                footer={(
+                  <>
+                    <Button onClick={() => setFormulaire(null)}>Annuler</Button>
+                    <Button variant="primary" icon="save" onClick={() => void enregistrerFormulaire()} disabled={enCours}>Enregistrer</Button>
+                  </>
+                )}>
+          <div className="grid grid-cols-2 gap-3">
+            {colonnes.filter((c) => c.editable !== false && !c.valeur).map((c, i) => (
+              <label key={c.champ} className="flex flex-col gap-1 min-w-0 text-xs font-semibold text-ink-label">
+                <span>
+                  {c.titre ?? c.champ}
+                  {c.validation?.some((r) => r.type === 'requis') && <span className="text-danger-text ml-0.5" aria-hidden="true">*</span>}
+                </span>
+                <div className="font-normal">
+                  {editeur(c, formulaire.valeurs[c.champ], (v) => setFormulaire((f) => f && ({ ...f, valeurs: { ...f.valeurs, [c.champ]: v }, erreurs: { ...f.erreurs, [c.champ]: '' } })),
+                    () => void enregistrerFormulaire(), () => setFormulaire(null), (formulaire.ligne ?? {}) as T, i === 0)}
+                </div>
+                {formulaire.erreurs[c.champ] && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-danger-text">
+                    <Icon name="alertCircle" size={14} />{formulaire.erreurs[c.champ]}
+                  </span>
+                )}
+              </label>
+            ))}
           </div>
-        </div>
+        </Dialog>
       )}
     </div>
   );
@@ -1003,7 +1052,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
   function rendreNouvelle() {
     const vide = {} as T;
     return (
-      <tr key={CLE_NOUVELLE} style={{ background: 'color-mix(in srgb, var(--success) 8%, var(--surface))' }} className="border-b border-line-soft">
+      <tr key={CLE_NOUVELLE} style={{ background: 'var(--success-soft)' }} className="border-b border-line-soft">
         {Array.from({ length: debutColonnesSysteme }).map((_, i) => <td key={i} />)}
         {visibles.map((c) => (
           <td key={c.champ} className="px-2.5 py-1.5" style={styleFige(c, 'var(--surface)')}>
@@ -1011,15 +1060,17 @@ export default function Grille<T>(props: GrilleProps<T>) {
               <>
                 {editeur(c, ligneEditee!.valeurs[c.champ], (v) => setLigneEditee((le) => le && ({ ...le, valeurs: { ...le.valeurs, [c.champ]: v } })),
                   () => void enregistrerLigne(), () => setLigneEditee(null), vide, c === editables[0])}
-                {ligneEditee!.erreurs[c.champ] && <div className="text-[10.5px]" style={{ color: 'var(--danger)' }}>{ligneEditee!.erreurs[c.champ]}</div>}
+                {ligneEditee!.erreurs[c.champ] && <div className="text-xs font-semibold text-danger-text">{ligneEditee!.erreurs[c.champ]}</div>}
               </>
             ) : null}
           </td>
         ))}
         {aCommandes && (
           <td className="text-center whitespace-nowrap" style={{ position: 'sticky', right: 0, background: 'var(--surface)' }}>
-            <button onClick={() => void enregistrerLigne()} disabled={enCours} className="px-1.5 font-bold text-brand-700" title="Enregistrer">✓</button>
-            <button onClick={() => setLigneEditee(null)} className="px-1.5 text-ink-muted" title="Annuler">✕</button>
+            <span className="inline-flex items-center justify-center gap-0.5 align-middle">
+              <IconButton size="xs" icon="check" tone="brand" label="Enregistrer" onClick={() => void enregistrerLigne()} disabled={enCours} />
+              <IconButton size="xs" icon="close" label="Annuler" onClick={() => setLigneEditee(null)} />
+            </span>
           </td>
         )}
       </tr>
