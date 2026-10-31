@@ -104,8 +104,7 @@ export default function ChampScan({ id, retour, onArticle }: {
         <div role="group" aria-label="Recherche par" className="flex p-[3px] rounded-[9px] bg-bg border border-line-soft">
           {(['designation', 'code'] as const).map((m) => (
             <button key={m} type="button" onClick={() => { setMode(m); inputRef.current?.focus(); }} aria-pressed={mode === m}
-                    className={`h-[30px] px-3 rounded-[7px] text-[12px] ${mode === m ? 'bg-surface font-bold text-ink shadow-[0_1px_3px_rgb(15_26_46/.1)]' : 'font-semibold'}`}
-                    style={mode === m ? undefined : { color: 'var(--text-secondary)' }}>
+                    className={`h-[30px] px-3 rounded-[7px] text-sm leading-[1.45] ${mode === m ? 'bg-surface font-bold text-ink shadow-[0_1px_3px_rgb(15_26_46/.1)]' : 'font-semibold text-ink-muted'}`}>
               {m === 'designation' ? 'Désignation' : 'Code'}
             </button>
           ))}
@@ -114,29 +113,29 @@ export default function ChampScan({ id, retour, onArticle }: {
       </label>
 
       {erreur && (
-        <div role="alert" className="mt-2 px-3 py-[7px] rounded-lg text-[12px] font-bold"
-             style={{ background: 'var(--pos-alert-soft)', color: 'var(--pos-alert)' }}>
+        <div role="alert" className="mt-2 px-3 py-[7px] rounded-lg text-sm leading-[1.45] font-bold bg-danger-soft"
+             style={{ color: 'var(--pos-alert)' }}>
           {erreur}
         </div>
       )}
 
       {ouvert && (
         <div className="absolute z-30 left-0 right-0 mt-2 bg-surface border border-line rounded-xl shadow-lifted max-h-[360px] overflow-auto">
-          {loading && <div className="px-4 py-3 text-[13px]" style={{ color: 'var(--text-secondary)' }}>Recherche…</div>}
-          {!loading && resultats.length === 0 && <div className="px-4 py-3 text-[13px]" style={{ color: 'var(--text-secondary)' }}>Aucun article.</div>}
+          {loading && <div className="px-4 py-3 text-base leading-[1.45] text-ink-muted">Recherche…</div>}
+          {!loading && resultats.length === 0 && <div className="px-4 py-3 text-base leading-[1.45] text-ink-muted">Aucun article.</div>}
           {resultats.map((a, i) => {
             const epuise = Number(a.qte_reale) <= 0;
             return (
               <button key={a.id} type="button" onMouseEnter={() => setHi(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => choisir(a)}
                       className={`w-full text-left px-4 min-h-[52px] flex items-center gap-4 border-b border-line-soft last:border-b-0 ${i === hi ? 'bg-brand-50' : ''}`}>
                 <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                  <span className="text-[14px] font-bold truncate">{a.designation}</span>
-                  <span className="money text-[11px]" style={{ color: 'var(--text-secondary)' }}>{a.code}{a.famille ? ` · ${a.famille}` : ''}</span>
+                  <span className="text-md leading-[1.45] font-bold truncate">{a.designation}</span>
+                  <span className="money text-xs leading-[1.45] text-ink-muted">{a.code}{a.famille ? ` · ${a.famille}` : ''}</span>
                 </span>
-                <span className="money text-[12px] font-semibold" style={{ color: epuise ? 'var(--pos-alert)' : 'var(--text-secondary)' }}>
+                <span className={`money text-sm leading-[1.45] font-semibold ${epuise ? '' : 'text-ink-muted'}`} style={epuise ? { color: 'var(--pos-alert)' } : undefined}>
                   stock {fmtQte(a.qte_reale)}
                 </span>
-                <span className="money text-[14px] font-extrabold w-[100px] text-right">{fmtMoney(a.prix_vente_ttc)}</span>
+                <span className="money text-md leading-[1.45] font-extrabold w-[100px] text-right">{fmtMoney(a.prix_vente_ttc)}</span>
               </button>
             );
           })}

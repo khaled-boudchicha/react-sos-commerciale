@@ -263,13 +263,12 @@ export default function Comptoir() {
   }, dialogue === null && apercu === null);
 
   if (!peutVendre && !peutRetour) {
-    return <div className="p-6 text-[13px]" style={{ color: 'var(--text-secondary)' }}>Accès refusé : droit « Nouveau Bon de Comptoir » requis.</div>;
+    return <div className="p-6 text-base leading-[1.45] text-ink-muted">Accès refusé : droit « Nouveau Bon de Comptoir » requis.</div>;
   }
 
   const clientNom = ticket.client?.nom ?? 'Client de passage';
   const credit = Number(ticket.client?.credit ?? 0);
   const vide = ticket.lignes.length === 0;
-  const secondaire = { color: 'var(--text-secondary)' };
   const [entierNet, decNet] = fmtMoney(tot.net).split(',');
 
   const outils: { label: string; kbd?: string; icon: NomIcone; tone: 'neutre' | 'retour' | 'danger'; onClick: () => void; disabled?: boolean; pressed?: boolean }[] = [
@@ -287,10 +286,10 @@ export default function Comptoir() {
       {/* ░░ Barre de caisse (60 px) ░░ */}
       <header className="h-[60px] flex-none flex items-center gap-5 px-5 bg-surface border-b border-line-soft">
         <div className="flex items-center gap-2.5">
-          <div className="w-[34px] h-[34px] rounded-[10px] bg-brand-700 text-white font-extrabold text-[13px] flex items-center justify-center">GC</div>
+          <div className="w-[34px] h-[34px] rounded-md bg-brand-700 text-white font-extrabold text-base leading-[1.45] flex items-center justify-center">GC</div>
           <div className="flex flex-col">
             <span className="font-extrabold text-[15px] leading-[1.1]">Vente au comptoir</span>
-            <span className="text-[11px] font-semibold" style={secondaire}>Dossier {dossier}</span>
+            <span className="text-xs leading-[1.45] font-semibold text-ink-muted">Dossier {dossier}</span>
           </div>
         </div>
 
@@ -301,35 +300,34 @@ export default function Comptoir() {
             const plein = sel ? (t.retour ? 'var(--pos-return)' : 'var(--brand-700)') : undefined;
             return (
               <button key={i} type="button" onClick={() => setActif(i)} aria-current={sel ? 'true' : undefined} title={`Ctrl+${i + 1}`}
-                      className={`h-[38px] px-3 rounded-[10px] text-[12.5px] flex items-center gap-2 ${sel ? 'text-white font-bold' : n > 0 ? 'bg-surface border border-line text-ink-label font-bold' : 'bg-transparent border border-dashed border-line font-semibold'}`}
-                      style={sel ? { background: plein, border: `1px solid ${plein}` } : n > 0 ? undefined : secondaire}>
+                      className={`h-[38px] px-3 rounded-md text-[12.5px] flex items-center gap-2 ${sel ? 'text-white font-bold' : n > 0 ? 'bg-surface border border-line text-ink-label font-bold' : 'bg-transparent border border-dashed border-line font-semibold text-ink-muted'}`}
+                      style={sel ? { background: plein, border: `1px solid ${plein}` } : undefined}>
                 {t.retour && <Icon name="retour" size={14} strokeWidth={2.2} />}
                 Ticket {i + 1}
                 {n > 0 && (
-                  <span className="money text-[11px] px-1.5 py-px rounded-md"
-                        style={sel ? { background: 'rgb(255 255 255 / .22)' } : { background: 'var(--brand-50)', color: 'var(--brand-900)' }}>{n}</span>
+                  <span className={`money text-xs leading-[1.45] px-1.5 py-px rounded-md ${sel ? 'bg-white/[.22]' : 'bg-brand-50 text-brand-900'}`}>{n}</span>
                 )}
               </button>
             );
           })}
-          <span className="self-center text-[11px] font-semibold ml-1" style={secondaire}>Ctrl + 1…5</span>
+          <span className="self-center text-xs leading-[1.45] font-semibold ml-1 text-ink-muted">Ctrl + 1…5</span>
         </nav>
 
-        <div className="ml-auto flex items-center gap-4 text-[12px] font-semibold text-ink-label">
+        <div className="ml-auto flex items-center gap-4 text-sm leading-[1.45] font-semibold text-ink-label">
           <span className="flex items-center gap-[7px]">
-            <span className="w-2 h-2 rounded-full" style={{ background: enLigne ? 'var(--success)' : 'var(--danger)' }} />
+            <span className={`w-2 h-2 rounded-full ${enLigne ? 'bg-success-solid' : 'bg-danger-solid'}`} />
             {enLigne ? 'Agent connecté' : 'Agent hors ligne'}
           </span>
           <button type="button" onClick={() => setOptions({ ticketAuto: !options.ticketAuto })} aria-pressed={options.ticketAuto}
                   title="Impression automatique du ticket après l’encaissement (F2)"
-                  className="flex items-center gap-[7px]" style={options.ticketAuto ? undefined : { ...secondaire, textDecoration: 'line-through' }}>
+                  className={`flex items-center gap-[7px] ${options.ticketAuto ? '' : 'text-ink-muted line-through'}`}>
             <Icon name="imprimante" size={16} />Ticket auto
           </button>
-          <span className="flex items-center gap-[7px] px-2.5 py-[5px] rounded-[10px] bg-bg border border-line-soft">
+          <span className="flex items-center gap-[7px] px-2.5 py-[5px] rounded-md bg-bg border border-line-soft">
             <Icon name="utilisateur" size={16} />Caissier : <b className="text-ink">{caissier}</b>
           </span>
-          <span className="money text-[14px] font-bold text-ink">{heure}</span>
-          <Link to="/ventes" className="h-9 px-3.5 rounded-[10px] border border-line text-brand-900 font-bold flex items-center hover:border-brand-300">
+          <span className="money text-md leading-[1.45] font-bold text-ink">{heure}</span>
+          <Link to="/ventes" className="h-9 px-3.5 rounded-md border border-line text-brand-900 font-bold flex items-center hover:border-brand-300">
             Quitter la caisse
           </Link>
         </div>
@@ -346,12 +344,12 @@ export default function Comptoir() {
         {/* Colonne saisie */}
         <section className="flex flex-col gap-3 min-h-0">
           {retour && (
-            <div className="flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-[10px] text-[13px] font-bold"
+            <div className="flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-md text-base leading-[1.45] font-bold"
                  style={{ background: 'var(--pos-return-soft)', border: '1px solid var(--pos-return-line)', color: 'var(--pos-return-deep)' }}>
               <Icon name="retour" size={18} strokeWidth={2.2} />
               Mode retour — les articles scannés reviennent en stock et le montant est à rembourser au client.
               <button type="button" disabled={!peutVendre} onClick={() => majTicket((t) => ({ ...t, retour: false }))}
-                      className="ml-auto h-8 px-3 rounded-lg bg-surface text-[12px] font-bold disabled:opacity-50"
+                      className="ml-auto h-8 px-3 rounded-lg bg-surface text-sm leading-[1.45] font-bold disabled:opacity-50"
                       style={{ border: '1px solid var(--pos-return-line)', color: 'var(--pos-return-deep)' }}>
                 Revenir à la vente
               </button>
@@ -372,15 +370,15 @@ export default function Comptoir() {
 
         {/* Colonne encaissement */}
         <aside className="flex flex-col gap-3 min-h-0 overflow-auto">
-          <div className="flex-none rounded-2xl text-white px-5 pt-[18px] pb-4 flex flex-col gap-1.5 shadow-card"
+          <div className="flex-none rounded-lg text-white px-5 pt-[18px] pb-4 flex flex-col gap-1.5 shadow-card"
                style={{ background: retour ? 'var(--pos-return-deep)' : 'var(--brand-900)' }}>
-            <div className="flex justify-between text-[11px] font-bold tracking-[1.4px] uppercase opacity-85">
+            <div className="flex justify-between text-xs leading-[1.45] font-bold tracking-[1.4px] uppercase opacity-85">
               <span>{retour ? 'À rembourser' : 'Net à payer'}</span><span>Ticket {actif + 1}</span>
             </div>
-            <div className="money text-[50px] font-extrabold leading-[1.05] text-right tracking-[-1px]" aria-live="polite">
-              {entierNet},{decNet}<span className="text-[20px] font-bold ml-2 opacity-80">DA</span>
+            <div className="money text-pos font-extrabold leading-[1.05] text-right tracking-[-1px]" aria-live="polite">
+              {entierNet},{decNet}<span className="text-2xl leading-[1.05] font-bold ml-2 opacity-80">DA</span>
             </div>
-            <div className="flex justify-between text-[12px] font-semibold opacity-90 pt-2" style={{ borderTop: '1px solid rgb(255 255 255 / .18)' }}>
+            <div className="flex justify-between text-sm leading-[1.45] font-semibold opacity-90 pt-2 border-t border-white/[.18]">
               <span>Total HT <b className="money">{fmtMoney(tot.ht * (1 - (ticket.remisePct || 0) / 100))}</b></span>
               <span>TVA <b className="money">{fmtMoney(tot.tva * (1 - (ticket.remisePct || 0) / 100))}</b></span>
               <span>Remise <b className="money">{fmtQte(ticket.remisePct)} %</b></span>
@@ -389,18 +387,18 @@ export default function Comptoir() {
 
           <div data-comptoir-client className="flex-none rounded-xl bg-surface border border-line-soft px-3.5 py-3 flex flex-col gap-2.5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-[10px] bg-brand-50 text-brand-900 flex items-center justify-center flex-none">
+              <div className="w-10 h-10 rounded-md bg-brand-50 text-brand-900 flex items-center justify-center flex-none">
                 <Icon name="utilisateur" size={20} />
               </div>
               <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-[11px] font-bold" style={secondaire}>CLIENT</span>
-                <span className="text-[14px] font-bold truncate">{clientNom}</span>
+                <span className="text-xs leading-[1.45] font-bold text-ink-muted">CLIENT</span>
+                <span className="text-md leading-[1.45] font-bold truncate">{clientNom}</span>
               </div>
               {ticket.client ? (
                 <>
                   <div className="flex flex-col items-end">
-                    <span className="text-[11px] font-bold" style={secondaire}>CRÉDIT</span>
-                    <span className="money text-[14px] font-bold" style={{ color: credit > 0 ? 'var(--pos-amber)' : undefined }}>{fmtMoney(credit)}</span>
+                    <span className="text-xs leading-[1.45] font-bold text-ink-muted">CRÉDIT</span>
+                    <span className={`money text-md leading-[1.45] font-bold ${credit > 0 ? 'text-warning-text' : ''}`}>{fmtMoney(credit)}</span>
                   </div>
                   <button type="button" onClick={() => setClient(null)} aria-label="Revenir au client de passage"
                           className="w-[38px] h-[38px] rounded-[9px] border border-line flex items-center justify-center text-ink-label hover:border-brand-300">
@@ -422,20 +420,20 @@ export default function Comptoir() {
                   style={{ background: retour ? 'var(--pos-return)' : 'var(--pos-cash)' }}>
             <Icon name={retour ? 'retour' : 'especes'} size={28} />
             <span className="flex flex-col items-start">
-              <span className="text-[20px] font-extrabold">{creation ? 'Enregistrement…' : retour ? 'Valider le retour' : 'Encaisser'}</span>
-              <span className="text-[12px] font-semibold opacity-90">{retour ? 'Remise en stock + bon de retour' : 'Espèces · montant, monnaie à rendre'}</span>
+              <span className="text-2xl leading-[1.45] font-extrabold">{creation ? 'Enregistrement…' : retour ? 'Valider le retour' : 'Encaisser'}</span>
+              <span className="text-sm leading-[1.45] font-semibold opacity-90">{retour ? 'Remise en stock + bon de retour' : 'Espèces · montant, monnaie à rendre'}</span>
             </span>
-            <span className="ml-auto [&>kbd]:text-[13px] [&>kbd]:font-extrabold [&>kbd]:px-[9px] [&>kbd]:py-1 [&>kbd]:rounded-[7px]"><Kbd tone="inverse">F2</Kbd></span>
+            <span className="ml-auto [&>kbd]:text-base [&>kbd]:leading-none [&>kbd]:font-extrabold [&>kbd]:px-[9px] [&>kbd]:py-1 [&>kbd]:rounded-[7px]"><Kbd tone="inverse">F2</Kbd></span>
           </button>
 
           {!retour && (
             <div className="flex-none grid gap-2" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
               <button type="button" onClick={() => demanderValidation('avecTicket')} disabled={vide || creation || !peutImprimer}
-                      className="h-[52px] rounded-[11px] border border-brand-700 bg-brand-50 text-brand-900 font-bold text-[13px] flex items-center justify-between px-3.5 disabled:opacity-45">
+                      className="h-[52px] rounded-[11px] border border-brand-700 bg-brand-50 text-brand-900 font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
                 Encaisser + ticket <Kbd tone="brand">F12</Kbd>
               </button>
               <button type="button" onClick={() => demanderValidation('sansTicket')} disabled={vide || creation}
-                      className="h-[52px] rounded-[11px] border border-line bg-surface text-ink-label font-bold text-[13px] flex items-center justify-between px-3.5 disabled:opacity-45">
+                      className="h-[52px] rounded-[11px] border border-line bg-surface text-ink-label font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
                 Sans ticket <Kbd>F11</Kbd>
               </button>
             </div>
@@ -450,14 +448,14 @@ export default function Comptoir() {
                         className="relative h-[70px] rounded-[11px] bg-surface flex flex-col justify-between items-start px-2.5 py-[9px] text-left hover:brightness-[.98] disabled:opacity-45 disabled:cursor-not-allowed"
                         style={{ border: `1px solid ${bord}`, color: couleur, background: o.pressed ? 'var(--pos-return-soft)' : undefined }}>
                   <Icon name={o.icon} size={20} />
-                  <span className="text-[12px] font-bold leading-[1.15]">{o.label}</span>
-                  {o.kbd && <span className="absolute top-2 right-2 [&>kbd]:text-[10px]"><Kbd>{o.kbd}</Kbd></span>}
+                  <span className="text-sm font-bold leading-[1.15]">{o.label}</span>
+                  {o.kbd && <span className="absolute top-2 right-2"><Kbd>{o.kbd}</Kbd></span>}
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-auto flex-none rounded-xl bg-surface border border-line-soft px-3.5 py-2.5 flex flex-col gap-1.5 text-[12px] text-ink-label">
+          <div className="mt-auto flex-none rounded-xl bg-surface border border-line-soft px-3.5 py-2.5 flex flex-col gap-1.5 text-sm leading-[1.45] text-ink-label">
             <div className="flex justify-between gap-3"><span>Dernier ticket</span>
               <b className="money text-ink">{dernier ? `N° ${dernier.numero} · ${fmtMoney(dernier.net)}` : '—'}</b></div>
             <div className="flex justify-between gap-3"><span>Caisse du jour</span>

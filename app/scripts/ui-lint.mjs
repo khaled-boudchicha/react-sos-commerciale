@@ -7,7 +7,7 @@
  *   node scripts/ui-lint.mjs            rapport
  *   node scripts/ui-lint.mjs --strict   code de sortie 1 s'il reste un écart
  *
- * Exclus : impression (documents imprimés), styles (jetons), tests, comptoir (métriques de sa maquette).
+ * Exclus : impression (documents imprimés), styles (jetons), tests. Le comptoir est contrôlé, avec des exceptions ciblées.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -16,16 +16,20 @@ import { fileURLToPath } from 'node:url';
 const RACINE = fileURLToPath(new URL('../src', import.meta.url));
 
 /** Dossiers / fichiers exclus de toutes les règles. */
-const EXCLUS = ['print/', 'impression/', 'styles/', '__tests__/', 'screens/comptoir/'];
+const EXCLUS = ['print/', 'impression/', 'styles/', '__tests__/'];
 
 /** Exceptions documentées par règle (chemin relatif à src, préfixe). */
 const EXCEPTIONS = {
   // Export PDF de la grille : document imprimé (fond blanc imposé), hors thème de l'application
   'couleur-en-dur': ['components/grille/exportGrille.ts'],
-  // NumberEdit sert surtout le comptoir (grands montants de la maquette)
-  'taille-arbitraire': ['components/ui/NumberEdit.tsx'],
+  // Comptoir (charte §1 principe 12) : tailles de sa maquette sans équivalent dans l'échelle nommée
+  // (10,5 · 11,5 · 12,5 · 15 · 17 · 30 · 34 px) ; toutes les autres passent par text-2xs … text-pos.
+  'taille-arbitraire': ['components/ui/NumberEdit.tsx', 'screens/comptoir/'],
   // Couches plein écran légitimes : coquille modale, palette, menu Fichier, notifications
   'voile-maison': ['components/ui/', 'components/CommandPalette.tsx', 'navigation/Backstage.tsx'],
+  // Ventes du jour : message d'erreur en --danger (aplat) conservé tel quel au lot 8 (alignement iso-pixel) ;
+  // à passer en --danger-text lors de la QA caisse.
+  'aplat-en-texte': ['screens/comptoir/VentesJourDialog.tsx'],
 };
 
 export const REGLES = [
