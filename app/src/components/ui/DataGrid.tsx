@@ -24,6 +24,10 @@ export type Column<T> = {
   field?: string;
   /** Mode distant : type du champ (défaut : montant si aligné à droite, sinon texte) */
   type?: 'string' | 'number' | 'money' | 'date';
+  /** Colonne optionnelle, masquée par défaut (l'utilisateur l'affiche via « Colonnes » ou une vue). */
+  hidden?: boolean;
+  /** Colonne figée par défaut (reste visible au défilement horizontal). */
+  pinned?: 'left' | 'right';
 };
 
 /** Mode distant : la liste est triée, filtrée, paginée et regroupée par le serveur. */
@@ -135,6 +139,8 @@ export default function DataGrid<T>({
       groupable: !!tri,
       filtreEntete: !!tri,
       masquable: !!c.header,
+      visible: c.hidden ? false : undefined,
+      figee: c.pinned === 'left' ? 'gauche' as const : c.pinned === 'right' ? 'droite' as const : undefined,
     };
   }), [columns, accesseurs, exportCsv, premiere, distant]);
 

@@ -92,6 +92,7 @@
   --shadow-card:   0 4px 12px rgb(15 26 46 / .08);
   --shadow-lifted: 0 12px 32px rgb(15 26 46 / .16);
   --shadow-modal:  0 24px 64px rgb(8 20 40 / .35);
+  --scroll-shadow: rgb(15 26 46 / .14);   /* ombre de bord des zones défilantes */
 
   /* ── Rayons ─────────────────────────────────────────────── */
   --r-xs: 4px; --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-xl: 20px;
@@ -177,6 +178,7 @@
   --shadow-soft: none; --shadow-card: none;
   --shadow-lifted: 0 12px 32px rgb(0 0 0 / .5);
   --shadow-modal:  0 24px 64px rgb(0 0 0 / .7);
+  --scroll-shadow: rgb(0 0 0 / .5);
 
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-300);
 

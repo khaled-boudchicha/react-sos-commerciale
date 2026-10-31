@@ -86,30 +86,68 @@ export function FiltreEntete({ ancre, valeurs, retenues, onAppliquer, onFermer }
 }
 
 /** Sélecteur de colonnes : afficher / masquer (glisser un en-tête ici le masque aussi). */
-export function SelecteurColonnes({ ancre, colonnes, masquees, onBasculer, onReinitialiser, onFermer }: {
+export function SelecteurColonnes({ ancre, colonnes, masquees, onBasculer, onReinitialiser, onFermer, figees, onFiger }: {
   ancre: DOMRect;
   colonnes: { champ: string; titre: string; masquable: boolean }[];
   masquees: string[];
   onBasculer: (champ: string) => void;
   onReinitialiser: () => void;
   onFermer: () => void;
+  /** Côté figé effectif par colonne (épingle) */
+  figees?: Record<string, 'gauche' | 'droite' | undefined>;
+  onFiger?: (champ: string, cote: 'gauche' | 'aucune') => void;
 }) {
+  // État local : le panneau est rendu une fois à l'ouverture, il suit ici les bascules
+  const [cachees, setCachees] = useState(masquees);
+  const [fig, setFig] = useState(figees ?? {});
+  const [q, setQ] = useState('');
+  const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const liste = colonnes.filter((c) => c.titre && (!q || norm(c.titre).includes(norm(q))));
+  const nbVisibles = colonnes.filter((c) => c.titre && !cachees.includes(c.champ)).length;
+  const basculer = (champ: string) => {
+    setCachees((m) => (m.includes(champ) ? m.filter((x) => x !== champ) : [...m, champ]));
+    onBasculer(champ);
+  };
+  const toutAfficher = () => {
+    for (const c of colonnes) if (c.masquable && cachees.includes(c.champ)) onBasculer(c.champ);
+    setCachees((m) => m.filter((x) => !colonnes.some((c) => c.champ === x && c.masquable)));
+  };
   return (
-    <Flottant ancre={ancre} onFermer={onFermer} largeur={240}>
+    <Flottant ancre={ancre} onFermer={onFermer} largeur={280}>
       <div className="flex items-center gap-2 px-3 py-2 font-bold text-ink border-b border-line-soft">
         <Icon name="columns" size={16} className="text-ink-muted" />Colonnes
+        <span className="ms-auto text-xs font-semibold text-ink-muted">{nbVisibles} / {colonnes.filter((c) => c.titre).length}</span>
+      </div>
+      <div className="p-2 border-b border-line-soft">
+        <TextInput size="sm" leading="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Chercher une colonne…" autoFocus
+                   aria-label="Chercher une colonne" />
       </div>
       <div className="max-h-72 overflow-auto py-1">
-        {colonnes.map((c) => (
-          <label key={c.champ} className={`flex items-center gap-2 px-3 py-1 hover:bg-hover ${c.masquable ? 'cursor-pointer' : 'opacity-50'}`}>
-            <input type="checkbox" className="accent-[var(--brand-700)]" disabled={!c.masquable} checked={!masquees.includes(c.champ)} onChange={() => onBasculer(c.champ)} />
-            {c.titre}
-          </label>
-        ))}
+        {liste.length === 0 && <div className="px-3 py-3 text-sm text-ink-muted">Aucune colonne ne correspond.</div>}
+        {liste.map((c) => {
+          const cote = fig[c.champ];
+          return (
+            <div key={c.champ} className="group flex items-center gap-2 px-3 h-8 hover:bg-hover">
+              <label className={`flex flex-1 min-w-0 items-center gap-2 ${c.masquable ? 'cursor-pointer' : 'opacity-50'}`}>
+                <input type="checkbox" className="accent-[var(--brand-700)]" disabled={!c.masquable} checked={!cachees.includes(c.champ)} onChange={() => basculer(c.champ)} />
+                <span className="truncate">{c.titre}</span>
+              </label>
+              {onFiger && (
+                <button type="button" title={cote ? 'Libérer la colonne' : 'Figer à gauche (reste visible au défilement)'}
+                        aria-label={cote ? `Libérer ${c.titre}` : `Figer ${c.titre} à gauche`} aria-pressed={!!cote}
+                        onClick={() => { const n = cote ? 'aucune' : 'gauche'; setFig((f) => ({ ...f, [c.champ]: n === 'aucune' ? undefined : 'gauche' })); onFiger(c.champ, n); }}
+                        className={`inline-flex h-6 w-6 flex-none items-center justify-center rounded-xs hover:bg-surface ${cote ? 'text-brand-text' : 'text-ink-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}`}>
+                  <Icon name="pin" size={14} />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
-      <div className="p-2 border-t border-line-soft bg-sunken">
-        <Button size="sm" block icon="refresh" onClick={() => { onReinitialiser(); onFermer(); }}>
-          Rétablir la disposition par défaut
+      <div className="p-2 border-t border-line-soft bg-sunken flex gap-2">
+        <Button size="sm" icon="eye" onClick={toutAfficher} className="flex-1">Tout afficher</Button>
+        <Button size="sm" icon="refresh" onClick={() => { onReinitialiser(); onFermer(); }} className="flex-1" title="Rétablir la disposition par défaut">
+          Par défaut
         </Button>
       </div>
     </Flottant>

@@ -4,6 +4,8 @@ import Dialog from '../ui/Dialog';
 import { Button, IconButton } from '../ui/Button';
 import { CONTROL, SearchField, Select } from '../ui/Field';
 import { Icon } from '../ui/Icon';
+import { Menu, type MenuItem } from '../ui/Menu';
+import { TextInput } from '../ui/Field';
 import { Alert, EmptyState, Loading, LoadingOverlay } from '../ui/States';
 import PrintPreview from '../../print/engine/PrintPreview';
 import { PrintDocument } from '../../print/engine/types';
@@ -16,7 +18,7 @@ import {
   EntreeMenu, FiltreEntete, LIBELLES_OPERATEURS, MenuContextuel, operateursPour, SelecteurColonnes, SYMBOLES_OPERATEURS, Flottant,
 } from './Popups';
 import { documentPdfGrille, exporterGrilleCsv, exporterGrilleExcel } from './exportGrille';
-import { ColonneGrille, FiltreColonne, GrilleProps, Resume } from './types';
+import { ColonneGrille, DensiteGrille, DispositionGrille, EtatGrille, FiltreColonne, GrilleProps, Resume, VueGrille } from './types';
 import { useEtatGrille } from './useEtatGrille';
 import { useSourceDistante } from './useSourceDistante';
 
@@ -26,6 +28,22 @@ const L_SELECTION = 36;
 const L_DETAIL = 30;
 const L_COMMANDES = 84;
 const TYPE_DND = 'text/x-grille-colonne';
+const HAUTEURS: Record<DensiteGrille, number> = { compacte: 28, normale: 34, confort: 42 };
+const PADDING_CELLULE: Record<DensiteGrille, string> = { compacte: 'py-1', normale: 'py-1.5', confort: 'py-2.5' };
+const LIBELLES_DENSITE: Record<DensiteGrille, string> = { compacte: 'Compacte', normale: 'Normale', confort: 'Confort' };
+const PREFIXE_VUES = 'gc.vues.';
+type VueUtilisateur = { id: string; libelle: string; etat: DispositionGrille };
+function lireVues(cle?: string): VueUtilisateur[] {
+  if (!cle) return [];
+  try { const v = JSON.parse(localStorage.getItem(PREFIXE_VUES + cle) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+}
+function ecrireVues(cle: string, vues: VueUtilisateur[]) {
+  try { localStorage.setItem(PREFIXE_VUES + cle, JSON.stringify(vues)); } catch { /* stockage indisponible */ }
+}
+/** Disposition capturée par une vue (colonnes, ordre, largeurs, figées, tri, densité, retour). */
+function disposition(e: EtatGrille): DispositionGrille {
+  return { ordreColonnes: e.ordreColonnes, masquees: e.masquees, largeurs: e.largeurs, figees: e.figees ?? {}, tri: e.tri, densite: e.densite, retour: e.retour };
+}
 
 function largeurDefaut<T>(c: ColonneGrille<T>): number {
   if (c.largeur) return c.largeur;
@@ -48,7 +66,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
     selecteurColonnes = true, reorganisationColonnes = true, redimensionnementColonnes = true, lignesAlternees = true,
     bordures = false, retourLigne = false, rtl = false, pagination = true, defilementVirtuel = false, hauteurLigne = 34,
     selection = 'aucune', toutSelectionner = 'tout', ligneActive = true, edition, resumes, resumesGroupe, detail,
-    cleEtat, styleLigne,
+    cleEtat, styleLigne, vues,
   } = props;
 
   const colonnes = useMemo(() => colonnesEffectives(colonnesProp, donnees),
@@ -57,7 +75,17 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const optPagination = typeof pagination === 'object' ? pagination : {};
   const taillesPage = optPagination.tailles ?? [10, 20, 50, 100];
   const { etat, actions } = useEtatGrille(colonnes, optPagination.taille ?? 20, cleEtat);
-  const visibles = useMemo(() => colonnesVisibles(colonnes, etat), [colonnes, etat]);
+  // Colonnes figées par l'utilisateur (prime sur la définition de la colonne)
+  const colonnesAff = useMemo(() => (etat.figees ? colonnes.map((c) => {
+    const f = etat.figees![c.champ];
+    return f ? { ...c, figee: f === 'aucune' ? undefined : f } : c;
+  }) : colonnes), [colonnes, etat.figees]);
+  const visibles = useMemo(() => colonnesVisibles(colonnesAff, etat), [colonnesAff, etat]);
+  // Densité et retour à la ligne (préférences de l'utilisateur, sinon props)
+  const densite: DensiteGrille = etat.densite ?? 'normale';
+  const hLigne = etat.densite ? HAUTEURS[densite] : hauteurLigne;
+  const padCellule = PADDING_CELLULE[densite];
+  const retour = etat.retour ?? retourLigne;
   const largeur = (c: ColonneGrille<T>) => etat.largeurs[c.champ] ?? largeurDefaut(c);
   // Mode distant : le serveur trie, filtre, pagine, regroupe et totalise
   const distant = useSourceDistante(props.source, colonnes, etat, resumes, resumesGroupe);
@@ -303,6 +331,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
     const ancre = new DOMRect(e.clientX, e.clientY, 0, 0);
     const tri = etat.tri.find((t) => t.champ === c.champ);
     const groupe = etat.groupes.includes(c.champ);
+    const cote = colonnesAff.find((x) => x.champ === c.champ)?.figee;
     const entrees: EntreeMenu[] = [
       { libelle: 'Tri croissant', action: () => actions.trierSens(c.champ, 'asc'), actif: tri?.sens === 'asc', desactive: c.triable === false },
       { libelle: 'Tri décroissant', action: () => actions.trierSens(c.champ, 'desc'), actif: tri?.sens === 'desc', desactive: c.triable === false },
@@ -313,8 +342,13 @@ export default function Grille<T>(props: GrilleProps<T>) {
         ...(distant.actif ? [] : [{ libelle: 'Tout déplier', action: actions.toutDeplier }]),
         { libelle: 'Tout replier', action: actions.toutReplier },
       ] : []),
+      { libelle: 'Figer à gauche', separateur: true, action: () => actions.figer(c.champ, 'gauche'), actif: cote === 'gauche' },
+      { libelle: 'Figer à droite', action: () => actions.figer(c.champ, 'droite'), actif: cote === 'droite' },
+      { libelle: 'Libérer la colonne', action: () => actions.figer(c.champ, 'aucune'), desactive: !cote },
       { libelle: 'Masquer la colonne', separateur: true, action: () => actions.basculerVisibilite(c.champ), desactive: c.masquable === false },
-      { libelle: 'Ajuster la largeur', action: () => actions.redimensionner(c.champ, largeurDefaut(c)) },
+      { libelle: 'Ajuster au contenu', action: () => ajusterAuContenu(c.champ) },
+      { libelle: 'Ajuster toutes les colonnes', action: ajusterTout },
+      { libelle: 'Largeur par défaut', action: () => actions.redimensionner(c.champ, largeurDefaut(c)) },
     ];
     setFlottant(<MenuContextuel ancre={ancre} entrees={entrees} onFermer={() => setFlottant(null)} />);
   }
@@ -376,8 +410,8 @@ export default function Grille<T>(props: GrilleProps<T>) {
     return () => ro.disconnect();
   }, []);
   const tampon = 8;
-  const debutVirtuel = defilementVirtuel ? Math.max(0, Math.floor(scroll.haut / hauteurLigne) - tampon) : 0;
-  const finVirtuel = defilementVirtuel ? Math.min(elementsPage.length, Math.ceil((scroll.haut + scroll.hauteur) / hauteurLigne) + tampon) : elementsPage.length;
+  const debutVirtuel = defilementVirtuel ? Math.max(0, Math.floor(scroll.haut / hLigne) - tampon) : 0;
+  const finVirtuel = defilementVirtuel ? Math.min(elementsPage.length, Math.ceil((scroll.haut + scroll.hauteur) / hLigne) + tampon) : elementsPage.length;
   const elementsRendus = elementsPage.slice(debutVirtuel, finVirtuel);
 
   // ─── Géométrie des colonnes (figées : positions « sticky ») ───────────────
@@ -402,6 +436,106 @@ export default function Grille<T>(props: GrilleProps<T>) {
     return { position: 'sticky', ...(rtl ? { right: p.left, left: p.right } : p), zIndex: 2, background: fond };
   };
   const largeurTotale = debutGauche + visibles.reduce((s, c) => s + largeurEff(c), 0) + (aCommandes ? L_COMMANDES : 0);
+
+  // ─── Défilement horizontal : ombres de bord (colonnes cachées à gauche / à droite) ─
+  const [bords, setBords] = useState({ gauche: false, droite: false });
+  const majBords = useCallback(() => {
+    const el = corpsRef.current;
+    if (!el) return;
+    const gauche = el.scrollLeft > 1;
+    const droite = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setBords((b) => (b.gauche === gauche && b.droite === droite ? b : { gauche, droite }));
+  }, []);
+  useEffect(() => {
+    const el = corpsRef.current;
+    if (!el) return;
+    majBords();
+    const ro = new ResizeObserver(majBords);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [majBords, largeurTotale, elementsPage.length]);
+  // Les ombres commencent après les colonnes figées (elles restent visibles au défilement)
+  const bordGauche = Math.max(aSelection ? L_SELECTION : 0,
+    ...visibles.filter((c) => positions[c.champ]?.left != null).map((c) => positions[c.champ].left! + largeurEff(c)));
+  const bordDroit = Math.max(aCommandes ? L_COMMANDES : 0,
+    ...visibles.filter((c) => positions[c.champ]?.right != null).map((c) => positions[c.champ].right! + largeurEff(c)));
+
+  // ─── Ajustement des largeurs au contenu (double-clic sur la poignée, menus) ──
+  function mesurer(champ: string): number | null {
+    const el = corpsRef.current;
+    if (!el) return null;
+    const sel = `[data-champ="${typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(champ) : champ}"]`;
+    let max = 0;
+    el.querySelectorAll<HTMLElement>(`th${sel}`).forEach((th) => {
+      const texte = th.querySelector<HTMLElement>('.truncate');
+      max = Math.max(max, (texte?.scrollWidth ?? 0) + 58);   // padding + icônes de tri / filtre
+    });
+    el.querySelectorAll<HTMLElement>(`td${sel}`).forEach((td) => { max = Math.max(max, td.scrollWidth + 4); });
+    return max > 0 ? Math.min(640, Math.max(56, Math.ceil(max))) : null;
+  }
+  function ajusterAuContenu(champ: string) {
+    const l = mesurer(champ);
+    if (l) actions.redimensionner(champ, l);
+  }
+  function ajusterTout() {
+    for (const c of visibles) if (c.redimensionnable !== false) ajusterAuContenu(c.champ);
+  }
+
+  // ─── Vues (modèles de liste) : prédéfinies + enregistrées sur le poste ─────
+  const [vuesPerso, setVuesPerso] = useState<VueUtilisateur[]>(() => lireVues(cleEtat));
+  const [nommerVue, setNommerVue] = useState<string | null>(null);
+  const toutesVues: VueGrille[] = [...(vues ?? []), ...vuesPerso];
+  const memeDisposition = (v: VueGrille) => {
+    const d = v.etat;
+    const ordre = d.ordreColonnes ?? colonnes.map((c) => c.champ);
+    const cachees = d.masquees ?? colonnes.filter((c) => c.visible === false).map((c) => c.champ);
+    const visiblesVue = ordre.filter((c) => !cachees.includes(c)).join('|');
+    const visiblesEtat = etat.ordreColonnes.filter((c) => !etat.masquees.includes(c)).join('|');
+    return visiblesVue === visiblesEtat;
+  };
+  // Vue courante : celle appliquée, sinon la première vue prédéfinie si la disposition y correspond (vue par défaut)
+  const vueCourante = toutesVues.find((v) => v.id === etat.vue)
+    ?? (!etat.vue && vues?.[0] && memeDisposition(vues[0]) ? vues[0] : undefined);
+  const vueModifiee = !!vueCourante && !memeDisposition(vueCourante);
+  function enregistrerVue(libelle: string) {
+    if (!cleEtat) return;
+    const v: VueUtilisateur = { id: `u:${Date.now().toString(36)}`, libelle, etat: disposition(etat) };
+    const liste = [...vuesPerso, v];
+    setVuesPerso(liste);
+    ecrireVues(cleEtat, liste);
+    actions.appliquerVue(v.id, v.etat);
+  }
+  function supprimerVue(id: string) {
+    if (!cleEtat) return;
+    const liste = vuesPerso.filter((v) => v.id !== id);
+    setVuesPerso(liste);
+    ecrireVues(cleEtat, liste);
+  }
+  const avecMenuVue = selecteurColonnes && (!!cleEtat || (vues?.length ?? 0) > 0);
+  const elementsVue: MenuItem[] = [
+    ...(toutesVues.length ? [{ heading: 'Vues' } as MenuItem] : []),
+    ...toutesVues.map<MenuItem>((v) => ({
+      label: v.libelle, icon: v.id === vueCourante?.id ? 'check' : undefined, hint: v.id.startsWith('u:') ? 'perso' : undefined,
+      onSelect: () => actions.appliquerVue(v.id, v.etat),
+    })),
+    ...(cleEtat ? [
+      { label: 'Enregistrer la vue actuelle…', icon: 'save', onSelect: () => setNommerVue('') } as MenuItem,
+      ...(etat.vue?.startsWith('u:') ? [{ label: `Supprimer la vue « ${vueCourante?.libelle ?? ''} »`, icon: 'trash', tone: 'danger', onSelect: () => supprimerVue(etat.vue!) } as MenuItem] : []),
+    ] : []),
+    'separator',
+    { heading: 'Densité des lignes' },
+    ...(['compacte', 'normale', 'confort'] as DensiteGrille[]).map<MenuItem>((d) => ({
+      label: LIBELLES_DENSITE[d], icon: densite === d ? 'check' : undefined, onSelect: () => actions.densite(d),
+    })),
+    'separator',
+    { label: 'Retour à la ligne dans les cellules', icon: retour ? 'check' : undefined, onSelect: () => actions.basculerRetour(retourLigne) },
+    { label: 'Ajuster les colonnes au contenu', icon: 'columns', onSelect: ajusterTout },
+    { label: 'Rétablir la disposition par défaut', icon: 'refresh', onSelect: actions.reinitialiser },
+  ];
+  const menuVue = avecMenuVue ? (
+    <Menu size="sm" icon="layers" width={290} items={elementsVue}
+          label={<span className="inline-flex items-center gap-1.5"><Icon name="layers" size={16} />{vueCourante ? vueCourante.libelle : 'Vue'}{vueModifiee && <span className="text-warning-text" title="Disposition modifiée depuis l'application de la vue">•</span>}</span>} />
+  ) : null;
 
   // ─── Navigation clavier ───────────────────────────────────────────────────
   function clavier(e: KE) {
@@ -510,7 +644,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
         <tr data-index={indexPage} onClick={(e) => cliquerLigne(e, ligne)}
             onDoubleClick={() => { if (modeEdition === 'ligne' || modeEdition === 'formulaire') { if (edition?.modification !== false) commencerModification(ligne); } else props.surDoubleClicLigne?.(ligne); }}
             className={`${supprimee ? 'line-through opacity-50' : ''} ${bordures ? '' : 'border-b border-line-soft'} ${props.surClicLigne ? 'cursor-pointer' : ''} [--fond-ligne:var(--fond-base)] ${survolable ? 'hover:[--fond-ligne:var(--surface-hover)]' : ''}`}
-            style={{ '--fond-base': fondCalcule, background: fond, height: defilementVirtuel ? hauteurLigne : undefined, ...(props.styleLigne?.(ligne) ?? {}) } as React.CSSProperties}>
+            style={{ '--fond-base': fondCalcule, background: fond, height: defilementVirtuel ? hLigne : undefined, ...(props.styleLigne?.(ligne) ?? {}) } as React.CSSProperties}>
           {etat.groupes.map((g, gi) => <td key={g} style={{ width: 18, ...(gi === 0 ? lisere : {}) }} />)}
           {aSelection && (
             <td className="text-center" style={{ width: L_SELECTION, position: 'sticky', left: 0, zIndex: 2, background: fond, ...(etat.groupes.length ? {} : lisere) }} onClick={(e) => e.stopPropagation()}>
@@ -539,7 +673,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
             const focusIci = focus.index === indexPage && focus.col === ci;
             const modifiee = modifs && c.champ in (modifs as object);
             return (
-              <td key={c.champ}
+              <td key={c.champ} data-champ={c.champ}
                   onClick={() => {
                     setFocus({ index: indexPage, col: ci });
                     if ((modeEdition === 'cellule' || modeEdition === 'lot') && editable && edition?.modification !== false && !enCellule) {
@@ -547,7 +681,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
                       setCelluleEditee({ cle: k, champ: c.champ, valeur: valeurDe(c, ligne) });
                     }
                   }}
-                  className={`px-2.5 py-1.5 ${retourLigne ? 'whitespace-normal' : 'whitespace-nowrap overflow-hidden text-ellipsis'} ${estNum(c.type) ? 'money' : ''} ${bordures ? 'border border-line-soft' : ''}`}
+                  className={`px-2.5 ${padCellule} ${retour ? 'whitespace-normal break-words' : 'whitespace-nowrap overflow-hidden text-ellipsis'} ${estNum(c.type) ? 'money' : ''} ${bordures ? 'border border-line-soft' : ''}`}
                   style={{
                     textAlign: alignement(c), ...styleFige(c, fond),
                     ...(ci === 0 && !etat.groupes.length && !aSelection && !aDetail ? lisere : {}),
@@ -620,7 +754,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
     return (
       <tr key={n.cle} data-index={indexPage} className="border-b border-line-soft cursor-pointer select-none"
           onClick={() => { actions.basculerGroupe(n.cle); setFocus({ index: indexPage, col: focus.col }); }}
-          style={{ background: 'var(--brand-soft)', height: defilementVirtuel ? hauteurLigne : undefined,
+          style={{ background: 'var(--brand-soft)', height: defilementVirtuel ? hLigne : undefined,
                    outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}
           aria-expanded={!replie}>
         <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0) + (aCommandes ? 1 : 0)}
@@ -638,7 +772,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
   function rendreInfo(el: Extract<ElementAffiche<T>, { type: 'info' }>, indexPage: number) {
     return (
       <tr key={el.cle} data-index={indexPage} className="border-b border-line-soft"
-          style={{ height: defilementVirtuel ? hauteurLigne : undefined,
+          style={{ height: defilementVirtuel ? hLigne : undefined,
                    outline: focus.index === indexPage ? '2px solid var(--brand-500)' : undefined, outlineOffset: -2 }}>
         <td colSpan={visibles.length + etat.groupes.length + (aSelection ? 1 : 0) + (aDetail ? 1 : 0) + (aCommandes ? 1 : 0)}
             className="px-2.5 py-1.5 text-xs" style={{ paddingInlineStart: 28 + el.niveau * 18 }}>
@@ -733,11 +867,13 @@ export default function Grille<T>(props: GrilleProps<T>) {
               Filtres{Object.keys(etat.filtres).length ? ` (${Object.keys(etat.filtres).length})` : ''}
             </Button>
           )}
+          {menuVue}
           {selecteurColonnes && (
             <Button size="sm" icon="columns" title="Colonnes" onClick={(e) => setFlottant(
               <SelecteurColonnes ancre={e.currentTarget.getBoundingClientRect()}
                                  colonnes={colonnes.map((c) => ({ champ: c.champ, titre: c.titre ?? c.champ, masquable: c.masquable !== false }))}
                                  masquees={etat.masquees} onBasculer={actions.basculerVisibilite} onReinitialiser={actions.reinitialiser}
+                                 figees={Object.fromEntries(colonnesAff.map((c) => [c.champ, c.figee]))} onFiger={actions.figer}
                                  onFermer={() => setFlottant(null)} />,
             )}>Colonnes</Button>
           )}
@@ -786,9 +922,18 @@ export default function Grille<T>(props: GrilleProps<T>) {
         <Alert tone="danger" compact onClose={() => setErreurEdition(null)} className="mx-3 my-2">{erreurEdition}</Alert>
       )}
 
-      {/* Tableau */}
+      {/* Tableau (ombres de bord : il reste des colonnes à gauche / à droite) */}
+      <div className="relative flex-1 min-h-[120px] flex flex-col">
+      {!rtl && bords.gauche && (
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-0 z-[6] w-3"
+              style={{ left: bordGauche, background: 'linear-gradient(to right, var(--scroll-shadow), transparent)' }} />
+      )}
+      {!rtl && bords.droite && (
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-0 z-[6] w-3"
+              style={{ right: bordDroit, background: 'linear-gradient(to left, var(--scroll-shadow), transparent)' }} />
+      )}
       <div ref={corpsRef} tabIndex={0} onKeyDown={clavier}
-           onScroll={(e) => defilementVirtuel && setScroll({ haut: e.currentTarget.scrollTop, hauteur: e.currentTarget.clientHeight })}
+           onScroll={(e) => { if (defilementVirtuel) setScroll({ haut: e.currentTarget.scrollTop, hauteur: e.currentTarget.clientHeight }); majBords(); }}
            className="flex-1 overflow-auto outline-none relative min-h-[120px]">
         <table className="text-sm text-ink" style={{ tableLayout: 'fixed', width: Math.max(largeurTotale, 0), minWidth: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
           <colgroup>
@@ -827,7 +972,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
                 const tri = t >= 0 ? etat.tri[t] : null;
                 const filtreEnt = !!etat.filtresEntete[c.champ]?.length;
                 return (
-                  <th key={c.champ} draggable={reorganisationColonnes || !!panneauGroupes}
+                  <th key={c.champ} data-champ={c.champ} draggable={reorganisationColonnes || !!panneauGroupes}
                       onDragStart={(e) => { e.dataTransfer.setData(TYPE_DND, c.champ); e.dataTransfer.effectAllowed = 'move'; setGlisseEnTete(true); }}
                       onDragEnd={() => setGlisseEnTete(false)}
                       onDragOver={(e) => { if (reorganisationColonnes && e.dataTransfer.types.includes(TYPE_DND)) e.preventDefault(); }}
@@ -862,6 +1007,8 @@ export default function Grille<T>(props: GrilleProps<T>) {
                     {redimensionnementColonnes && c.redimensionnable !== false && (
                       <span onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); redim.current = { champ: c.champ, x: e.clientX, l: largeurEff(c) }; document.body.style.cursor = 'col-resize'; }}
                             onClick={(e) => e.stopPropagation()}
+                            onDoubleClick={(e) => { e.stopPropagation(); ajusterAuContenu(c.champ); }}
+                            title="Glisser : redimensionner · Double-clic : ajuster au contenu"
                             className="absolute top-0 h-full w-1.5 cursor-col-resize hover:bg-brand-line" style={{ [rtl ? 'left' : 'right']: 0 }} />
                     )}
                   </th>
@@ -922,12 +1069,12 @@ export default function Grille<T>(props: GrilleProps<T>) {
           </thead>
           <tbody>
             {ligneEditee?.nouvelle && (edition?.positionNouvelle !== 'fin') && rendreNouvelle()}
-            {defilementVirtuel && debutVirtuel > 0 && <tr style={{ height: debutVirtuel * hauteurLigne }} />}
+            {defilementVirtuel && debutVirtuel > 0 && <tr style={{ height: debutVirtuel * hLigne }} />}
             {elementsRendus.map((el, i) => (el.type === 'groupe'
               ? rendreGroupe(el.noeud, el.replie, debutVirtuel + i)
               : el.type === 'info' ? rendreInfo(el, debutVirtuel + i)
               : rendreLigne(el.ligne, debutVirtuel + i)))}
-            {defilementVirtuel && finVirtuel < elementsPage.length && <tr style={{ height: (elementsPage.length - finVirtuel) * hauteurLigne }} />}
+            {defilementVirtuel && finVirtuel < elementsPage.length && <tr style={{ height: (elementsPage.length - finVirtuel) * hLigne }} />}
             {ligneEditee?.nouvelle && edition?.positionNouvelle === 'fin' && rendreNouvelle()}
           </tbody>
           {resumes?.length ? (
@@ -971,6 +1118,24 @@ export default function Grille<T>(props: GrilleProps<T>) {
         )}
         {(chargement || distant.chargement) && <LoadingOverlay />}
       </div>
+      </div>
+
+      {nommerVue !== null && (
+        <Dialog title="Enregistrer la vue" subtitle="Colonnes, ordre, largeurs, colonnes figées, tri et densité" icon="save" size="sm"
+                onClose={() => setNommerVue(null)} closeOnOverlay={false}
+                footer={(
+                  <>
+                    <Button onClick={() => setNommerVue(null)}>Annuler</Button>
+                    <Button variant="primary" icon="check" disabled={!nommerVue.trim()}
+                            onClick={() => { enregistrerVue(nommerVue.trim()); setNommerVue(null); }}>Enregistrer</Button>
+                  </>
+                )}>
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink-label">Nom de la vue
+            <TextInput autoFocus value={nommerVue} onChange={(e) => setNommerVue(e.target.value)} placeholder="Ex. Recouvrement du mois"
+                       onKeyDown={(e) => { if (e.key === 'Enter' && nommerVue.trim()) { enregistrerVue(nommerVue.trim()); setNommerVue(null); } }} />
+          </label>
+        </Dialog>
+      )}
 
       {/* Panneau des filtres actifs */}
       {panneauFiltre && filtresActifs.length > 0 && (

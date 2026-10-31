@@ -91,3 +91,25 @@ Sans `colonnes`, elles sont déduites de la première ligne.
 - **Clavier** : flèches, Début/Fin, PgPréc/PgSuiv, Entrée/F2 (édition), Espace (sélection), Suppr.
 - **Export** : Excel, CSV, PDF — exactement ce qui est affiché (colonnes visibles, filtre, tri, groupes).
 - **RTL** : `rtl` inverse la disposition (colonnes figées et redimensionnement compris).
+
+## Disposition personnelle et vues (façon Sage / Odoo / Dynamics)
+
+Barre d'outils, menu **Vue** (avec `cleEtat` ou `vues`) :
+- **Vues** : vues prédéfinies passées par l'écran (`vues: VueGrille[]`, ex. Standard / Comptable / Recouvrement / Complète
+  dans `screens/Ventes.tsx`) et vues **enregistrées par l'utilisateur** sur le poste (`localStorage gc.vues.<cleEtat>`).
+  Une vue capture la disposition : colonnes visibles, ordre, largeurs, colonnes figées, tri, densité, retour à la ligne
+  (les filtres et la recherche sont conservés). Un point ambre signale une disposition modifiée depuis la vue.
+- **Densité** : compacte (28 px) / normale (34 px) / confort (42 px).
+- **Retour à la ligne** dans les cellules ; **ajuster les colonnes au contenu** ; **rétablir la disposition par défaut**.
+
+Colonnes :
+- **Figer** à gauche / à droite / libérer : menu contextuel de l'en-tête (clic droit) ou épingle du sélecteur de colonnes.
+  Le choix de l'utilisateur prime sur `figee` de la définition (`'aucune'` libère une colonne figée par défaut).
+- **Ajuster au contenu** : double-clic sur la poignée de redimensionnement, ou menu de l'en-tête.
+- **Ombres de bord** quand des colonnes sont cachées à gauche / à droite (défilement horizontal), après les colonnes figées.
+- **Sélecteur de colonnes** : recherche, compteur, « Tout afficher », « Par défaut ».
+- `DataGrid` : `hidden: true` = colonne optionnelle masquée par défaut, `pinned: 'left' | 'right'` = figée par défaut.
+  Une colonne optionnelle ajoutée après coup reste masquée sur les postes qui avaient déjà un état mémorisé.
+
+Ces préférences sont des champs **facultatifs** de `EtatGrille` (`figees`, `densite`, `retour`, `vue`) : les états mémorisés
+avant leur ajout restent valides.

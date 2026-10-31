@@ -10,7 +10,8 @@ import Journal from './JournalVentes';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeBordereau } from '../impression/demandes';
-import { DocBadge, DOC_TONE, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Toolbar } from '../components/ui/atoms';
+import { Badge, DocBadge, DOC_TONE, PayStatus, Money, Tabs, PeriodPicker, PageHeader, Toolbar } from '../components/ui/atoms';
+import type { VueGrille } from '../components/grille/types';
 import { Button } from '../components/ui/Button';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
@@ -79,17 +80,51 @@ export default function Ventes() {
   }
   const isAvoir = type === 'FAV' || type === 'BRT';
 
+  // Colonnes : les 8 historiques (tri / filtres / totaux côté serveur) + colonnes optionnelles masquées
+  // par défaut (affichées via « Colonnes » ou une vue). Les optionnelles n'envoient aucun champ au serveur.
+  const vide = <span className="text-ink-muted">—</span>;
+  const montantOpt = (v: unknown) => (v === null || v === undefined || v === '' ? vide : <Money value={v} />);
   const columns: Column<Vente>[] = [
-    { key: 'numero', header: 'N° pièce', field: 'numero', render: (v) => <span className="flex items-center gap-2"><DocBadge code={type} /><span className="money">{v.numero}</span></span> },
-    { key: 'date', header: 'Date', width: '90px', field: 'date', type: 'date', render: (v) => fmtDate(v.date) },
-    { key: 'client', header: 'Client', field: 'raison', render: (v) => <b>{v.raison ?? v.code_cli ?? '—'}</b> },
-    { key: 'mode', header: 'Mode', width: '90px', field: 'mode_payement', render: (v) => <span className="text-ink-muted">{v.mode_payement ?? '—'}</span> },
-    { key: 'ttc', header: 'Net à payer', align: 'right', width: '120px', field: 'net_a_payer', render: (v) => <Money value={v.net_a_payer ?? v.total_ttc} /> },
-    { key: 'regler', header: 'Réglé', align: 'right', width: '110px', field: 'regler', render: (v) => <Money value={v.regler} /> },
-    { key: 'reste', header: 'Reste', align: 'right', width: '110px', field: 'reste_a_payer', render: (v) => (
+    { key: 'numero', header: 'N° pièce', field: 'numero', width: '190px', pinned: 'left',
+      render: (v) => <span className="flex items-center gap-2"><DocBadge code={type} /><span className="money font-semibold">{v.numero}</span>
+        {Number(v.grouped) > 0 && <Badge tone="neutral" title="Pièce regroupée (BL facturé / facture de regroupement)">groupée</Badge>}</span> },
+    { key: 'date', header: 'Date', width: '96px', field: 'date', type: 'date', render: (v) => <span className="money">{fmtDate(v.date)}</span> },
+    { key: 'echeance', header: 'Échéance', width: '104px', hidden: true,
+      render: (v) => (v.date_echeance ? <span className="money">{fmtDate(v.date_echeance)}</span> : vide) },
+    { key: 'retard', header: 'Retard', width: '136px', hidden: true, render: (v) => <Retard v={v} /> },
+    { key: 'code_cli', header: 'Code client', width: '100px', hidden: true, render: (v) => (v.code_cli ? <span className="money">{v.code_cli}</span> : vide) },
+    { key: 'client', header: 'Client', field: 'raison', render: (v) => <b title={v.raison ?? undefined}>{v.raison ?? v.code_cli ?? '—'}</b> },
+    { key: 'tel', header: 'Téléphone', width: '120px', hidden: true, render: (v) => (v.tel ? <span className="money">{v.tel}</span> : vide) },
+    { key: 'mode', header: 'Mode', width: '96px', field: 'mode_payement', render: (v) => <span className="text-ink-label">{v.mode_payement ?? '—'}</span> },
+    { key: 'ht', header: 'Total HT', align: 'right', width: '120px', hidden: true, render: (v) => montantOpt(v.total_ht) },
+    { key: 'remise', header: 'Remise', align: 'right', width: '104px', hidden: true, render: (v) => montantOpt(v.remise) },
+    { key: 'tva', header: 'TVA', align: 'right', width: '110px', hidden: true, render: (v) => montantOpt(v.tva ?? v.total_taxe) },
+    { key: 'timbre', header: 'Timbre', align: 'right', width: '96px', hidden: true, render: (v) => montantOpt(v.timbre) },
+    { key: 'ttc', header: 'Net à payer', align: 'right', width: '124px', field: 'net_a_payer', render: (v) => <Money value={v.net_a_payer ?? v.total_ttc} className="font-semibold" /> },
+    { key: 'regler', header: 'Réglé', align: 'right', width: '116px', field: 'regler', render: (v) => <Money value={v.regler} /> },
+    { key: 'reste', header: 'Reste', align: 'right', width: '116px', field: 'reste_a_payer', render: (v) => (
       <span className="money font-medium" style={{ color: Number(v.reste_a_payer) > 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(v.reste_a_payer)}</span>
     ) },
-    { key: 'statut', header: 'Statut', width: '86px', render: (v) => isAvoir ? null : <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} /> },
+    { key: 'statut', header: 'Statut', width: '92px', render: (v) => isAvoir ? null : <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} /> },
+    { key: 'observation', header: 'Observation', width: '220px', hidden: true,
+      render: (v) => (v.observation ? <span className="text-ink-label" title={v.observation}>{v.observation}</span> : vide) },
+  ];
+
+  // Vues de liste prédéfinies (modèles à la Sage / Odoo) — champs : clé serveur si la colonne en a une
+  const C = { numero: 'numero', date: 'date', echeance: 'echeance', retard: 'retard', code: 'code_cli', client: 'raison', tel: 'tel',
+    mode: 'mode_payement', ht: 'ht', remise: 'remise', tva: 'tva', timbre: 'timbre', ttc: 'net_a_payer', regler: 'regler',
+    reste: 'reste_a_payer', statut: 'statut', obs: 'observation' } as const;
+  const tous = Object.values(C) as string[];
+  const seulement = (garder: string[]) => tous.filter((c) => !garder.includes(c));
+  const vues: VueGrille[] = [
+    { id: 'standard', libelle: 'Standard', etat: { ordreColonnes: tous, masquees: seulement([C.numero, C.date, C.client, C.mode, C.ttc, C.regler, C.reste, C.statut]) } },
+    { id: 'comptable', libelle: 'Comptable (HT · TVA · TTC)', etat: {
+      ordreColonnes: [C.numero, C.date, C.code, C.client, C.ht, C.remise, C.tva, C.timbre, C.ttc, C.statut, ...seulement([C.numero, C.date, C.code, C.client, C.ht, C.remise, C.tva, C.timbre, C.ttc, C.statut])],
+      masquees: seulement([C.numero, C.date, C.code, C.client, C.ht, C.remise, C.tva, C.timbre, C.ttc, C.statut]) } },
+    { id: 'recouvrement', libelle: 'Recouvrement (échéances)', etat: {
+      ordreColonnes: [C.numero, C.date, C.echeance, C.retard, C.client, C.tel, C.ttc, C.regler, C.reste, C.statut, ...seulement([C.numero, C.date, C.echeance, C.retard, C.client, C.tel, C.ttc, C.regler, C.reste, C.statut])],
+      masquees: seulement([C.numero, C.date, C.echeance, C.retard, C.client, C.tel, C.ttc, C.regler, C.reste, C.statut]) } },
+    { id: 'complete', libelle: 'Complète (toutes les colonnes)', etat: { ordreColonnes: tous, masquees: [], figees: { [C.numero]: 'gauche', [C.statut]: 'droite' }, densite: 'compacte' } },
   ];
 
   const csvDocs: ExportColumn<Vente>[] = [
@@ -150,7 +185,7 @@ export default function Ventes() {
       <DataGrid
         exportCsv={{ nom: `ventes-${type.toLowerCase()}`, columns: csvDocs }}
         columns={columns} rowKey={(v) => v.id}
-        distant={distant} cleEtat="ventes"
+        distant={distant} cleEtat="ventes" grille={{ vues }}
         onRowClick={(v) => navigate(`/ventes/${v.id}`)}
         footer={(r) => ({
           _label: `${r?.total ?? 0} pièce(s)`,
@@ -163,4 +198,17 @@ export default function Ventes() {
       )}
     </div>
   );
+}
+
+/** Retard de paiement (pièces avec reste dû) : échue → rouge, proche (≤ 7 j) → ambre, sinon jours restants. */
+function Retard({ v }: { v: Vente }) {
+  if (!v.date_echeance || !(Number(v.reste_a_payer) > 0.009)) return <span className="text-ink-muted">—</span>;
+  const jour = 86_400_000;
+  const aujourdhui = new Date(); aujourdhui.setHours(0, 0, 0, 0);
+  const ech = new Date(`${String(v.date_echeance).slice(0, 10)}T00:00:00`);
+  const n = Math.round((aujourdhui.getTime() - ech.getTime()) / jour);
+  if (Number.isNaN(n)) return <span className="text-ink-muted">—</span>;
+  if (n > 0) return <Badge tone="danger" icon="clock">{n} j de retard</Badge>;
+  if (n >= -7) return <Badge tone="warning" icon="clock">{n === 0 ? 'aujourd’hui' : `dans ${-n} j`}</Badge>;
+  return <span className="text-xs text-ink-muted">dans {-n} j</span>;
 }

@@ -99,7 +99,24 @@ export type EtatGrille = {
   /** Groupes repliés (clé de chemin) — ou dépliés si tousReplies */
   groupesBascules: string[];
   tousReplies: boolean;
+  // ── Disposition personnelle (facultatif : états mémorisés avant ces options restent valides) ──
+  /** Colonnes figées par l'utilisateur (prime sur `figee` de la colonne ; 'aucune' libère une colonne figée par défaut) */
+  figees?: Record<string, 'gauche' | 'droite' | 'aucune'>;
+  /** Densité des lignes */
+  densite?: DensiteGrille;
+  /** Retour à la ligne dans les cellules (prime sur la prop `retourLigne`) */
+  retour?: boolean;
+  /** Vue appliquée (prédéfinie ou enregistrée) */
+  vue?: string;
 };
+
+export type DensiteGrille = 'compacte' | 'normale' | 'confort';
+
+/** Partie « disposition » de l'état, capturée par une vue (modèle de liste à la Sage / Odoo). */
+export type DispositionGrille = Partial<Pick<EtatGrille, 'ordreColonnes' | 'masquees' | 'largeurs' | 'figees' | 'densite' | 'retour' | 'tri'>>;
+
+/** Vue de liste : jeu de colonnes, ordre, largeurs, colonnes figées, tri et densité. */
+export type VueGrille = { id: string; libelle: string; description?: string; etat: DispositionGrille };
 
 export type ChangementsLot<T> = {
   modifiees: Map<string | number, Partial<T>>;
@@ -231,6 +248,11 @@ export type GrilleProps<T> = {
 
   /** Persistance de l'état (colonnes, tri, filtres, groupes, page) dans localStorage */
   cleEtat?: string;
+  /**
+   * Vues prédéfinies proposées dans le menu « Vue » (ex. Standard, Comptable, Recouvrement).
+   * Avec `cleEtat`, l'utilisateur peut aussi enregistrer ses propres vues sur le poste.
+   */
+  vues?: VueGrille[];
   /** Classes / styles par ligne */
   styleLigne?: (ligne: T) => React.CSSProperties | undefined;
 };
