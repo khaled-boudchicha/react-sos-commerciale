@@ -10,6 +10,7 @@ const GROUPES: { titre: string; items: [string[], string][] }[] = [
     items: [
       [['Ctrl', 'K'], 'Rechercher un client, un article, une pièce ou un écran'],
       [['Ctrl', '/'], 'Afficher cette aide'],
+      [['Ctrl', 'N'], 'Nouvelle pièce (tableau de bord, ventes, achats)'],
       [['Échap'], 'Fermer la fenêtre ou le panneau ouvert'],
       [['Tab'], 'Passer au champ suivant (Maj+Tab : précédent)'],
     ],

@@ -5,13 +5,15 @@ import { StatVentesResult, DebiteursResult, StatParFamille } from '../api/types'
 import { fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 import { D, useDroits } from '../lib/droits';
 import { useSession } from '../store/session';
-import { C, type Commande } from '../navigation/commandes';
+import { C, TEINTE_TON, commandeDeChemin, type Commande } from '../navigation/commandes';
+import { useRecents, ilYA } from '../navigation/recents';
+import { Link } from 'react-router-dom';
 import { usePageTitle } from '../components/ui/atoms';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader } from '../components/ui/Card';
 import { KpiTile, BarList } from '../components/ui/Kpi';
 import { Alert, EmptyState, Skeleton } from '../components/ui/States';
-import { Icon, type IconName } from '../components/ui/Icon';
+import { Icon, TONE_VARS, type IconName } from '../components/ui/Icon';
 
 type SoldeCompte = { compte: string | null; compte_id: number | null; solde: number; total_entrees: number; total_sorties: number };
 
@@ -32,6 +34,8 @@ export default function Dashboard() {
   const droits = useDroits();
   const { peut, comptesAutorises } = droits;
   const user = useSession((s) => s.dossierUser);
+  // « Reprendre où vous en étiez » : écrans récents du poste (hors tableau de bord)
+  const recents = useRecents((s) => s.recents).filter((r) => r.chemin !== '/').slice(0, 5);
   // Indicateurs sensibles masqués selon les droits (parité desktop)
   const voitMarge = peut('vente', D.vente.benefice) || peut('autre', D.autre.beneficeStat);
   const voitCaisse = peut('autre', D.autre.tresorerie);
@@ -163,6 +167,34 @@ export default function Dashboard() {
                        items={familles.map((f) => ({ key: f.famille || '—', label: f.famille || '(sans famille)', value: Number(f.total_ttc ?? 0) }))} />}
         </Card>
       </div>
+
+      {recents.length > 0 && (
+        <Card>
+          <CardHeader title="Reprendre où vous en étiez" description="Derniers écrans ouverts sur ce poste" icon="history" iconTone="neutral" />
+          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2">
+            {recents.map((r) => {
+              const [chemin, recherche = ''] = r.chemin.split('?');
+              const cmd = commandeDeChemin(chemin, recherche ? `?${recherche}` : '');
+              const teinte = TONE_VARS[cmd ? TEINTE_TON[cmd.ton] : 'neutral'];
+              return (
+                <li key={r.chemin}>
+                  <Link to={r.chemin}
+                        className="group flex items-center gap-3 rounded-md border border-line-soft px-3 py-2.5 hover:border-brand-line hover:bg-hover transition-colors min-w-0">
+                    <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-sm"
+                          style={{ background: teinte.soft, color: teinte.text }}>
+                      <Icon name={cmd?.icone ?? 'history'} size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-ink truncate group-hover:text-brand-text">{r.titre || chemin}</span>
+                      <span className="block text-xs text-ink-muted truncate">{ilYA(r.date)}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
     </div>
   );
 }
