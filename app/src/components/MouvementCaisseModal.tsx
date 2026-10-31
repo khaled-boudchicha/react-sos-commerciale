@@ -5,6 +5,11 @@ import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
 import { useToast } from './ui/Toast';
 import { useDroits } from '../lib/droits';
+import Dialog from './ui/Dialog';
+import { Button } from './ui/Button';
+import { Field, Select, TextInput } from './ui/Field';
+import { Alert } from './ui/States';
+import type { IconName, Tone } from './ui/Icon';
 
 const ADD_ENCAISSEMENT = gql`mutation AddEncaissement($input: JSON!) { addEncaissement(input: $input) }`;
 const ADD_DECAISSEMENT = gql`mutation AddDecaissement($input: JSON!) { addDecaissement(input: $input) }`;
@@ -23,6 +28,12 @@ const TITRES: Record<MouvementKind, string> = {
  * entre comptes. Le compte (caisse/banque) est obligatoire : sans lui, le
  * mouvement n'entre dans aucun solde.
  */
+const ICONES: Record<MouvementKind, { icon: IconName; tone: Tone }> = {
+  encaissement: { icon: 'plus', tone: 'success' },
+  decaissement: { icon: 'minus', tone: 'danger' },
+  transfert: { icon: 'movements', tone: 'brand' },
+};
+
 export default function MouvementCaisseModal({ kind, onClose, onDone }: {
   kind: MouvementKind; onClose: () => void; onDone: () => void;
 }) {
@@ -97,99 +108,79 @@ export default function MouvementCaisseModal({ kind, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-      <div className="w-[520px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="font-extrabold text-[15px]">{TITRES[kind]}</div>
-          <button onClick={onClose} className="text-ink-muted text-[18px] px-2">✕</button>
-        </div>
+    <Dialog title={TITRES[kind]} icon={ICONES[kind].icon} iconTone={ICONES[kind].tone} width={520}
+            onClose={onClose} closeOnOverlay={false}
+            footer={(
+              <>
+                <Button onClick={onClose} disabled={loading}>Annuler</Button>
+                <Button variant="primary" icon="save" onClick={() => void submit()} loading={loading}>
+                  {loading ? 'Enregistrement…' : 'Enregistrer'}
+                </Button>
+              </>
+            )}>
+      {error && <Alert tone="danger" compact className="mb-3">{error}</Alert>}
 
-        {error && (
-          <div className="text-[12px] rounded-md px-3 py-2 mb-3"
-               style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>{error}</div>
-        )}
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Montant (DA)" required>
+          <TextInput type="number" min="0" step="0.01" autoFocus value={montant} mono align="right"
+                     onChange={(e) => setMontant(e.target.value)} />
+        </Field>
+        <Field label="Date">
+          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
 
-        <div className="grid grid-cols-2 gap-3">
-          <label className="text-[11px] font-bold text-ink-label">Montant (DA)
-            <input type="number" min="0" step="0.01" autoFocus value={montant}
-                   onChange={(e) => setMontant(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-[14px] text-right font-normal" />
-          </label>
-          <label className="text-[11px] font-bold text-ink-label">Date
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                   className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-          </label>
+        <Field label={kind === 'transfert' ? 'Compte source' : 'Compte / caisse'} required>
+          <Select value={compteId} onChange={(e) => setCompteId(e.target.value)}>
+            <option value="">— choisir —</option>
+            {comptes.map((c) => (
+              <option key={String(c.compte_id)} value={String(c.compte_id)}>
+                {c.compte} ({fmtMoney(c.solde)})
+              </option>
+            ))}
+          </Select>
+        </Field>
 
-          <label className="text-[11px] font-bold text-ink-label">
-            {kind === 'transfert' ? 'Compte source' : 'Compte / caisse'}
-            <select value={compteId} onChange={(e) => setCompteId(e.target.value)}
-                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
+        {kind === 'transfert' ? (
+          <Field label="Compte destination" required>
+            <Select value={compteDestId} onChange={(e) => setCompteDestId(e.target.value)}>
               <option value="">— choisir —</option>
-              {comptes.map((c) => (
+              {comptes.filter((c) => String(c.compte_id) !== compteId).map((c) => (
                 <option key={String(c.compte_id)} value={String(c.compte_id)}>
                   {c.compte} ({fmtMoney(c.solde)})
                 </option>
               ))}
-            </select>
-          </label>
+            </Select>
+          </Field>
+        ) : (
+          <Field label="Mode de paiement">
+            <Select value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="Espece">Espèces</option>
+              {modes.map((m: any, i: number) => {
+                const v = String(m.nom ?? m.name ?? m.mode ?? m);
+                return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
+              })}
+            </Select>
+          </Field>
+        )}
 
-          {kind === 'transfert' ? (
-            <label className="text-[11px] font-bold text-ink-label">Compte destination
-              <select value={compteDestId} onChange={(e) => setCompteDestId(e.target.value)}
-                      className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-                <option value="">— choisir —</option>
-                {comptes.filter((c) => String(c.compte_id) !== compteId).map((c) => (
-                  <option key={String(c.compte_id)} value={String(c.compte_id)}>
-                    {c.compte} ({fmtMoney(c.solde)})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <label className="text-[11px] font-bold text-ink-label">Mode de paiement
-              <select value={mode} onChange={(e) => setMode(e.target.value)}
-                      className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-                <option value="Espece">Espèces</option>
-                {modes.map((m: any, i: number) => {
-                  const v = String(m.nom ?? m.name ?? m.mode ?? m);
-                  return v.toLowerCase() === 'espece' ? null : <option key={i} value={v}>{v}</option>;
-                })}
-              </select>
-            </label>
-          )}
-
-          {kind !== 'transfert' && (
-            <>
-              <label className="text-[11px] font-bold text-ink-label col-span-2">Objet / libellé
-                <input value={objet} onChange={(e) => setObjet(e.target.value)}
-                       placeholder={kind === 'encaissement' ? 'Recette diverse…' : 'Dépense, charge…'}
-                       className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal" />
-              </label>
-              {kind === 'decaissement' && (
-                <label className="text-[11px] font-bold text-ink-label col-span-2">Catégorie
-                  <select value={categorie} onChange={(e) => setCategorie(e.target.value)}
-                          className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
-                    <option value="">Décaissement (défaut)</option>
-                    <option value="Charge">Charge</option>
-                    <option value="Charge Production">Charge Production</option>
-                  </select>
-                </label>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} disabled={loading}
-                  className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">
-            Annuler
-          </button>
-          <button onClick={() => void submit()} disabled={loading}
-                  className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-            {loading ? 'Enregistrement…' : 'Enregistrer'}
-          </button>
-        </div>
+        {kind !== 'transfert' && (
+          <>
+            <Field label="Objet / libellé" className="col-span-2">
+              <TextInput value={objet} onChange={(e) => setObjet(e.target.value)}
+                         placeholder={kind === 'encaissement' ? 'Recette diverse…' : 'Dépense, charge…'} />
+            </Field>
+            {kind === 'decaissement' && (
+              <Field label="Catégorie" className="col-span-2">
+                <Select value={categorie} onChange={(e) => setCategorie(e.target.value)}>
+                  <option value="">Décaissement (défaut)</option>
+                  <option value="Charge">Charge</option>
+                  <option value="Charge Production">Charge Production</option>
+                </Select>
+              </Field>
+            )}
+          </>
+        )}
       </div>
-    </div>
+    </Dialog>
   );
 }

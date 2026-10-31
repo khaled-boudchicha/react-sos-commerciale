@@ -41,11 +41,11 @@ export function formatNombre(n: number, decimals: number, minDecimals = decimals
 }
 
 const TAILLES = {
-  sm: 'text-[12px] py-1 px-2',
-  md: 'text-[13px] py-2 px-3',
-  lg: 'text-[16px] py-2.5 px-3 font-bold',
+  sm: 'text-sm py-1 px-2',
+  md: 'text-base py-2 px-3',
+  lg: 'text-lg py-2.5 px-3 font-bold',
   xl: 'text-[26px] py-3 px-4 font-extrabold',
-  pos: 'h-[38px] text-[14px] px-2.5 rounded-lg font-medium',
+  pos: 'h-[38px] text-md px-2.5 rounded-lg font-medium',
   montant: 'h-[68px] text-[34px] px-0 font-extrabold bg-transparent',
 };
 
@@ -94,7 +94,7 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
         }}
         className={`money w-full text-right text-ink outline-none disabled:opacity-60 ${size === 'montant' ? '' : 'border border-line rounded-sm bg-surface focus:border-brand-500'} ${TAILLES[size]} ${suffix ? 'pr-10' : ''} ${className}`}
       />
-      {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-ink-muted pointer-events-none">{suffix}</span>}
+      {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-ink-muted pointer-events-none">{suffix}</span>}
     </div>
   );
 

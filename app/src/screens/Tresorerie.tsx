@@ -14,7 +14,10 @@ import { fmtDate, fmtMoney, isoFirstOfMonth, isoToday } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import { ReponseDistante, RequeteDistante } from '../components/grille/types';
-import { PeriodPicker, PageHeader } from '../components/ui/atoms';
+import { Money, PageHeader, Toolbar } from '../components/ui/atoms';
+import { Button, IconButton } from '../components/ui/Button';
+import { DateRangeField } from '../components/ui/Field';
+import { KpiTile } from '../components/ui/Kpi';
 import MouvementDetailModal from '../components/MouvementDetailModal';
 
 /** Requête de premier niveau (ni valeurs d'un filtre d'en-tête, ni sous-groupe) : ses totaux valent pour la liste */
@@ -137,64 +140,48 @@ export default function Tresorerie() {
     { key: 'mode', header: 'Mode', width: '90px', field: 'mode_payement', render: (m) => <span className="text-ink-muted">{m.mode_payement ?? '—'}</span> },
     { key: 'user', header: 'Utilisateur', width: '90px', field: 'user', render: (m) => <span className="text-ink-muted">{m.user ?? '—'}</span> },
     { key: 'montant', header: 'Montant', align: 'right', width: '120px', field: 'montant', render: (m) => (
-      <span className="money font-semibold" style={{ color: Number(m.montant) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-        {Number(m.montant) >= 0 ? '+' : ''}{fmtMoney(m.montant)}
-      </span>
+      <Money value={m.montant} signed colorNeg={false} tone={Number(m.montant) >= 0 ? 'success' : 'danger'} className="font-semibold" />
     ) },
     // Pas de `field` : le cumul n'a de sens qu'en ordre chronologique, sans filtre de grille
     { key: 'solde', header: 'Solde cumulé', align: 'right', width: '120px', render: (m) => <span className="money">{fmtMoney(m.solde_cumul)}</span> },
     ...(peutAnnuler && !groupe ? [{ key: 'actions', header: '', align: 'right' as const, width: '70px', render: (m: MouvementTresorie) => !annulable(m) ? null : (
-      <button onClick={(e) => { e.stopPropagation(); setAnnulation(m); }} title="Annuler ce mouvement"
-              className="px-1.5 py-0.5 rounded-sm border border-line text-[11px] font-semibold" style={{ color: 'var(--danger)' }}>
-        Annuler
-      </button>
+      <IconButton icon="xCircle" label="Annuler ce mouvement" size="xs" tone="danger"
+                  onClick={(e) => { e.stopPropagation(); setAnnulation(m); }} />
     ) }] : []),
   ];
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Trésorerie">
-        <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
-        <button onClick={() => setGroupe((g) => !g)} aria-pressed={groupe}
-                title="Un mouvement par règlement (uuid, tiers et date)"
-                className={`rounded-md px-3 py-2 font-bold text-[12px] border ${groupe ? 'border-brand-700 text-brand-700' : 'border-line text-ink-label'}`}>
-          {groupe ? 'Vue détaillée' : 'Vue groupée'}
-        </button>
-        <button onClick={() => void printEtat()} disabled={printing}
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
-          {printing ? 'Préparation…' : "Imprimer l'état"}
-        </button>
-        <button onClick={() => void exporter()} disabled={exporting}
-                title="Exporter tous les mouvements en CSV (Excel)"
-                className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
-          {exporting ? 'Export…' : '⬇ CSV'}
-        </button>
+      <PageHeader title="Trésorerie" icon="wallet" description="Soldes des comptes, mouvements de caisse et de banque">
         {peutArreter && (
-          <button onClick={() => setArrete(true)}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Arrêté de caisse
-          </button>
+          <Button icon="lock" onClick={() => setArrete(true)}>Arrêté de caisse</Button>
         )}
         {peutTransfert && (
-          <button onClick={() => setMouvement('transfert')}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Transfert
-          </button>
+          <Button icon="movements" onClick={() => setMouvement('transfert')}>Transfert</Button>
         )}
         {peutCreer && (
-          <button onClick={() => setMouvement('decaissement')}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line"
-                  style={{ color: 'var(--danger)' }}>
-            − Décaissement
-          </button>
+          <Button icon="minus" className="!text-danger-text" onClick={() => setMouvement('decaissement')}>Décaissement</Button>
         )}
         {peutCreer && (
-          <button onClick={() => setMouvement('encaissement')}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-            ＋ Encaissement
-          </button>
+          <Button variant="primary" icon="plus" onClick={() => setMouvement('encaissement')}>Encaissement</Button>
         )}
       </PageHeader>
+      <Toolbar>
+        <DateRangeField from={debut} to={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
+        <Button icon="layers" onClick={() => setGroupe((g) => !g)} pressed={groupe}
+                title="Un mouvement par règlement (uuid, tiers et date)">
+          {groupe ? 'Vue détaillée' : 'Vue groupée'}
+        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          <Button icon="printer" onClick={() => void printEtat()} disabled={printing}>
+            {printing ? 'Préparation…' : "Imprimer l'état"}
+          </Button>
+          <Button icon="download" onClick={() => void exporter()} disabled={exporting}
+                  title="Exporter tous les mouvements en CSV (Excel)">
+            {exporting ? 'Export…' : 'CSV'}
+          </Button>
+        </div>
+      </Toolbar>
       {arrete && (
         <ArreteCaisseModal onClose={() => setArrete(false)}
                            onDone={() => { void refetchMvts(); void refetchSoldes(); }} />
@@ -206,7 +193,7 @@ export default function Tresorerie() {
             {annulation.tier ? <> ({annulation.tier})</> : null}.
             <div className="mt-2">{messageAnnulation(annulation.cle)}</div>
           </>}
-          confirmLabel="Annuler le mouvement" danger loading={annulant}
+          confirmLabel="Annuler le mouvement" cancelLabel="Conserver" danger loading={annulant}
           onConfirm={() => void confirmerAnnulation()} onCancel={() => setAnnulation(null)} />
       )}
       {mouvement && (
@@ -215,8 +202,8 @@ export default function Tresorerie() {
       )}
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
 
-      <div className="flex gap-3 flex-wrap">
-        {!restreint && <CompteCard label="Tous les comptes" solde={soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0)}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-3">
+        {!restreint && <CompteCard tous label="Tous les comptes" solde={soldes.reduce((s, c) => s + Number(c.solde ?? 0), 0)}
                     active={compteId === null} onClick={() => setCompteId(null)} />}
         {soldes.map((c) => (
           <CompteCard key={c.compte_id ?? c.compte} label={c.compte} solde={c.solde}
@@ -225,11 +212,11 @@ export default function Tresorerie() {
       </div>
 
       {res && !enAttente && (
-        <div className="text-[11.5px] text-ink-muted">
-          Solde initial : <span className="money">{fmtMoney(res.solde_initial as number | null | undefined)}</span>
-          {' · '}Crédits : <span className="money" style={{ color: 'var(--success)' }}>{fmtMoney(totalDistant(res, 'credit'))}</span>
-          {' · '}Débits : <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(totalDistant(res, 'debit'))}</span>
-          {' · '}Solde final : <b className="money text-ink">{fmtMoney(totalDistant(res, 'montant'))}</b>
+        <div className="text-sm text-ink-muted">
+          Solde initial : <Money value={res.solde_initial as number | null | undefined} colorNeg={false} className="text-ink-label" />
+          {' · '}Crédits : <Money value={totalDistant(res, 'credit')} tone="success" />
+          {' · '}Débits : <Money value={totalDistant(res, 'debit')} tone="danger" />
+          {' · '}Solde final : <Money value={totalDistant(res, 'montant')} colorNeg={false} className="font-bold text-ink" />
         </div>
       )}
 
@@ -265,13 +252,9 @@ function messageAnnulation(cle: string): string {
   return 'Le mouvement est supprimé et le solde du compte est recalculé.';
 }
 
-function CompteCard({ label, solde, active, onClick }: { label: string; solde: number; active: boolean; onClick: () => void }) {
+function CompteCard({ label, solde, active, onClick, tous }: { label: string; solde: number; active: boolean; onClick: () => void; tous?: boolean }) {
   return (
-    <button onClick={onClick}
-            className={`text-left bg-surface border rounded-md shadow-soft px-3.5 py-2.5 min-w-[170px] ${active ? 'border-brand-500' : 'border-line-soft'}`}
-            style={active ? { boxShadow: '0 0 0 2px var(--brand-100)' } : undefined}>
-      <div className="text-[10.5px] font-bold text-ink-muted">{label}</div>
-      <div className="money text-[15px] font-extrabold mt-0.5">{fmtMoney(solde)} DA</div>
-    </button>
+    <KpiTile size="sm" label={label} value={`${fmtMoney(solde)} DA`} icon={tous ? 'layers' : 'wallet'}
+             tone={active ? 'brand' : 'neutral'} selected={active} onClick={onClick} />
   );
 }

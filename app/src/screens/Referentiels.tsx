@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DocumentNode, useQuery } from '@apollo/client';
 import {
   REFERENTIELS, SOUS_FAMILLES, RAYONS, COMMERCIAUX, CENTRES_COUT,
@@ -19,6 +20,9 @@ import { useCrud } from '../forms/useCrud';
 import { D, useDroits } from '../lib/droits';
 import DataGrid, { Column } from '../components/ui/DataGrid';
 import { PageHeader, Tabs } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Icon } from '../components/ui/Icon';
+import { EmptyState } from '../components/ui/States';
 import { fmtMoney } from '../lib/format';
 
 type Ligne = { id: number } & Record<string, any>;
@@ -227,19 +231,30 @@ export default function Referentiels() {
   const { peut } = useDroits();
   const refs = REFS.filter((r) => { const d = DROIT_ONGLET[r.code]; return !d || peut(d.module, d.libelle); });
   const [onglet, setOnglet] = useState(refs[0]?.code ?? REFS[0].code);
+  // Emplacement de l'action « Nouveau … » dans l'en-tête (projetée par l'onglet actif)
+  const [slotAction, setSlotAction] = useState<HTMLElement | null>(null);
   const ref = refs.find((r) => r.code === onglet) ?? refs[0];
-  if (!ref) return <PageHeader title="Référentiels" />;
+  if (!ref) {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <PageHeader title="Référentiels" icon="book" />
+        <EmptyState icon="lock" title="Aucun référentiel accessible" description="Vos droits ne donnent accès à aucun référentiel." />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Référentiels" />
-      <Tabs value={ref.code} onChange={setOnglet} options={refs.map((r) => ({ code: r.code, label: r.label }))} />
+      <PageHeader title="Référentiels" icon="book" description="Listes de base : familles, dépôts, TVA, comptes, modes de paiement…">
+        <span ref={setSlotAction} className="contents" />
+      </PageHeader>
+      <Tabs value={ref.code} onChange={setOnglet} options={refs.map((r) => ({ code: r.code, label: r.label }))} label="Référentiels" />
       {/* key = remount complet au changement d'onglet (hooks propres à chaque référentiel) */}
-      <TableRef key={ref.code} ref_={ref} />
+      <TableRef key={ref.code} ref_={ref} slotAction={slotAction} />
     </div>
   );
 }
 
-function TableRef({ ref_ }: { ref_: Ref }) {
+function TableRef({ ref_, slotAction }: { ref_: Ref; slotAction: HTMLElement | null }) {
   const { data, loading, error, refetch } = useQuery(ref_.query, { fetchPolicy: 'cache-and-network' });
   const brut = data?.[ref_.champ];
   const lignes: Ligne[] = ref_.listeDansData
@@ -264,21 +279,20 @@ function TableRef({ ref_ }: { ref_: Ref }) {
 
   return (
     <>
-      <div className="flex">
-        <button onClick={crud.openCreate}
-                className="ml-auto rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ {ref_.titres?.creer ?? 'Nouveau'}
-        </button>
-      </div>
+      {slotAction && createPortal(
+        <Button variant="primary" icon="plus" onClick={crud.openCreate}>{ref_.titres?.creer ?? 'Nouveau'}</Button>,
+        slotAction,
+      )}
       {crud.modals}
       <DataGrid complet columns={colonnes} rows={lignes} rowKey={(l, i) => l.id ?? i}
                 loading={loading} error={error?.message}
                 emptyMessage={`Aucun élément dans « ${ref_.label} ».`}
                 footer={{ _label: `${lignes.length} élément(s)` }} />
       {!ref_.update && lignes.length > 0 && (
-        <div className="text-[11px] text-ink-muted">
+        <p className="text-xs text-ink-muted flex items-center gap-1.5">
+          <Icon name="info" size={14} />
           Ce référentiel ne se modifie pas : supprimez puis recréez l'élément (limite du serveur).
-        </div>
+        </p>
       )}
     </>
   );

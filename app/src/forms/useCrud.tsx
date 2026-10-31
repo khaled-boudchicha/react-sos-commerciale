@@ -3,6 +3,8 @@ import { DocumentNode, useMutation } from '@apollo/client';
 import FormModal, { Section } from '../components/ui/FormModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
+import { IconButton } from '../components/ui/Button';
+import { Alert } from '../components/ui/States';
 
 type Entity = { id: number } & Record<string, unknown>;
 
@@ -36,7 +38,7 @@ export function useCrud<T extends Entity>({
   width?: number;
   /** Aperçu réactif rendu sous le formulaire (ex. matrice de prix calculée). */
   formExtra?: (values: Record<string, unknown>) => ReactNode;
-  /** Droits de l'utilisateur dossier : masquent les actions ✎ / ✕ correspondantes. */
+  /** Droits de l'utilisateur dossier : masquent les actions Modifier / Supprimer correspondantes. */
   peutModifier?: boolean;
   peutSupprimer?: boolean;
 }) {
@@ -88,10 +90,7 @@ export function useCrud<T extends Entity>({
   const modals = (
     <>
       {error && !editing && (
-        <div className="text-[12px] rounded-md px-3 py-2"
-             style={{ background: 'color-mix(in srgb, var(--danger) 10%, transparent)', color: 'var(--danger)' }}>
-          {error}
-        </div>
+        <Alert tone="danger" compact>{error}</Alert>
       )}
       {editing && (
         <FormModal
@@ -110,7 +109,7 @@ export function useCrud<T extends Entity>({
         <ConfirmDialog
           title={deleteTitle ?? `Supprimer ce ${label} ?`}
           message={<><b>{labelOf(deleting)}</b> sera définitivement supprimé. Action irréversible.</>}
-          confirmLabel="Supprimer" danger loading={removing}
+          confirmLabel="Supprimer définitivement" danger loading={removing}
           onConfirm={confirmDelete} onCancel={() => setDeleting(null)}
         />
       )}
@@ -120,15 +119,12 @@ export function useCrud<T extends Entity>({
   /** Boutons d'action pour une ligne de grille (stoppent la propagation du clic). */
   function rowActions(row: T) {
     return (
-      <span className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+      <span className="flex gap-0.5 justify-end" onClick={(e) => e.stopPropagation()}>
         {updateDoc && peutModifier && (
-          <button onClick={() => setEditing(row)} title="Modifier"
-                  className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted hover:text-brand-700 text-[11px]">✎</button>
+          <IconButton icon="edit" label="Modifier" size="xs" onClick={() => setEditing(row)} />
         )}
         {peutSupprimer && (
-          <button onClick={() => setDeleting(row)} title="Supprimer"
-                  className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]"
-                  style={{ color: 'var(--danger)' }}>✕</button>
+          <IconButton icon="trash" label="Supprimer" size="xs" tone="danger" onClick={() => setDeleting(row)} />
         )}
       </span>
     );

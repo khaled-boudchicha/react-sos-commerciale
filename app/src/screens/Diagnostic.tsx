@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { gql, useApolloClient } from '@apollo/client';
 import { MY_AGENTS, REFRESH_TOKEN } from '../api/auth';
 import { useSession } from '../store/session';
 import { PageHeader } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Card, DescriptionList } from '../components/ui/Card';
+import { IconBadge, type IconName, type Tone } from '../components/ui/Icon';
 import { useToast } from '../components/ui/Toast';
 
 const PING = gql`query DiagPing { __typename }`;
@@ -13,11 +15,11 @@ const DOSSIER_DATA = gql`query DiagDossier { modesPayement }`;
 type Etat = 'ok' | 'ko' | 'warn' | 'run';
 type Check = { cle: string; libelle: string; etat: Etat; detail: string; ms?: number };
 
-const PASTILLE: Record<Etat, { c: string; t: string }> = {
-  ok:   { c: 'var(--success)', t: '✓' },
-  ko:   { c: 'var(--danger)',  t: '✕' },
-  warn: { c: 'var(--warning)', t: '!' },
-  run:  { c: 'var(--ink-muted)', t: '…' },
+const PASTILLE: Record<Etat, { tone: Tone; icon: IconName }> = {
+  ok:   { tone: 'success', icon: 'check' },
+  ko:   { tone: 'danger',  icon: 'close' },
+  warn: { tone: 'warning', icon: 'alert' },
+  run:  { tone: 'neutral', icon: 'clock' },
 };
 
 export default function Diagnostic() {
@@ -107,54 +109,48 @@ export default function Diagnostic() {
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Diagnostic de connexion">
-        <Link to="/parametres" className="text-[12px] font-bold text-brand-700">← Paramètres</Link>
+      <PageHeader title="Diagnostic de connexion" icon="activity" backTo="/parametres" backLabel="Retour aux paramètres"
+                  breadcrumb={[{ label: 'Paramètres', to: '/parametres' }, { label: 'Diagnostic de connexion' }]}>
+        <Button icon="refresh" onClick={() => void rafraichirJeton()}>Renouveler le jeton</Button>
+        <Button variant="primary" icon="activity" onClick={() => void lancer()} disabled={running} loading={running}>
+          {running ? 'Test…' : 'Retester'}
+        </Button>
       </PageHeader>
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 flex items-center gap-4 flex-wrap">
-        <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-extrabold text-[18px]"
-             style={{ background: PASTILLE[global].c }}>{PASTILLE[global].t}</div>
-        <div>
-          <div className="font-extrabold text-[15px]">
+      <Card className="flex items-center gap-4 flex-wrap">
+        <IconBadge name={PASTILLE[global].icon} tone={PASTILLE[global].tone} size="lg" />
+        <div role="status" aria-live="polite">
+          <div className="font-extrabold text-lg text-ink">
             {global === 'ok' ? 'Tout fonctionne' : global === 'warn' ? 'Fonctionnel avec réserves' : global === 'ko' ? 'Problème détecté' : 'Test en cours…'}
           </div>
-          <div className="text-[11.5px] text-ink-muted money">{cloudUrl}</div>
+          <div className="text-xs text-ink-muted money">{cloudUrl}</div>
         </div>
-        <div className="ml-auto flex gap-2">
-          <button onClick={() => void rafraichirJeton()}
-                  className="rounded-md px-3 py-2 font-bold text-[12px] border border-line text-ink-label">
-            Renouveler le jeton
-          </button>
-          <button onClick={() => void lancer()} disabled={running}
-                  className="rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700 disabled:opacity-60">
-            {running ? 'Test…' : 'Retester'}
-          </button>
-        </div>
-      </div>
+      </Card>
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft divide-y divide-line-soft">
+      <Card padding="none" className="divide-y divide-line-soft">
         {['cloud', 'agent', 'session', 'donnees'].map((cle) => {
           const c = checks.find((x) => x.cle === cle);
           const etat: Etat = c?.etat ?? 'run';
           return (
             <div key={cle} className="flex items-center gap-3 px-4 py-3">
-              <span className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold text-[12px]"
-                    style={{ background: PASTILLE[etat].c }}>{PASTILLE[etat].t}</span>
+              <IconBadge name={PASTILLE[etat].icon} tone={PASTILLE[etat].tone} size="sm" />
               <div className="flex-1">
-                <div className="font-semibold text-[12.5px]">{c?.libelle ?? cle}</div>
-                <div className="text-[11px] text-ink-muted">{c?.detail ?? 'en attente…'}</div>
+                <div className="font-semibold text-base text-ink">{c?.libelle ?? cle}</div>
+                <div className="text-xs text-ink-muted">{c?.detail ?? 'en attente…'}</div>
               </div>
-              {c?.ms != null && <span className="money text-[11px] text-ink-muted">{c.ms} ms</span>}
+              {c?.ms != null && <span className="money text-xs text-ink-muted">{c.ms} ms</span>}
             </div>
           );
         })}
-      </div>
+      </Card>
 
-      <div className="bg-surface border border-line-soft rounded-md shadow-soft p-4 text-[12px] text-ink-label flex flex-col gap-1.5">
-        <div>Agent associé : <b>{agent?.label ?? agent?.agentId ?? '—'}</b></div>
-        <div>Dossier : <b>{dossier ?? '—'}</b></div>
-        <div>Utilisateur du dossier : <b>{dossierUser?.username ?? '—'}</b></div>
-      </div>
+      <Card>
+        <DescriptionList columns={3} items={[
+          { label: 'Agent associé', value: agent?.label ?? agent?.agentId ?? '—' },
+          { label: 'Dossier', value: dossier ?? '—' },
+          { label: 'Utilisateur du dossier', value: dossierUser?.username ?? '—' },
+        ]} />
+      </Card>
     </div>
   );
 }

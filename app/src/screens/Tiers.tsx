@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import {
@@ -18,7 +19,10 @@ import { fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column, DataGridDistant, totalDistant } from '../components/ui/DataGrid';
 import { RequeteDistante } from '../components/grille/types';
-import { Money, Tabs, PageHeader, SearchInput, ExportBtn, Bucket } from '../components/ui/atoms';
+import { Money, Tabs, PageHeader, ExportBtn, Toolbar } from '../components/ui/atoms';
+import { Button } from '../components/ui/Button';
+import { Checkbox, SearchField } from '../components/ui/Field';
+import { KpiTile } from '../components/ui/Kpi';
 
 // Limite de sécurité pour l'export « tout » : au-delà, on prévient plutôt que
 // d'exporter silencieusement une liste tronquée.
@@ -54,13 +58,18 @@ const csvDebiteurs: ExportColumn<Debiteur>[] = [
 const estRacine = (req: RequeteDistante) => !req.sauf && (!req.groupe || req.groupe.chemin.length === 0);
 
 const VUES = [
-  { code: 'clients', label: 'Clients' },
-  { code: 'fournisseurs', label: 'Fournisseurs' },
-  { code: 'debiteurs', label: 'Débiteurs' },
-  { code: 'recouvrement', label: 'Recouvrement' },
-  { code: 'etat_clients', label: 'États clients' },
-  { code: 'etat_fournisseurs', label: 'États fournisseurs' },
+  { code: 'clients', label: 'Clients', icon: 'users' },
+  { code: 'fournisseurs', label: 'Fournisseurs', icon: 'building' },
+  { code: 'debiteurs', label: 'Débiteurs', icon: 'debtors' },
+  { code: 'recouvrement', label: 'Recouvrement', icon: 'history' },
+  { code: 'etat_clients', label: 'États clients', icon: 'statement' },
+  { code: 'etat_fournisseurs', label: 'États fournisseurs', icon: 'journal' },
 ] as const;
+
+/** Emplacement de l'action primaire dans l'en-tête : la vue active y projette son bouton « Nouveau … ». */
+function ActionEntete({ cible, children }: { cible: HTMLElement | null; children: ReactNode }) {
+  return cible ? createPortal(children, cible) : null;
+}
 
 export default function Tiers() {
   const { peut } = useDroits();
@@ -75,15 +84,18 @@ export default function Tiers() {
     if (v) setVue(v.code);
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
   const [search, setSearch] = useState('');
+  const [slotAction, setSlotAction] = useState<HTMLElement | null>(null);
 
   return (
     <div className="flex flex-col gap-3.5">
-      <PageHeader title="Clients & fournisseurs">
-        <SearchInput value={search} onChange={setSearch} placeholder="Nom, code…" />
+      <PageHeader title="Clients & fournisseurs" icon="users"
+                  description="Fiches, soldes, créances et recouvrement des tiers">
+        <SearchField value={search} onChange={setSearch} placeholder="Nom, code…" label="Rechercher un tiers" width={260} />
+        <span ref={setSlotAction} className="contents" />
       </PageHeader>
-      <Tabs value={vue} onChange={setVue} options={vues} />
-      {vue === 'clients' && <ClientsGrid search={search} />}
-      {vue === 'fournisseurs' && <FournisseursGrid search={search} />}
+      <Tabs value={vue} onChange={setVue} options={vues} label="Vues des tiers" />
+      {vue === 'clients' && <ClientsGrid search={search} slotAction={slotAction} />}
+      {vue === 'fournisseurs' && <FournisseursGrid search={search} slotAction={slotAction} />}
       {vue === 'debiteurs' && <DebiteursGrid search={search} />}
       {vue === 'recouvrement' && <RecouvrementPanel search={search} />}
       {vue === 'etat_clients' && <EtatsGrid sens="client" search={search} />}
@@ -92,7 +104,7 @@ export default function Tiers() {
   );
 }
 
-function ClientsGrid({ search }: { search: string }) {
+function ClientsGrid({ search, slotAction }: { search: string; slotAction: HTMLElement | null }) {
   const navigate = useNavigate();
   const client = useApolloClient();
   // Incrémenté après création / modification / suppression : recharge la liste
@@ -126,18 +138,15 @@ function ClientsGrid({ search }: { search: string }) {
     { key: 'ville', header: 'Ville', width: '110px', field: 'ville', render: (c) => <span className="text-ink-muted">{c.ville ?? '—'}</span> },
     { key: 'plafond', header: 'Plafond crédit', align: 'right', width: '120px', render: (c) => <Money value={c.plafond_credit} /> },
     { key: 'solde', header: 'Solde', align: 'right', width: '120px', field: 'credit', render: (c) => (
-      <span className="money font-semibold" style={{ color: Number(c.credit) > 0 ? 'var(--warning)' : undefined }}>{fmtMoney(c.credit)}</span>
+      <Money value={c.credit} colorNeg={false} tone={Number(c.credit) > 0 ? 'warning' : undefined} className="font-semibold" />
     ) },
     { key: 'actions', header: '', align: 'right', width: '70px', render: (c) => crud.rowActions(c as Client & { id: number }) },
   ];
   return (
     <>
-      <div className="flex">
-        <button onClick={crud.openCreate}
-                className="ml-auto rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Nouveau client
-        </button>
-      </div>
+      <ActionEntete cible={slotAction}>
+        <Button variant="primary" icon="plus" onClick={crud.openCreate}>Nouveau client</Button>
+      </ActionEntete>
       {crud.modals}
       <DataGrid columns={columns} rowKey={(c) => c.id}
                 distant={distant} cleEtat="tiers-clients"
@@ -148,7 +157,7 @@ function ClientsGrid({ search }: { search: string }) {
   );
 }
 
-function FournisseursGrid({ search }: { search: string }) {
+function FournisseursGrid({ search, slotAction }: { search: string; slotAction: HTMLElement | null }) {
   const navigate = useNavigate();
   const client = useApolloClient();
   // Incrémenté après création / modification / suppression : recharge la liste
@@ -184,12 +193,9 @@ function FournisseursGrid({ search }: { search: string }) {
   ];
   return (
     <>
-      <div className="flex">
-        <button onClick={crud.openCreate}
-                className="ml-auto rounded-md px-4 py-2 font-bold text-[12px] text-white bg-brand-700">
-          ＋ Nouveau fournisseur
-        </button>
-      </div>
+      <ActionEntete cible={slotAction}>
+        <Button variant="primary" icon="plus" onClick={crud.openCreate}>Nouveau fournisseur</Button>
+      </ActionEntete>
       {crud.modals}
       <DataGrid columns={columns} rowKey={(f) => f.id}
                 distant={distant} cleEtat="tiers-fournisseurs"
@@ -244,30 +250,30 @@ function DebiteursGrid({ search }: { search: string }) {
     { key: 'nb', header: 'Factures', align: 'right', width: '80px', field: 'nb_factures', type: 'number', render: (d) => <span className="money">{String(d.nb_factures ?? '')}</span> },
     { key: 'retard', header: 'Retard', align: 'right', width: '80px', field: 'jours_retard', type: 'number', render: (d) => {
       const j = Number((d as any).jours_retard ?? 0);
-      return <span className="money" style={{ color: j > 60 ? 'var(--danger)' : j > 30 ? 'var(--warning)' : undefined }}>{j} j</span>;
+      return <span className="money" style={{ color: j > 60 ? 'var(--danger-text)' : j > 30 ? 'var(--warning-text)' : undefined }}>{j} j</span>;
     } },
     { key: 'reste', header: 'Créance', align: 'right', width: '130px', field: 'montant', render: (d) => (
-      <span className="money font-semibold" style={{ color: 'var(--danger)' }}>{fmtMoney((d as any).montant ?? d.total_reste)}</span>
+      <Money value={(d as any).montant ?? d.total_reste} tone="danger" className="font-semibold" />
     ) },
   ];
   return (
     <>
       {res && (
         <div className="grid grid-cols-4 gap-3">
-          <Bucket label="Total créances" value={res.total_creances} tone="var(--danger)" sub={`${res.total_clients} clients · ${res.total_factures} factures`} />
-          <Bucket label="0–30 jours" value={res.bucket_0_30} tone="var(--text)" />
-          <Bucket label="30–60 jours" value={res.bucket_30_60} tone="var(--warning)" />
-          <Bucket label="+60 jours" value={res.bucket_60_plus} tone="var(--danger)" />
+          <KpiTile label="Total créances" value={fmtMoney(res.total_creances)} icon="debtors" tone="danger" valueTone="danger"
+                   sub={`${res.total_clients} clients · ${res.total_factures} factures`} />
+          <KpiTile label="0–30 jours" value={fmtMoney(res.bucket_0_30)} icon="clock" tone="neutral" />
+          <KpiTile label="30–60 jours" value={fmtMoney(res.bucket_30_60)} icon="clock" tone="warning" valueTone="warning" />
+          <KpiTile label="+60 jours" value={fmtMoney(res.bucket_60_plus)} icon="alert" tone="danger" valueTone="danger" />
         </div>
       )}
       {res && (
-        <div className="flex gap-2">
-          <button onClick={() => void printAll()} disabled={printing}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label disabled:opacity-60">
+        <Toolbar className="justify-end">
+          <Button icon="printer" onClick={() => void printAll()} disabled={printing}>
             {printing ? 'Préparation…' : "Imprimer l'état des créances"}
-          </button>
+          </Button>
           <ExportBtn onClick={() => void exporter()} loading={exporting} />
-        </div>
+        </Toolbar>
       )}
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <DataGrid columns={columns} rowKey={(d) => String(d.code_cli)}
@@ -276,7 +282,7 @@ function DebiteursGrid({ search }: { search: string }) {
                 footer={(r) => ({
                   _label: `${r?.total ?? 0} débiteur(s)`,
                   reste: r?.total_creances != null
-                    ? <span className="money" style={{ color: 'var(--danger)' }}>{fmtMoney(r.total_creances as number)}</span>
+                    ? <Money value={r.total_creances as number} tone="danger" />
                     : undefined,
                 })} />
     </>
@@ -339,22 +345,16 @@ function EtatsGrid({ sens, search }: { sens: 'client' | 'fournisseur'; search: s
       render: (l) => <span className="money">{fmtMoney(l.ca)}</span> },
     { key: 'credit', header: 'Solde', align: 'right', width: '130px', field: 'credit',
       render: (l) => (
-        <span className="money font-semibold"
-              style={{ color: Number(l.credit) > 0 ? 'var(--warning)' : undefined }}>
-          {fmtMoney(l.credit)}
-        </span>
+        <Money value={l.credit} colorNeg={false} tone={Number(l.credit) > 0 ? 'warning' : undefined} className="font-semibold" />
       ) },
   ];
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <label className="text-[12px] font-semibold text-ink-label flex items-center gap-1.5">
-          <input type="checkbox" checked={sansZeros} onChange={(e) => setSansZeros(e.target.checked)} />
-          Masquer les tiers soldés
-        </label>
+      <Toolbar className="justify-between">
+        <Checkbox label="Masquer les tiers soldés" checked={sansZeros} onChange={(e) => setSansZeros(e.target.checked)} />
         <ExportBtn onClick={() => void exporter()} loading={exporting} />
-      </div>
+      </Toolbar>
       <DataGrid columns={cols} rowKey={(l, i) => l.code_cli ?? l.code_four ?? i}
                 distant={distant} cleEtat={client ? 'tiers-etat-clients' : 'tiers-etat-fournisseurs'}
                 onRowClick={(l) => {

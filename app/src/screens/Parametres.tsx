@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { D, useDroits } from '../lib/droits';
 import { useMutation, useQuery } from '@apollo/client';
 import { COORDONNEES_SOCIETE, UPDATE_COORDONNEES, NUMEROTATION_DOCS, SET_NUMEROTATION } from '../api/queries';
 import FormModal from '../components/ui/FormModal';
 import { useSession } from '../store/session';
 import { PageHeader } from '../components/ui/atoms';
+import { Button, IconButton } from '../components/ui/Button';
+import { Card, CardHeader, DescriptionList } from '../components/ui/Card';
+import { Field, SegmentedControl, Select, TextInput } from '../components/ui/Field';
+import { Alert } from '../components/ui/States';
+import Dialog from '../components/ui/Dialog';
 import {
   supporteImpressionDirecte, listerImprimantes, getImprimanteTicket, setImprimanteTicket, PrinterInfo,
 } from '../print/engine/silentPrint';
@@ -22,6 +26,12 @@ export async function loadTheme() {
   if (saved) document.documentElement.dataset.theme = saved;
   return saved ?? 'light';
 }
+
+/** Libellés des coordonnées affichées (clés renvoyées par COORDONNEES_SOCIETE). */
+const LIBELLES_COORD: Record<string, string> = {
+  raison_sociale: 'Raison sociale', adresse: 'Adresse', wilaya: 'Wilaya', telephone: 'Téléphone', email: 'Email',
+  nif: 'NIF', nis: 'NIS', rc: 'RC', art: 'Art. imposition', rib: 'RIB',
+};
 
 export default function Parametres() {
   const { agent, dossier } = useSession();
@@ -78,85 +88,65 @@ export default function Parametres() {
 
   return (
     <div className="flex flex-col gap-3.5 max-w-[720px]">
-      <PageHeader title="Paramètres">
+      <PageHeader title="Paramètres" icon="settings" description="Apparence, connexion, impression et identité de la société">
         {peut('autre', D.autre.droitsAcces) && (
-          <Link to="/parametres/utilisateurs" className="text-[12px] font-bold text-brand-700">Utilisateurs &amp; droits →</Link>
+          <Button icon="shield" iconRight="arrowRight" to="/parametres/utilisateurs">Utilisateurs &amp; droits</Button>
         )}
       </PageHeader>
 
       <SectionMisesAJour />
 
-      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <h2 className="font-bold text-[13px] mb-3">Apparence</h2>
-        <div className="flex gap-2">
-          {(['light', 'dark'] as const).map((t) => (
-            <button key={t} onClick={() => { setTheme(t); applyTheme(t); }}
-                    className={`px-4 py-2 rounded-md border text-[12px] font-bold ${theme === t ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-line text-ink-label'}`}>
-              {t === 'light' ? '☀️ Clair' : '🌙 Sombre'}
-            </button>
-          ))}
-        </div>
-        <h3 className="font-bold text-[12.5px] mt-5 mb-1">Disposition du menu</h3>
-        <p className="text-[11.5px] text-ink-muted mb-3">Barre de navigation latérale ou ruban de commandes en haut, comme Microsoft Office. Réglage propre à ce poste.</p>
+      <Card as="section">
+        <CardHeader title="Apparence" icon="sun" description="Thème de l'interface et disposition du menu" />
+        <SegmentedControl label="Thème" value={theme} onChange={(t) => { setTheme(t); applyTheme(t); }}
+                          options={[{ value: 'light', label: 'Clair', icon: 'sun' }, { value: 'dark', label: 'Sombre', icon: 'moon' }]} />
+        <h3 className="font-bold text-base text-ink mt-5 mb-1">Disposition du menu</h3>
+        <p className="text-sm text-ink-muted mb-3">Barre de navigation latérale ou ruban de commandes en haut, comme Microsoft Office. Réglage propre à ce poste.</p>
         <ChoixDisposition />
-      </section>
+      </Card>
 
-      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-[13px]">Connexion</h2>
-          <Link to="/diagnostic" className="text-[11.5px] font-bold text-brand-700">Diagnostic de connexion →</Link>
-        </div>
-        <div className="text-[12px] text-ink-label flex flex-col gap-1.5">
-          <div>Agent : <b>{agent?.label ?? agent?.agentId}</b></div>
-          <div>Dossier : <b>{dossier}</b></div>
-        </div>
-      </section>
+      <Card as="section">
+        <CardHeader title="Connexion" icon="server"
+                    actions={<Button variant="link" size="sm" iconRight="arrowRight" to="/diagnostic">Diagnostic de connexion</Button>} />
+        <DescriptionList items={[
+          { label: 'Agent', value: agent?.label ?? agent?.agentId },
+          { label: 'Dossier', value: dossier },
+        ]} />
+      </Card>
 
-      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <h2 className="font-bold text-[13px] mb-3">Impression</h2>
+      <Card as="section">
+        <CardHeader title="Impression" icon="printer" />
         {impressionDispo ? (
-          <label className="text-[11px] font-bold text-ink-label block max-w-md">
-            Imprimante ticket (impression directe, sans dialogue)
-            <select value={imprimanteTicket}
-                    onChange={(e) => { setImprimanteTicketState(e.target.value); void setImprimanteTicket(e.target.value); }}
-                    className="mt-1 w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink font-normal">
+          <Field label="Imprimante ticket (impression directe, sans dialogue)" className="max-w-md"
+                 help="Utilisée par le bouton « Impression directe » de l'aperçu (tickets comptoir).">
+            <Select value={imprimanteTicket}
+                    onChange={(e) => { setImprimanteTicketState(e.target.value); void setImprimanteTicket(e.target.value); }}>
               <option value="">— imprimante par défaut du système —</option>
               {imprimantes.map((p) => (
                 <option key={p.name} value={p.name}>{p.displayName || p.name}{p.isDefault ? ' (défaut)' : ''}</option>
               ))}
-            </select>
-            <div className="text-[10.5px] text-ink-muted font-normal mt-1">
-              Utilisée par le bouton « Impression directe » de l'aperçu (tickets comptoir).
-            </div>
-          </label>
+            </Select>
+          </Field>
         ) : (
-          <div className="text-[12px] text-ink-muted">
+          <div className="text-sm text-ink-muted">
             L'impression directe (silencieuse) est disponible uniquement dans l'application installée.
           </div>
         )}
         <CachetReglage />
-      </section>
+      </Card>
 
-      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <div className="flex items-center mb-3">
-          <h2 className="font-bold text-[13px]">Coordonnées de la société</h2>
-          {peut('autre', D.autre.coordonnees) && (
-            <button onClick={() => { setErreur(null); setEditCoord(true); }}
-                    className="ml-auto rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
-              Modifier
-            </button>
-          )}
-        </div>
-        {erreur && <div className="text-[12px] mb-2" style={{ color: 'var(--danger)' }}>{erreur}</div>}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
-          {['raison_sociale', 'adresse', 'wilaya', 'telephone', 'email', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => (
-            <div key={k} className="flex justify-between border-b border-line-soft py-1">
-              <span className="text-ink-muted uppercase text-[10px] font-bold tracking-wide">{k.replace('_', ' ')}</span>
-              <span className="font-semibold">{String(coord[k] ?? '—')}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Card as="section">
+        <CardHeader title="Coordonnées de la société" icon="building"
+                    actions={peut('autre', D.autre.coordonnees) && (
+                      <Button size="sm" icon="edit" onClick={() => { setErreur(null); setEditCoord(true); }}>Modifier</Button>
+                    )} />
+        {erreur && <Alert tone="danger" compact className="mb-3">{erreur}</Alert>}
+        <DescriptionList items={['raison_sociale', 'adresse', 'wilaya', 'telephone', 'email', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => ({
+          label: LIBELLES_COORD[k] ?? k.replace('_', ' '),
+          value: coord[k] == null ? null : String(coord[k]),
+          mono: ['nif', 'nis', 'rc', 'art', 'rib'].includes(k),
+        }))} />
+      </Card>
 
       {editCoord && (
         <FormModal
@@ -196,52 +186,45 @@ export default function Parametres() {
         />
       )}
 
-      <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-        <h2 className="font-bold text-[13px] mb-1">Numérotation des documents</h2>
-        <div className="text-[11px] text-ink-muted mb-3">
-          Le compteur est le dernier numéro attribué : la prochaine pièce prendra la valeur suivante.
-        </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[12px]">
+      <Card as="section">
+        <CardHeader title="Numérotation des documents" icon="templates"
+                    description="Le compteur est le dernier numéro attribué : la prochaine pièce prendra la valeur suivante." />
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
           {numerotations.length === 0 && <div className="text-ink-muted">Aucune numérotation configurée.</div>}
           {numerotations.map((n: { type: string; masque: string; compteur: number }) => (
-            <div key={n.type} className="flex items-center gap-2 border-b border-line-soft py-1.5">
+            <div key={n.type} className="flex items-center gap-2 border-b border-line-soft py-1.5 min-h-[34px]">
               <span className="font-semibold flex-1">{n.type}</span>
-              <span className="text-ink-muted money text-[11px]">{n.masque}</span>
+              <span className="text-ink-muted money text-xs">{n.masque}</span>
               <span className="money font-bold">{n.compteur}</span>
               {peut('autre', D.autre.numerotation) && (
-                <button onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur), actuel: n.compteur })}
-                        className="px-1.5 py-0.5 rounded-sm border border-line text-ink-muted text-[11px]" title="Modifier le compteur">✎</button>
+                <IconButton icon="edit" label="Modifier le compteur" size="xs"
+                            onClick={() => setEditNum({ type: n.type, valeur: String(n.compteur), actuel: n.compteur })} />
               )}
             </div>
           ))}
         </div>
-      </section>
+      </Card>
 
       {editNum && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgb(15 26 46 / .45)' }}>
-          <div className="w-[420px] bg-surface border border-line-soft rounded-lg shadow-lifted p-5">
-            <div className="font-extrabold text-[15px] mb-1">Compteur — {editNum.type}</div>
-            <div className="text-[11.5px] text-ink-muted mb-4">
-              Le compteur peut seulement avancer (actuel : {editNum.actuel}) : un numéro déjà attribué ne peut pas être réattribué.
-            </div>
-            <input type="number" min={editNum.actuel} step={1} value={editNum.valeur} autoFocus
-                   onChange={(e) => setEditNum({ ...editNum, valeur: e.target.value, erreur: undefined })}
-                   onKeyDown={(e) => { if (e.key === 'Enter' && !savingNum) void enregistrerCompteur(); }}
-                   className="w-full border border-line rounded-sm px-3 py-2 bg-surface text-ink money text-right" />
-            {editNum.erreur && (
-              <div className="mt-2 text-[12px] font-semibold" style={{ color: 'var(--danger)' }}>{editNum.erreur}</div>
-            )}
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setEditNum(null)} disabled={savingNum}
-                      className="flex-1 border border-line rounded-md py-2.5 font-bold text-ink-label disabled:opacity-60">Annuler</button>
-              <button disabled={savingNum}
-                      onClick={() => void enregistrerCompteur()}
-                      className="flex-[2] rounded-md py-2.5 font-bold text-white bg-brand-700 disabled:opacity-60">
-                {savingNum ? 'Enregistrement…' : 'Enregistrer'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <Dialog title={`Compteur — ${editNum.type}`} size="sm" icon="templates" closeOnOverlay={false}
+                onClose={() => { if (!savingNum) setEditNum(null); }}
+                footer={(
+                  <>
+                    <Button onClick={() => setEditNum(null)} disabled={savingNum}>Annuler</Button>
+                    <Button variant="primary" icon="save" loading={savingNum} onClick={() => void enregistrerCompteur()}>
+                      {savingNum ? 'Enregistrement…' : 'Enregistrer'}
+                    </Button>
+                  </>
+                )}>
+          <p className="text-sm text-ink-muted mb-4">
+            Le compteur peut seulement avancer (actuel : {editNum.actuel}) : un numéro déjà attribué ne peut pas être réattribué.
+          </p>
+          <Field label="Dernier numéro attribué" required error={editNum.erreur}>
+            <TextInput type="number" min={editNum.actuel} step={1} value={editNum.valeur} autoFocus mono align="right"
+                       onChange={(e) => setEditNum({ ...editNum, valeur: e.target.value, erreur: undefined })}
+                       onKeyDown={(e) => { if (e.key === 'Enter' && !savingNum) void enregistrerCompteur(); }} />
+          </Field>
+        </Dialog>
       )}
     </div>
   );
@@ -271,27 +254,22 @@ function SectionMisesAJour() {
   }[etat.etat];
 
   return (
-    <section className="bg-surface border border-line-soft rounded-md shadow-soft p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <h2 className="font-bold text-[13px]">Application</h2>
-        <span className="text-[11px] text-ink-muted money">v{version ?? '…'}</span>
-      </div>
-      <div className="text-[12px] text-ink-label">{libelle}</div>
+    <Card as="section">
+      <CardHeader title="Application" icon="download" description={<span className="money">v{version ?? '…'}</span>} />
+      <div className="text-sm text-ink-label">{libelle}</div>
       <div className="flex gap-2 mt-3">
         {etat?.etat !== 'desactive' && (
-          <button onClick={() => void window.gc.majVerifier?.().then(setEtat)}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label">
+          <Button size="sm" icon="refresh" onClick={() => void window.gc.majVerifier?.().then(setEtat)}>
             Rechercher une mise à jour
-          </button>
+          </Button>
         )}
         {etat?.etat === 'telechargee' && (
-          <button onClick={() => void window.gc.majInstaller?.()}
-                  className="rounded-md px-3 py-1.5 font-bold text-[12px] text-white bg-brand-700">
+          <Button size="sm" variant="primary" icon="download" onClick={() => void window.gc.majInstaller?.()}>
             Redémarrer et installer
-          </button>
+          </Button>
         )}
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -299,6 +277,7 @@ function SectionMisesAJour() {
 function CachetReglage() {
   const [cachet, setCachetState] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const fichier = useRef<HTMLInputElement>(null);
   useEffect(() => { void getCachet().then(setCachetState); }, []);
 
   async function choisir(f: File | undefined) {
@@ -313,23 +292,23 @@ function CachetReglage() {
 
   return (
     <div className="mt-4 pt-3 border-t border-line-soft flex items-center gap-4">
-      <div className="w-[94px] h-[86px] rounded-md border border-dashed border-line flex items-center justify-center bg-bg overflow-hidden flex-none">
-        {cachet ? <img src={cachet} alt="Cachet" className="max-w-full max-h-full object-contain" /> : <span className="text-[10.5px] text-ink-muted">Aucun cachet</span>}
+      <div className="w-[94px] h-[86px] rounded-md border border-dashed border-line flex items-center justify-center bg-sunken overflow-hidden flex-none">
+        {cachet ? <img src={cachet} alt="Cachet" className="max-w-full max-h-full object-contain" /> : <span className="text-xs text-ink-muted">Aucun cachet</span>}
       </div>
-      <div className="flex flex-col gap-1.5 text-[12px]">
-        <span className="text-[11px] font-bold text-ink-label">Cachet de la société</span>
-        <span className="text-[11px] text-ink-muted">Image PNG ou JPEG (fond transparent de préférence), imprimée par les modèles « avec cachet ».</span>
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="text-xs font-semibold text-ink-label">Cachet de la société</span>
+        <span className="text-xs text-ink-muted">Image PNG ou JPEG (fond transparent de préférence), imprimée par les modèles « avec cachet ».</span>
         <div className="flex gap-2">
-          <label className="rounded-md px-3 py-1.5 font-bold text-[12px] border border-line text-ink-label cursor-pointer hover:border-brand-300">
+          <Button size="sm" icon="upload" onClick={() => fichier.current?.click()}>
             {cachet ? 'Remplacer…' : 'Choisir une image…'}
-            <input type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => void choisir(e.target.files?.[0])} />
-          </label>
+          </Button>
+          <input ref={fichier} type="file" accept="image/png,image/jpeg" className="hidden" onChange={(e) => void choisir(e.target.files?.[0])} />
           {cachet && (
-            <button onClick={() => { void setCachet(null); setCachetState(null); }}
-                    className="rounded-md px-3 py-1.5 font-bold text-[12px]" style={{ color: 'var(--danger)' }}>Retirer</button>
+            <Button size="sm" variant="ghost" icon="trash" className="!text-danger-text"
+                    onClick={() => { void setCachet(null); setCachetState(null); }}>Retirer</Button>
           )}
         </div>
-        {erreur && <span style={{ color: 'var(--danger)' }}>{erreur}</span>}
+        {erreur && <span className="text-danger-text font-semibold">{erreur}</span>}
       </div>
     </div>
   );

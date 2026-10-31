@@ -140,7 +140,7 @@ export default function Ruban({ session, executer }: { session: InfosSession; ex
       {/* Onglets */}
       <div className="h-[34px] flex items-end gap-0.5 px-2 bg-surface" role="tablist" aria-label="Onglets du ruban">
         <button onClick={() => setBackstage(true)} title="Fichier — dossier, compte, paramètres"
-                className="relative h-[28px] px-4 mb-[3px] rounded-md text-[12.5px] font-bold text-white hover:brightness-110"
+                className="relative h-[28px] px-4 mb-[3px] rounded-md text-sm font-bold text-white hover:brightness-110"
                 style={{ background: 'var(--brand-700)' }}>
           Fichier
           {touches === 'onglets' && <ToucheAcces lettre="F" />}
@@ -151,7 +151,7 @@ export default function Ruban({ session, executer }: { session: InfosSession; ex
             <button key={o.id} role="tab" aria-selected={sel}
                     onClick={() => choisirOnglet(o.id)} onDoubleClick={() => { definirRubanReduit(!rubanReduit); setDeplieTemporaire(false); }}
                     style={sel && corpsVisible ? { color: 'var(--ruban-accent)' } : undefined}
-                    className={`relative h-[31px] px-3.5 rounded-t-md text-[12.5px] font-semibold transition-colors ${sel && corpsVisible ? '' : 'text-ink-label hover:text-ink hover:bg-line-soft'}`}>
+                    className={`relative h-[31px] px-3.5 rounded-t-md text-sm font-semibold transition-colors ${sel && corpsVisible ? '' : 'text-ink-label hover:text-ink hover:bg-line-soft'}`}>
               {o.libelle}
               {sel && corpsVisible && <span className="absolute left-2.5 right-2.5 bottom-0 h-[3px] rounded-full" style={{ background: 'var(--ruban-accent)' }} />}
               {touches === 'onglets' && <ToucheAcces lettre={o.touche} />}
@@ -177,7 +177,7 @@ export default function Ruban({ session, executer }: { session: InfosSession; ex
                 {gi > 0 && <div className="w-px my-2.5 flex-none" style={{ background: 'var(--line-soft)' }} />}
                 <div className="flex flex-col flex-none px-1">
                   <div className="flex items-start gap-0.5 flex-1 pt-1.5">{colonnes(g.elements, props)}</div>
-                  <div className="text-[10.5px] text-ink-muted text-center pb-1 leading-none whitespace-nowrap">{g.titre}</div>
+                  <div className="text-xs text-ink-muted text-center pb-1 leading-none whitespace-nowrap">{g.titre}</div>
                 </div>
               </Fragment>
             ))}
@@ -205,8 +205,8 @@ function BarreTitre({ session, executer, lancer, ouvrirFichier, droits }: {
   return (
     <div className="h-[40px] flex items-center gap-3 px-3 text-white overflow-hidden" style={{ background: 'var(--gradient-hero)' }}>
       <div className="flex items-center gap-2 flex-none">
-        <div className="w-6 h-6 rounded-md text-[10.5px] font-extrabold flex items-center justify-center" style={{ background: 'rgb(255 255 255 / .18)' }}>GC</div>
-        <span className="text-[12.5px] font-bold tracking-tight">Gestion Commerciale</span>
+        <div className="w-6 h-6 rounded-md text-xs font-extrabold flex items-center justify-center" style={{ background: 'rgb(255 255 255 / .18)' }}>GC</div>
+        <span className="text-sm font-bold tracking-tight">Gestion Commerciale</span>
       </div>
       {/* Barre d'outils Accès rapide */}
       <div className="flex items-center gap-0.5 pl-2 ml-1 border-l" style={{ borderColor: 'rgb(255 255 255 / .22)' }} aria-label="Accès rapide">
@@ -218,13 +218,13 @@ function BarreTitre({ session, executer, lancer, ouvrirFichier, droits }: {
         ))}
       </div>
       <button onClick={() => executer('palette')}
-              className="mx-auto flex-1 min-w-[150px] max-w-[440px] h-[28px] flex items-center gap-2 rounded-md px-3 text-[12px] text-left hover:bg-white/25 transition-colors"
+              className="mx-auto flex-1 min-w-[150px] max-w-[440px] h-[28px] flex items-center gap-2 rounded-md px-3 text-sm text-left hover:bg-white/25 transition-colors"
               style={{ background: 'rgb(255 255 255 / .16)', border: '1px solid rgb(255 255 255 / .22)' }}>
         <Icone nom="rechercher" taille={14} />
         <span className="opacity-90 truncate">Rechercher un client, un article, une pièce…</span>
-        <span className="ml-auto font-mono text-[10px] rounded px-1.5 py-px" style={{ background: 'rgb(255 255 255 / .18)' }}>Ctrl K</span>
+        <span className="ml-auto font-mono text-2xs rounded px-1.5 py-px" style={{ background: 'rgb(255 255 255 / .18)' }}>Ctrl K</span>
       </button>
-      <div className="flex items-center gap-2 flex-none text-[11.5px] font-semibold">
+      <div className="flex items-center gap-2 flex-none text-xs font-semibold">
         <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 h-[24px]" style={{ background: 'rgb(255 255 255 / .14)' }}
               title={`${session.online ? 'Agent connecté' : 'Agent hors ligne'} — ${session.agent}`}>
           <span className="w-2 h-2 rounded-full" style={{ background: session.online ? 'var(--status-online)' : 'var(--status-offline)', boxShadow: '0 0 0 2px rgb(255 255 255 / .25)' }} />
@@ -234,7 +234,7 @@ function BarreTitre({ session, executer, lancer, ouvrirFichier, droits }: {
           <Icone nom="dossier" taille={14} /> <span className="max-w-[90px] xl:max-w-[180px] truncate">{session.dossier}</span>
         </button>
         <button onClick={ouvrirFichier} title={`${session.utilisateur} — compte et options`}
-                className="w-[26px] h-[26px] rounded-full text-[10.5px] font-extrabold inline-flex items-center justify-center hover:ring-2 hover:ring-white/40"
+                className="w-[26px] h-[26px] rounded-full text-xs font-extrabold inline-flex items-center justify-center hover:ring-2 hover:ring-white/40"
                 style={{ background: 'rgb(255 255 255 / .92)', color: 'var(--brand-700)' }}>
           {initiales}
         </button>
@@ -285,7 +285,7 @@ function BoutonGrand({ cmd, lancer, survol, quitter, chemin, recherche, niveau, 
       <span className="w-[30px] h-[30px] rounded-[8px] inline-flex items-center justify-center flex-none" style={{ color: couleur, background: teinte(couleur, 12) }}>
         <Icone nom={cmd.icone} taille={compact ? 18 : 19} />
       </span>
-      <span className={`text-center font-semibold leading-[12.5px] line-clamp-2 ${compact ? 'text-[10.5px]' : 'text-[11px]'}`}
+      <span className={`text-center font-semibold leading-[12.5px] line-clamp-2 ${compact ? 'text-xs' : 'text-xs'}`}
             style={{ color: actif ? 'var(--ruban-accent)' : 'var(--text-label)' }}>
         {cmd.court ?? cmd.libelle}
       </span>
@@ -299,7 +299,7 @@ function BoutonPetit({ cmd, lancer, survol, quitter, chemin, recherche, niveau, 
   const iconeSeule = niveau >= 2;
   return (
     <button onClick={() => lancer(cmd)} onMouseEnter={survol(cmd)} onMouseLeave={quitter} aria-label={cmd.libelle} aria-current={actif ? 'page' : undefined}
-            className={`relative h-[22px] flex items-center gap-1.5 rounded px-1.5 text-[11.5px] font-semibold whitespace-nowrap transition-colors ${actif ? '' : 'hover:bg-line-soft'}`}
+            className={`relative h-[22px] flex items-center gap-1.5 rounded px-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${actif ? '' : 'hover:bg-line-soft'}`}
             style={actif ? { background: teinte('var(--ruban-accent)', 10), color: 'var(--ruban-accent)' } : { color: 'var(--text-label)' }}>
       <Icone nom={cmd.icone} taille={15} style={{ color: COULEUR_TON[cmd.ton] }} />
       {!iconeSeule && <span>{cmd.libelle}</span>}
@@ -311,7 +311,7 @@ function BoutonPetit({ cmd, lancer, survol, quitter, chemin, recherche, niveau, 
 function ToucheAcces({ lettre, petit }: { lettre: string; petit?: boolean }) {
   if (!lettre) return null;
   return (
-    <span className={`absolute ${petit ? 'left-[11px] top-[9px]' : 'left-1/2 -translate-x-1/2 top-[24px]'} z-10 min-w-[16px] h-[16px] px-1 rounded-[4px] text-[10px] font-extrabold leading-[16px] text-center pointer-events-none`}
+    <span className={`absolute ${petit ? 'left-[11px] top-[9px]' : 'left-1/2 -translate-x-1/2 top-[24px]'} z-10 min-w-[16px] h-[16px] px-1 rounded-[4px] text-2xs font-extrabold leading-[16px] text-center pointer-events-none`}
           style={{ background: 'var(--text)', color: 'var(--surface)', boxShadow: 'var(--shadow-card)' }}>
       {lettre}
     </span>
@@ -326,10 +326,10 @@ function InfoBulle({ cmd, x, y }: { cmd: Commande; x: number; y: number }) {
         <span className="w-6 h-6 rounded-[6px] inline-flex items-center justify-center flex-none" style={{ color: COULEUR_TON[cmd.ton], background: teinte(COULEUR_TON[cmd.ton], 12) }}>
           <Icone nom={cmd.icone} taille={14} />
         </span>
-        <span className="text-[12.5px] font-bold text-ink">{cmd.libelle}</span>
-        {cmd.raccourci && <span className="ml-auto font-mono text-[10px] text-ink-muted border border-line rounded px-1.5">{cmd.raccourci}</span>}
+        <span className="text-sm font-bold text-ink">{cmd.libelle}</span>
+        {cmd.raccourci && <span className="ml-auto font-mono text-2xs text-ink-muted border border-line rounded px-1.5">{cmd.raccourci}</span>}
       </div>
-      {cmd.aide && <p className="mt-1.5 text-[11.5px] leading-snug text-ink-label">{cmd.aide}</p>}
+      {cmd.aide && <p className="mt-1.5 text-xs leading-snug text-ink-label">{cmd.aide}</p>}
     </div>
   );
 }
