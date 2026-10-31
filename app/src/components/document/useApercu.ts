@@ -33,7 +33,7 @@ export type Apercu<T> = {
 };
 
 /**
- * Aperçu rapide d'une liste de pièces (FactBox Dynamics / volet Sage) : préférence mémorisée
+ * Aperçu rapide d'une liste (pièces, tiers, articles — FactBox Dynamics / volet Sage) : préférence mémorisée
  * par écran (`localStorage gc.apercu.<ecran>`), ligne sélectionnée, branchement sur la grille.
  * `cleListe` : quand elle change (onglet, période…), la sélection est vidée.
  */

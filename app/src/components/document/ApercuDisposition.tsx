@@ -8,13 +8,19 @@ const SEUIL_SUPERPOSITION = 1280;
 /** Écart entre le panneau collant et les bords haut / bas de la zone qui défile. */
 const MARGE = 12;
 
-/** Bouton bascule « Aperçu » (barre d'outils de la grille). */
-export function BoutonApercu({ apercu }: { apercu: Pick<Apercu<unknown>, 'actif' | 'basculer'> }) {
+/**
+ * Bouton bascule « Aperçu » (barre d'outils de la grille). `objet` adapte l'info-bulle à la liste
+ * (par défaut la pièce) : `de` = « de la pièce », `le` = ce qu'ouvre le clic sans aperçu.
+ */
+export function BoutonApercu({ apercu, objet = { de: 'de la pièce', le: 'la pièce' } }: {
+  apercu: Pick<Apercu<unknown>, 'actif' | 'basculer'>;
+  objet?: { de: string; le: string };
+}) {
   return (
     <Button size="sm" icon="layoutSidebar" pressed={apercu.actif} onClick={() => apercu.basculer()}
             title={apercu.actif
-              ? "Masquer l'aperçu (le clic sur une ligne ouvrira de nouveau la pièce)"
-              : "Afficher un aperçu de la pièce à côté de la liste (clic : aperçu, double-clic ou Entrée : ouvrir)"}>
+              ? `Masquer l'aperçu (le clic sur une ligne ouvrira de nouveau ${objet.le})`
+              : `Afficher un aperçu ${objet.de} à côté de la liste (clic : aperçu, double-clic ou Entrée : ouvrir)`}>
       Aperçu
     </Button>
   );
@@ -23,7 +29,7 @@ export function BoutonApercu({ apercu }: { apercu: Pick<Apercu<unknown>, 'actif'
 /**
  * Grille + panneau d'aperçu. Large écran : côte à côte (le panneau est collant et défile avec la page) ;
  * sous ~1280 px de largeur utile : le panneau se superpose à droite de la grille (ombre), seulement quand
- * une pièce est sélectionnée. Sans aperçu actif, rend la grille telle quelle.
+ * une ligne (pièce, tiers, article…) est sélectionnée. Sans aperçu actif, rend la grille telle quelle.
  *
  * `panneau(fermer)` : `fermer` masque la superposition (désélection) ou, côte à côte, désactive l'aperçu,
  * puis rend le focus à la grille.
