@@ -6,6 +6,13 @@ import { calculerEncaissement, montantsRapides } from './comptoirCalc';
 
 export type ResultatPaiement = { recu: number; regle: number; rendu: number; credit: boolean; imprimer: boolean };
 
+/** Résultat de l'encaissement pour un montant remis donné ; null si insuffisant sans crédit possible. */
+export function resultatPaiement(net: number, recu: number, credit: boolean, creditPossible: boolean, imprimer: boolean): ResultatPaiement | null {
+  const e = calculerEncaissement(net, recu, credit);
+  if (!creditPossible && e.reste > 0) return null;
+  return { recu: credit ? 0 : recu, regle: e.regle, rendu: e.rendu, credit, imprimer };
+}
+
 /**
  * Encaissement du ticket (portage de CacheReglements.pas) — gabarit maquette « Encaissement (F2) ».
  * Montant remis pré-rempli au net, coupures rapides, monnaie à rendre, vente à crédit pour un
@@ -33,9 +40,12 @@ export default function PaiementDialog({
   const insuffisant = !creditPossible && e.reste > 0;
   const rapides = montantsRapides(net);
 
-  function valider() {
-    if (enCours || insuffisant) return;
-    onValider({ recu: credit ? 0 : recu, regle: e.regle, rendu: e.rendu, credit, imprimer });
+  // `montantRecu` est passé explicitement : sur Entrée, NumberEdit fournit la valeur saisie,
+  // alors que `recu` date encore du rendu précédent (closure périmée).
+  function valider(montantRecu: number) {
+    if (enCours) return;
+    const r = resultatPaiement(net, montantRecu, credit, creditPossible, imprimer);
+    if (r) onValider(r);
   }
 
   const secondaire = { color: 'var(--text-secondary)' };
@@ -45,7 +55,7 @@ export default function PaiementDialog({
             subtitle={`Ticket ${ticket} · ${clientNom} · ${fmtQte(articles)} article${articles > 1 ? 's' : ''}`}
             footer={<>
               <DialogButton onClick={onClose} kbd="Échap">Retour au ticket</DialogButton>
-              <DialogButton kind="cash" onClick={valider} disabled={enCours || insuffisant} kbd="Entrée">
+              <DialogButton kind="cash" onClick={() => valider(recu)} disabled={enCours || insuffisant} kbd="Entrée">
                 {enCours ? 'Enregistrement…' : 'Valider la vente'}
               </DialogButton>
             </>}>

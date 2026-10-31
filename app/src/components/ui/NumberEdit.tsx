@@ -10,8 +10,12 @@ import { forwardRef, useState } from 'react';
 export type NumberEditProps = {
   value: number;
   onChange: (v: number) => void;
-  /** Appelé après validation par Entrée (ex. : passer au champ suivant). */
-  onEnter?: () => void;
+  /**
+   * Appelé après validation par Entrée (ex. : passer au champ suivant, valider la fenêtre).
+   * Reçoit la valeur validée : `onChange` vient de mettre à jour l'état du parent, mais ce
+   * dernier n'est pas encore re-rendu — il doit utiliser `v`, pas son état (closure périmée).
+   */
+  onEnter?: (v: number) => void;
   decimals?: number;
   /** Décimales minimales affichées (défaut = decimals) ; 0 pour une quantité « 3 » plutôt que « 3,000 ». */
   minDecimals?: number;
@@ -40,6 +44,13 @@ export function formatNombre(n: number, decimals: number, minDecimals = decimals
     .format(Number.isFinite(n) ? n : 0);
 }
 
+/** Valeur résultant d'une saisie : bornée et arrondie ; saisie vide ou invalide → valeur courante. */
+export function resoudreSaisie(texte: string, value: number, { min, max, decimals = 2 }: { min?: number; max?: number; decimals?: number } = {}): number {
+  const n = parseNombre(texte);
+  if (n == null) return value;
+  return Number(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n)).toFixed(Math.max(decimals, 0)));
+}
+
 const TAILLES = {
   sm: 'text-sm py-1 px-2',
   md: 'text-base py-2 px-3',
@@ -60,8 +71,7 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
   const arrondi = (n: number) => Number(n.toFixed(Math.max(decimals, 0)));
 
   function valider(): number {
-    const n = parseNombre(texte);
-    const v = n == null ? value : arrondi(borne(n));
+    const v = resoudreSaisie(texte, value, { min, max, decimals });
     if (v !== value) onChange(v);
     return v;
   }
@@ -88,7 +98,7 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
         // Champ montant : le cadre parent porte déjà le focus (bordure + halo)
         style={size === 'montant' ? { boxShadow: 'none' } : undefined}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); valider(); setTexte(''); (e.target as HTMLInputElement).select(); onEnter?.(); }
+          if (e.key === 'Enter') { e.preventDefault(); const v = valider(); setTexte(''); (e.target as HTMLInputElement).select(); onEnter?.(v); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); incr(1); }
           else if (e.key === 'ArrowDown') { e.preventDefault(); incr(-1); }
         }}
