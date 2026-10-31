@@ -17,6 +17,7 @@ import { useSessionKeepAlive } from '../api/useSessionKeepAlive';
 import { useDroitsSync } from '../api/useDroitsSync';
 import { useDroits } from '../lib/droits';
 import { applyTheme } from '../screens/Parametres';
+import { PALETTES, applyPalette, paletteCourante } from '../lib/apparence';
 import { Icon, Kbd } from './ui/Icon';
 import { IconButton } from './ui/Button';
 import { Menu } from './ui/Menu';
@@ -251,6 +252,9 @@ export default function AppShell() {
               { label: 'Changer de dossier', icon: 'folder', onSelect: () => setChangerDossier(true) },
               ...(plusieursAgents ? [{ label: 'Changer d’agent', icon: 'server' as const, onSelect: () => setChangerAgent(true) }] : []),
               { label: 'Ruban de commandes', icon: 'layoutRibbon', onSelect: () => usePreferencesNavigation.getState().definirDisposition('ruban') },
+              'separator',
+              { heading: 'Palette de couleurs' },
+              ...PALETTES.map((p) => ({ label: p.libelle, icon: p.id === paletteCourante() ? 'check' as const : undefined, onSelect: () => applyPalette(p.id) })),
               'separator',
               { label: 'Se déconnecter', icon: 'logout', tone: 'danger', onSelect: logout },
             ]} />

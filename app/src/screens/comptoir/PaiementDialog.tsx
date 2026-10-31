@@ -68,7 +68,7 @@ export default function PaiementDialog({
               const sel = !credit && Math.abs(recu - m) < 0.005;
               return (
                 <button key={m} type="button" disabled={credit} onClick={() => setRecu(m)} aria-pressed={sel}
-                        className={`money h-[46px] rounded-md text-md leading-[1.45] disabled:opacity-40 ${sel ? 'font-extrabold text-brand-900 bg-brand-50 border-2 border-brand-700' : 'font-bold text-ink-label bg-surface border border-line hover:border-brand-300'}`}>
+                        className={`money h-[46px] rounded-md text-md leading-[1.45] disabled:opacity-40 ${sel ? 'font-extrabold text-brand-text bg-brand-50 border-2 border-brand-700' : 'font-bold text-ink-label bg-surface border border-line hover:border-brand-300'}`}>
                   {i === 0 ? 'Exact' : fmtMoney(m, 0)}
                 </button>
               );

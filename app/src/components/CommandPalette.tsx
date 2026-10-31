@@ -10,6 +10,7 @@ import { Icon, IconBadge, Kbd, type IconName, type Tone } from './ui/Icon';
 import { Spinner } from './ui/Button';
 import { useRecents, ilYA } from '../navigation/recents';
 import { applyTheme } from '../screens/Parametres';
+import { PALETTES, applyPalette } from '../lib/apparence';
 import { EmptyState } from './ui/States';
 
 /** Icône et teinte par groupe de résultats. */
@@ -113,6 +114,9 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       { id: 'a-raccourcis', groupe: 'Actions', titre: 'Raccourcis clavier', sous: 'Ctrl+/',
         action: () => { onClose(); window.dispatchEvent(new KeyboardEvent('keydown', { key: '/', ctrlKey: true })); } },
       { id: 'a-charte', groupe: 'Actions', titre: 'Charte graphique et composants', sous: 'Configuration › Outils', action: go('/outils/ui') },
+      // Palettes : proposées seulement quand on les cherche (« palette », « couleur », nom de la palette)
+      ...(q ? PALETTES.map((p) => ({ id: `a-pal-${p.id}`, groupe: 'Actions', titre: `Palette « ${p.libelle} »`, sous: `Couleurs de l’interface — ${p.description}`,
+        action: () => { onClose(); applyPalette(p.id); } })) : []),
     ].filter((a) => !q || norm(a.titre).includes(q) || norm(a.sous ?? '').includes(q));
 
     const statiques: Item[] = STATIQUES

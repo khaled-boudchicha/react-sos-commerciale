@@ -186,3 +186,140 @@
   --pos-return-soft: #2A1709;
   --pos-return-line: #7C3514;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Palettes de couleurs (attribut data-palette sur <html>, choisi dans Paramètres › Apparence).
+   Sans attribut : palette « Classique » (valeurs ci-dessus). Chaque palette a sa variante claire
+   et sombre ; les couleurs sémantiques (succès, alerte, danger…) restent communes.
+   Contrastes AA vérifiés (texte, secondaire, marque, sémantiques sur chaque surface).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Ivoire — papier chaud, bleu roi et or (identité conservée, sans blanc pur) */
+:root[data-palette="ivoire"]:not([data-theme="dark"]) {
+  --bg: #F3EFE6; --surface: #FAF7F0; --surface-raised: #FCFAF5; --surface-sunken: #F1ECE2;
+  --surface-hover: #F0EBE0; --surface-active: #E9EDF8;
+  --line-soft: #E8E1D3; --line: #D3C9B6; --line-strong: #A99D86;
+  --text: #1F1A14; --text-label: #4A4135; --text-muted: #6A6052; --text-placeholder: #9A8F7D;
+  --neutral-text: #4A4135; --neutral-soft: #E8E1D3; --neutral-line: #D3C9B6;
+  --brand-50: #E9EDF8; --brand-100: #D6DFF6; --brand-300: #7C9BF2; --brand-500: #3B66F5;
+  --brand-700: #2450E0; --brand-900: #1E3FB5; --brand-solid: #2450E0;
+  --brand-text: #2450E0; --brand-soft: #E9EDF8; --brand-line: #7C9BF2;
+  --gradient-hero: linear-gradient(135deg, #3B66F5 0%, #2450E0 55%, #1E3FB5 100%);
+  --chart-1: #2450E0;
+}
+:root[data-palette="ivoire"][data-theme="dark"] {
+  --bg: #14120E; --surface: #1D1A15; --surface-raised: #24201A; --surface-sunken: #181611;
+  --surface-hover: #26221B; --surface-active: #1E2236;
+  --line-soft: #2A261E; --line: #3D372C; --line-strong: #575042;
+  --text: #EFEAE0; --text-label: #CFC6B6; --text-muted: #A39885; --text-placeholder: #7C7262;
+  --neutral-text: #CFC6B6; --neutral-soft: #2A261E; --neutral-line: #3D372C;
+  --brand-50: #1E2236; --brand-100: #25305A; --brand-300: #5B7BD6; --brand-500: #3B66F5;
+  --brand-700: #2450E0; --brand-900: #1E3FB5; --brand-solid: #2450E0;
+  --brand-text: #8FA9F5; --brand-soft: #1E2236; --brand-line: #4D66B8;
+  --gradient-hero: linear-gradient(135deg, #3B66F5 0%, #2450E0 55%, #1E3FB5 100%);
+  --chart-1: #8FA9F5;
+}
+
+/* Ardoise — gris bleuté doux, bleu profond (esprit SAP Fiori / Horizon) */
+:root[data-palette="ardoise"]:not([data-theme="dark"]) {
+  --bg: #E6EAF0; --surface: #F1F4F8; --surface-raised: #F6F8FB; --surface-sunken: #EAEEF3;
+  --surface-hover: #E8EDF3; --surface-active: #E1E9FB;
+  --line-soft: #DDE3EB; --line: #C0C9D6; --line-strong: #8F9BAE;
+  --text: #132033; --text-label: #3B4A60; --text-muted: #5A677C; --text-placeholder: #8692A5;
+  --neutral-text: #3B4A60; --neutral-soft: #DDE3EB; --neutral-line: #C0C9D6;
+  --brand-50: #E1E9FB; --brand-100: #C9D8F8; --brand-300: #7FA0EE; --brand-500: #2F6AF0;
+  --brand-700: #1D4ED8; --brand-900: #1A3FA8; --brand-solid: #1D4ED8;
+  --brand-text: #1D4ED8; --brand-soft: #E1E9FB; --brand-line: #7FA0EE;
+  --gradient-hero: linear-gradient(135deg, #2F6AF0 0%, #1D4ED8 55%, #1A3FA8 100%);
+  --chart-1: #1D4ED8;
+}
+:root[data-palette="ardoise"][data-theme="dark"] {
+  --bg: #0D121A; --surface: #161D28; --surface-raised: #1B2431; --surface-sunken: #111721;
+  --surface-hover: #1C2533; --surface-active: #172341;
+  --line-soft: #222C3B; --line: #33405A; --line-strong: #4D5C78;
+  --text: #E6ECF5; --text-label: #B4C0D3; --text-muted: #8492A8; --text-placeholder: #66748B;
+  --neutral-text: #B4C0D3; --neutral-soft: #222C3B; --neutral-line: #33405A;
+  --brand-50: #172341; --brand-100: #1D2E57; --brand-300: #4B72D1; --brand-500: #2F6AF0;
+  --brand-700: #2563EB; --brand-900: #1A3FA8; --brand-solid: #2563EB;
+  --brand-text: #8AB0FF; --brand-soft: #172341; --brand-line: #4B72D1;
+  --gradient-hero: linear-gradient(135deg, #2F6AF0 0%, #1D4ED8 55%, #1A3FA8 100%);
+  --chart-1: #8AB0FF;
+}
+
+/* Sauge — vert pharmacie apaisant, émeraude (santé, officine) */
+:root[data-palette="sauge"]:not([data-theme="dark"]) {
+  --bg: #E9EFEA; --surface: #F5F8F4; --surface-raised: #F8FAF7; --surface-sunken: #EDF2EE;
+  --surface-hover: #ECF1EC; --surface-active: #E2F2EB;
+  --line-soft: #DCE5DE; --line: #BDCCC1; --line-strong: #8CA294;
+  --text: #132019; --text-label: #3A4D42; --text-muted: #566A5E; --text-placeholder: #869A8D;
+  --neutral-text: #3A4D42; --neutral-soft: #DCE5DE; --neutral-line: #BDCCC1;
+  --brand-50: #E2F2EB; --brand-100: #C6E6D8; --brand-300: #6CBF9F; --brand-500: #11906A;
+  --brand-700: #0B7254; --brand-900: #085A42; --brand-solid: #0B7254;
+  --brand-text: #0B7254; --brand-soft: #E2F2EB; --brand-line: #6CBF9F;
+  --gradient-hero: linear-gradient(135deg, #11906A 0%, #0B7254 55%, #085A42 100%);
+  --chart-1: #0B7254;
+}
+:root[data-palette="sauge"][data-theme="dark"] {
+  --bg: #0C1410; --surface: #141F19; --surface-raised: #192720; --surface-sunken: #101914;
+  --surface-hover: #1A2620; --surface-active: #12271E;
+  --line-soft: #1F2D25; --line: #2F4337; --line-strong: #48614F;
+  --text: #E5EFE9; --text-label: #B5C8BC; --text-muted: #86A091; --text-placeholder: #66806F;
+  --neutral-text: #B5C8BC; --neutral-soft: #1F2D25; --neutral-line: #2F4337;
+  --brand-50: #12271E; --brand-100: #173A2C; --brand-300: #3E9C78; --brand-500: #11906A;
+  --brand-700: #0B7254; --brand-900: #085A42; --brand-solid: #0B7254;
+  --brand-text: #5FD3A7; --brand-soft: #12271E; --brand-line: #3E9C78;
+  --gradient-hero: linear-gradient(135deg, #11906A 0%, #0B7254 55%, #085A42 100%);
+  --chart-1: #5FD3A7;
+}
+
+/* Graphite — gris neutre et indigo (esprit Windows 11 / Fluent) */
+:root[data-palette="graphite"]:not([data-theme="dark"]) {
+  --bg: #E7E7EA; --surface: #F3F3F5; --surface-raised: #F7F7F8; --surface-sunken: #ECECEF;
+  --surface-hover: #EBEBEE; --surface-active: #E8E7FB;
+  --line-soft: #DEDEE2; --line: #C4C4CA; --line-strong: #95959E;
+  --text: #18181B; --text-label: #3F3F46; --text-muted: #5E5E68; --text-placeholder: #8E8E98;
+  --neutral-text: #3F3F46; --neutral-soft: #DEDEE2; --neutral-line: #C4C4CA;
+  --brand-50: #E8E7FB; --brand-100: #D3D1F7; --brand-300: #8E88EE; --brand-500: #5B52EC;
+  --brand-700: #4338CA; --brand-900: #372FA3; --brand-solid: #4338CA;
+  --brand-text: #4338CA; --brand-soft: #E8E7FB; --brand-line: #8E88EE;
+  --gradient-hero: linear-gradient(135deg, #5B52EC 0%, #4338CA 55%, #372FA3 100%);
+  --chart-1: #4338CA;
+}
+:root[data-palette="graphite"][data-theme="dark"] {
+  --bg: #101012; --surface: #19191C; --surface-raised: #1F1F23; --surface-sunken: #141416;
+  --surface-hover: #222226; --surface-active: #1F1D3A;
+  --line-soft: #26262B; --line: #38383F; --line-strong: #52525B;
+  --text: #ECECEF; --text-label: #C4C4CB; --text-muted: #8F8F99; --text-placeholder: #6E6E78;
+  --neutral-text: #C4C4CB; --neutral-soft: #26262B; --neutral-line: #38383F;
+  --brand-50: #1F1D3A; --brand-100: #2A2758; --brand-300: #6C66D9; --brand-500: #5B52EC;
+  --brand-700: #4F46E5; --brand-900: #372FA3; --brand-solid: #4F46E5;
+  --brand-text: #A5A1F7; --brand-soft: #1F1D3A; --brand-line: #6C66D9;
+  --gradient-hero: linear-gradient(135deg, #5B52EC 0%, #4338CA 55%, #372FA3 100%);
+  --chart-1: #A5A1F7;
+}
+
+/* Bordeaux — crème chaleureuse et bordeaux, accent or (premium) */
+:root[data-palette="bordeaux"]:not([data-theme="dark"]) {
+  --bg: #F2ECE6; --surface: #FAF6F2; --surface-raised: #FCF9F6; --surface-sunken: #F1EAE3;
+  --surface-hover: #F0E8E0; --surface-active: #F6E6EA;
+  --line-soft: #E8DED4; --line: #D1C2B4; --line-strong: #A6958A;
+  --text: #24170F; --text-label: #4E3E33; --text-muted: #6E5D51; --text-placeholder: #9C8B7F;
+  --neutral-text: #4E3E33; --neutral-soft: #E8DED4; --neutral-line: #D1C2B4;
+  --brand-50: #F6E6EA; --brand-100: #EDCCD5; --brand-300: #D0809A; --brand-500: #B0284F;
+  --brand-700: #8E1F3F; --brand-900: #6E1730; --brand-solid: #8E1F3F;
+  --brand-text: #8E1F3F; --brand-soft: #F6E6EA; --brand-line: #D0809A;
+  --gradient-hero: linear-gradient(135deg, #B0284F 0%, #8E1F3F 55%, #6E1730 100%);
+  --chart-1: #8E1F3F;
+}
+:root[data-palette="bordeaux"][data-theme="dark"] {
+  --bg: #151011; --surface: #1F1719; --surface-raised: #261C1F; --surface-sunken: #191314;
+  --surface-hover: #2A1F22; --surface-active: #2E1820;
+  --line-soft: #2C2124; --line: #403036; --line-strong: #5C474E;
+  --text: #F2E9E7; --text-label: #D3C3C0; --text-muted: #A89491; --text-placeholder: #806D6A;
+  --neutral-text: #D3C3C0; --neutral-soft: #2C2124; --neutral-line: #403036;
+  --brand-50: #2E1820; --brand-100: #42202C; --brand-300: #B8607A; --brand-500: #B0284F;
+  --brand-700: #B0284F; --brand-900: #6E1730; --brand-solid: #B0284F;
+  --brand-text: #F08DA8; --brand-soft: #2E1820; --brand-line: #B8607A;
+  --gradient-hero: linear-gradient(135deg, #B0284F 0%, #8E1F3F 55%, #6E1730 100%);
+  --chart-1: #F08DA8;
+}

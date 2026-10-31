@@ -6,6 +6,7 @@ import { useSession } from './store/session';
 import App from './App';
 import { ToastProvider } from './components/ui/Toast';
 import { loadTheme } from './screens/Parametres';
+import { loadPalette } from './lib/apparence';
 import './styles/index.css';
 import './styles/report-theme.css';
 import { initialiserImpression } from './impression';
@@ -15,6 +16,7 @@ import PontNotifications from './impression/PontNotifications';
 initialiserImpression();
 void useSession.getState().hydrate();
 void loadTheme();
+void loadPalette();
 void usePreferencesNavigation.getState().charger();
 
 // Aide au dev navigateur (hors Electron) : window.__session.getState().setAuth(...)
