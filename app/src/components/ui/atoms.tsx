@@ -116,7 +116,7 @@ export function Tabs<T extends string>({ value, onChange, options, variant = 'pi
         const sel = value === o.code;
         const tone = o.tone ? TONE_VARS[o.tone] : null;
         return (
-          <button key={o.code} ref={(el) => { refs.current[i] = el; }} role="tab" type="button" aria-selected={sel}
+          <button key={o.code} ref={(el) => { refs.current[i] = el; }} role="tab" type="button" aria-selected={sel} data-code={o.code}
                   tabIndex={sel ? 0 : -1} onClick={() => onChange(o.code)} onKeyDown={(e) => onKey(e, i)}
                   className={cn('inline-flex items-center gap-1.5 whitespace-nowrap font-semibold transition-colors duration-fast',
                     size === 'sm' ? 'text-sm' : 'text-base',

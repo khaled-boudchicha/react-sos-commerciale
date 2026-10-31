@@ -198,7 +198,7 @@ export default function AppShell() {
           {replie ? (
             <>
               <IconButton icon="folder" label={`Dossier ${dossier} — changer`} onClick={() => setChangerDossier(true)} />
-              <IconButton icon="chevronsRight" label="Déplier le menu" onClick={basculerRepli} />
+              <IconButton icon="chevronsRight" label="Déplier le menu" tooltip onClick={basculerRepli} />
             </>
           ) : (
             <>
@@ -214,12 +214,12 @@ export default function AppShell() {
                 <Icon name="chevronRight" size={14} className="text-ink-muted" />
               </button>
               <div className="flex items-center justify-between mt-2">
-                <IconButton icon="chevronsLeft" label="Réduire le menu" size="sm" onClick={basculerRepli} />
+                <IconButton icon="chevronsLeft" label="Réduire le menu" size="sm" tooltip onClick={basculerRepli} />
                 <div className="flex items-center gap-0.5">
-                  <IconButton icon="layoutRibbon" label="Afficher le ruban de commandes (style Office)" size="sm"
+                  <IconButton icon="layoutRibbon" label="Afficher le ruban de commandes (style Office)" size="sm" tooltip
                               onClick={() => usePreferencesNavigation.getState().definirDisposition('ruban')} />
                   {plusieursAgents && <IconButton icon="server" label="Changer d’agent" size="sm" onClick={() => setChangerAgent(true)} />}
-                  <IconButton icon="logout" label="Se déconnecter (changer d’utilisateur)" size="sm" onClick={logout} />
+                  <IconButton icon="logout" label="Se déconnecter (changer d’utilisateur)" size="sm" tooltip onClick={logout} />
                 </div>
               </div>
             </>
@@ -242,8 +242,10 @@ export default function AppShell() {
               <StatusDot online={online} />
               <span className="max-w-[200px] truncate">{online ? 'Connecté' : 'Hors ligne'} · {nomAgent}</span>
             </span>
-            <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'} onClick={basculerTheme} />
-            <IconButton icon="keyboard" label="Raccourcis clavier (Ctrl+/)" onClick={() => setAide(true)} />
+            <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+                        tooltip tooltipSide="bottom" onClick={basculerTheme} />
+            <IconButton icon="keyboard" label="Raccourcis clavier (Ctrl+/)" tooltip="Raccourcis clavier" kbd="Ctrl+/" tooltipSide="bottom"
+                        onClick={() => setAide(true)} />
             <Menu label="Compte" icon="user" iconOnly variant="ghost" width={250} items={[
               { heading: `${utilisateur || 'Utilisateur'} · ${dossier ?? ''}` },
               { label: 'Changer de dossier', icon: 'folder', onSelect: () => setChangerDossier(true) },

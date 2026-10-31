@@ -6,7 +6,7 @@ import { CONTROL, SearchField, Select } from '../ui/Field';
 import { Icon } from '../ui/Icon';
 import { Menu, type MenuItem } from '../ui/Menu';
 import { TextInput } from '../ui/Field';
-import { Alert, EmptyState, Loading, LoadingOverlay } from '../ui/States';
+import { Alert, EmptyState, Loading, LoadingOverlay, Skeleton } from '../ui/States';
 import PrintPreview from '../../print/engine/PrintPreview';
 import { PrintDocument } from '../../print/engine/types';
 import { isoDate } from '../../lib/format';
@@ -413,6 +413,8 @@ export default function Grille<T>(props: GrilleProps<T>) {
   const debutVirtuel = defilementVirtuel ? Math.max(0, Math.floor(scroll.haut / hLigne) - tampon) : 0;
   const finVirtuel = defilementVirtuel ? Math.min(elementsPage.length, Math.ceil((scroll.haut + scroll.hauteur) / hLigne) + tampon) : elementsPage.length;
   const elementsRendus = elementsPage.slice(debutVirtuel, finVirtuel);
+  /** Premier chargement (aucune ligne encore affichée) : squelette de lignes au lieu d'un voile sur une table vide */
+  const premierChargement = (!!chargement || distant.chargement) && elementsPage.length === 0 && !ligneEditee?.nouvelle;
 
   // ─── Géométrie des colonnes (figées : positions « sticky ») ───────────────
   const aSelection = selection === 'multiple';
@@ -1076,6 +1078,17 @@ export default function Grille<T>(props: GrilleProps<T>) {
               : rendreLigne(el.ligne, debutVirtuel + i)))}
             {defilementVirtuel && finVirtuel < elementsPage.length && <tr style={{ height: (elementsPage.length - finVirtuel) * hLigne }} />}
             {ligneEditee?.nouvelle && edition?.positionNouvelle === 'fin' && rendreNouvelle()}
+            {premierChargement && Array.from({ length: 8 }, (_, i) => (
+              <tr key={`squelette-${i}`} aria-hidden="true" style={{ height: hLigne }}>
+                {debutColonnesSysteme > 0 && <td colSpan={debutColonnesSysteme} />}
+                {visibles.map((c, ci) => (
+                  <td key={c.champ} className={`px-2.5 ${padCellule}`} style={{ textAlign: alignement(c) }}>
+                    <Skeleton height={10} width={`${estNum(c.type) ? 50 : 45 + ((i * 17 + ci * 23) % 45)}%`} />
+                  </td>
+                ))}
+                {aCommandes && <td />}
+              </tr>
+            ))}
           </tbody>
           {resumes?.length ? (
             <tfoot className="sticky bottom-0 z-[3]">
@@ -1116,7 +1129,7 @@ export default function Grille<T>(props: GrilleProps<T>) {
         {distant.erreur && elementsPage.length > 0 && (
           <div className="sticky left-0 px-3 py-2 max-w-full"><Alert tone="danger" compact>{distant.erreur}</Alert></div>
         )}
-        {(chargement || distant.chargement) && <LoadingOverlay />}
+        {(chargement || distant.chargement) && !premierChargement && <LoadingOverlay />}
       </div>
       </div>
 

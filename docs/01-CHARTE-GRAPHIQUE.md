@@ -121,8 +121,10 @@ Règles :
 | Composant | Rôle | Points clés |
 |---|---|---|
 | `Button` | toutes les actions | variantes `primary`, `secondary` (défaut), `ghost`, `danger`, `danger-solid`, `success`, `accent`, `link` ; tailles `xs` à `xl` ; `icon`, `iconRight`, `kbd`, `loading`, `pressed`, `to` |
-| `IconButton` | action à icône seule | `label` obligatoire (nom accessible + info-bulle) ; `tone="danger"` pour les corbeilles |
-| `Menu` | actions secondaires regroupées | `role=menu`, ↑ ↓ Début Fin Entrée Échap |
+| `IconButton` | action à icône seule | `label` obligatoire (nom accessible + info-bulle) ; `tone="danger"` pour les corbeilles ; `tooltip` (+ `kbd`, `tooltipSide`) remplace le `title` natif par un `Tooltip` |
+| `Menu` | actions secondaires regroupées | `role=menu`, ↑ ↓ Début Fin Entrée Échap, une lettre = saut au libellé ; liste rendue par `MenuList` (commune avec `ContextMenu`) |
+| `ContextMenu` | menu contextuel (clic droit) ou flottant sur un bouton | ancre = point `{x, y}` ou `DOMRect` (`align` start / end), maintenu dans la fenêtre ; éléments `ContextMenuItem` : `heading`, `'separator'`, `label` + `icon` / `kbd` / `hint` / `tone="danger"` / `disabled` / `checked` (+ `radio`, `keepOpen`) ; clavier ↑ ↓ Début Fin Entrée Échap + lettre ; ferme au clic extérieur, défilement, redimensionnement ; focus rendu ; portail, `z-popover` |
+| `Tooltip` | info-bulle | `<Tooltip content kbd? description? side?><button/></Tooltip>` : survol 450 ms, focus clavier immédiat, Échap / sortie / clic masquent ; `role=tooltip` + `aria-describedby` ; haut / bas automatique dans la fenêtre ; portail, `z-tooltip` ; `TooltipBubble` = rendu seul (info-bulles détaillées du ruban). Pas d'attribut `title` pour une info-bulle riche |
 | `Field` + `TextInput` / `Select` / `Textarea` / `Checkbox` / `Switch` | formulaires | libellé au-dessus, requis `*`, `error` / `help` reliés par ARIA |
 | `SearchField`, `DateRangeField`, `SegmentedControl` | filtres | loupe + effacement (Échap) ; période avec raccourcis (Aujourd'hui, Ce mois…) |
 | `Card`, `CardHeader`, `SectionTitle` | conteneurs | une seule recette de carte ; `to` / `onClick` la rendent interactive |

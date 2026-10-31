@@ -42,5 +42,5 @@ export function lignesPourServeur(lignes: LigneDoc[]) {
 /** Bandeau d'erreur / d'accès refusé commun aux éditeurs. */
 export const bandeauDanger = {
   background: 'color-mix(in srgb, var(--danger) 10%, transparent)',
-  color: 'var(--danger)',
+  color: 'var(--danger-text)',
 } as const;

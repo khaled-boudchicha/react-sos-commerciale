@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLazyQuery } from '@apollo/client';
 import { CLIENTS, ARTICLES, FOURNISSEURS } from '../api/queries';
 import { Client, Article, Fournisseur } from '../api/types';
@@ -8,10 +8,14 @@ import { useDebouncedValue } from '../lib/useDebounce';
 import { D, useDroits } from '../lib/droits';
 import { Icon, IconBadge, Kbd, type IconName, type Tone } from './ui/Icon';
 import { Spinner } from './ui/Button';
+import { useRecents, ilYA } from '../navigation/recents';
+import { applyTheme } from '../screens/Parametres';
 import { EmptyState } from './ui/States';
 
 /** Icône et teinte par groupe de résultats. */
 const GROUPES: Record<string, { icon: IconName; tone: Tone }> = {
+  'Récents': { icon: 'history', tone: 'neutral' },
+  'Actions': { icon: 'sparkles', tone: 'info' },
   'Aller à': { icon: 'arrowRight', tone: 'brand' },
   'Créer': { icon: 'plus', tone: 'success' },
   Clients: { icon: 'users', tone: 'violet' },
@@ -63,6 +67,9 @@ function norm(s: string) {
 export default function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const droits = useDroits();
+  const recents = useRecents((s) => s.recents);
+  const { pathname, search } = useLocation();
+  const ici = `${pathname}${search}`;
   const [term, setTerm] = useState('');
   const termDiffere = useDebouncedValue(term, 220);
   const [hi, setHi] = useState(0);
@@ -93,12 +100,27 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     const go = (to: string) => () => { onClose(); navigate(to); };
     const q = norm(term.trim());
 
+    // Écrans récents (reprendre où l'on en était) et actions d'interface
+    const recentsItems: Item[] = recents
+      .filter((r) => r.chemin !== ici)
+      .filter((r) => !q || norm(r.titre).includes(q) || norm(r.chemin).includes(q))
+      .slice(0, q ? 5 : 4)
+      .map((r, i) => ({ id: `r${i}`, groupe: 'Récents', titre: r.titre || r.chemin, sous: r.chemin, droite: ilYA(r.date), action: go(r.chemin) }));
+    const sombre = document.documentElement.dataset.theme === 'dark';
+    const actionsItems: Item[] = [
+      { id: 'a-theme', groupe: 'Actions', titre: sombre ? 'Passer en mode clair' : 'Passer en mode sombre', sous: 'Thème de l’interface',
+        action: () => { onClose(); applyTheme(sombre ? 'light' : 'dark'); } },
+      { id: 'a-raccourcis', groupe: 'Actions', titre: 'Raccourcis clavier', sous: 'Ctrl+/',
+        action: () => { onClose(); window.dispatchEvent(new KeyboardEvent('keydown', { key: '/', ctrlKey: true })); } },
+      { id: 'a-charte', groupe: 'Actions', titre: 'Charte graphique et composants', sous: 'Configuration › Outils', action: go('/outils/ui') },
+    ].filter((a) => !q || norm(a.titre).includes(q) || norm(a.sous ?? '').includes(q));
+
     const statiques: Item[] = STATIQUES
       .filter((c) => !c.si || c.si(droits))
       .filter((s) => !q || norm(s.titre).includes(q) || norm(s.sous ?? '').includes(q))
       .map((s, i) => ({ id: `s${i}`, groupe: s.groupe, titre: s.titre, sous: s.sous, action: go(s.to) }));
 
-    if (q.length < 2) return statiques;
+    if (q.length < 2) return [...recentsItems, ...statiques, ...actionsItems];
 
     const clients: Item[] = ((cData?.clients?.data ?? []) as Client[]).map((c) => ({
       id: `c${c.id}`, groupe: 'Clients', titre: c.nom || c.code, sous: c.code,
@@ -116,8 +138,8 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       action: go(`/stock/article/${a.id}`),
     }));
 
-    return [...statiques, ...clients, ...fournisseurs, ...articles];
-  }, [term, cData, aData, fData, navigate, onClose, droits.droits]);
+    return [...recentsItems, ...statiques, ...clients, ...fournisseurs, ...articles, ...actionsItems];
+  }, [term, cData, aData, fData, navigate, onClose, droits.droits, recents, ici]);
 
   useEffect(() => { setHi(0); }, [term]);
 

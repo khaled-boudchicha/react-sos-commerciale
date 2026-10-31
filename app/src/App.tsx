@@ -39,6 +39,7 @@ function G({ si, children }: { si: (d: ReturnType<typeof useDroits>) => boolean;
   return <RequireDroit si={si(d)}>{children}</RequireDroit>;
 }
 import ErrorBoundary from './components/ErrorBoundary';
+import RaccourcisGlobaux from './components/RaccourcisGlobaux';
 
 export default function App() {
   const { hydrated, token, dossier, dossierUser } = useSession();
@@ -49,6 +50,7 @@ export default function App() {
 
   return (
     <HashRouter>
+      <RaccourcisGlobaux />
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<Dashboard />} />
