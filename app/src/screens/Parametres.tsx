@@ -15,6 +15,7 @@ import {
 } from '../print/engine/silentPrint';
 import { getCachet, lireImage, setCachet } from '../print/engine/cachet';
 import ChoixDisposition from '../navigation/ChoixDisposition';
+import ChoixPalette from '../components/ChoixPalette';
 
 export function applyTheme(theme: 'light' | 'dark') {
   document.documentElement.dataset.theme = theme;
@@ -97,7 +98,11 @@ export default function Parametres() {
       <SectionMisesAJour />
 
       <Card as="section">
-        <CardHeader title="Apparence" icon="sun" description="Thème de l'interface et disposition du menu" />
+        <CardHeader title="Apparence" icon="sun" description="Palette de couleurs, thème clair / sombre et disposition du menu" />
+        <h3 className="font-bold text-base text-ink mb-1">Palette de couleurs</h3>
+        <p className="text-sm text-ink-muted mb-3">Effet immédiat sur tout l’écran ; chaque palette existe en clair et en sombre. Réglage propre à ce poste.</p>
+        <ChoixPalette />
+        <h3 className="font-bold text-base text-ink mt-5 mb-2">Thème</h3>
         <SegmentedControl label="Thème" value={theme} onChange={(t) => { setTheme(t); applyTheme(t); }}
                           options={[{ value: 'light', label: 'Clair', icon: 'sun' }, { value: 'dark', label: 'Sombre', icon: 'moon' }]} />
         <h3 className="font-bold text-base text-ink mt-5 mb-1">Disposition du menu</h3>
