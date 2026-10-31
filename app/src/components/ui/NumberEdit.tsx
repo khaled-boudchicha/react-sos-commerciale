@@ -1,4 +1,5 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 /**
  * Éditeur numérique réutilisable (équivalent TcxCurrencyEdit / TcxSpinEdit) :
@@ -55,6 +56,10 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
 }, ref) {
   const [focus, setFocus] = useState(false);
   const [texte, setTexte] = useState('');
+  // Dernier `onEnter` reçu : après la validation, le parent a été re-rendu avec la nouvelle valeur
+  // et c'est ce gestionnaire à jour (et non celui du rendu précédent) qu'il faut appeler.
+  const onEnterRef = useRef(onEnter);
+  onEnterRef.current = onEnter;
 
   const borne = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
   const arrondi = (n: number) => Number(n.toFixed(Math.max(decimals, 0)));
@@ -88,7 +93,14 @@ const NumberEdit = forwardRef<HTMLInputElement, NumberEditProps>(function Number
         // Champ montant : le cadre parent porte déjà le focus (bordure + halo)
         style={size === 'montant' ? { boxShadow: 'none' } : undefined}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); valider(); setTexte(''); (e.target as HTMLInputElement).select(); onEnter?.(); }
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            // La valeur saisie doit être appliquée chez le parent AVANT `onEnter` : sinon le parent valide
+            // avec l'état précédent (ex. remise « 5 » + Entrée → 0 % ; montant remis ignoré à l'encaissement).
+            flushSync(() => { valider(); setTexte(''); });
+            (e.target as HTMLInputElement).select();
+            onEnterRef.current?.();
+          }
           else if (e.key === 'ArrowUp') { e.preventDefault(); incr(1); }
           else if (e.key === 'ArrowDown') { e.preventDefault(); incr(-1); }
         }}
