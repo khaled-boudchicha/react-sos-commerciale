@@ -39,21 +39,33 @@ export default function ApercuDisposition<T>({ apercu, children, panneau, libell
   const [largeurUtile, setLargeurUtile] = useState<number | null>(null);
   const [hauteurMax, setHauteurMax] = useState<number | null>(null);
 
-  // Largeur utile (contenu) et hauteur visible de la zone qui défile (main#contenu)
+  // Largeur utile (contenu) et hauteur disponible pour le panneau : de son bord haut (position
+  // naturelle, ou collé en haut après défilement) jusqu'au bas de la zone qui défile (main#contenu)
   useLayoutEffect(() => {
     const el = racine.current;
     if (!el || !apercu.actif) return;
     const defilement = el.closest('main') as HTMLElement | null;
+    let image = 0;
     const mesurer = () => {
+      image = 0;
       setLargeurUtile(el.clientWidth);
-      setHauteurMax(Math.max(240, (defilement?.clientHeight ?? window.innerHeight) - MARGE * 2));
+      const zone = defilement?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+      const haut = Math.max(zone.top + MARGE, el.getBoundingClientRect().top);
+      setHauteurMax(Math.max(240, Math.floor(zone.bottom - haut - MARGE)));
     };
+    const planifier = () => { if (!image) image = requestAnimationFrame(mesurer); };
     mesurer();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(mesurer) : null;
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(planifier) : null;
     ro?.observe(el);
     if (defilement) ro?.observe(defilement);
-    window.addEventListener('resize', mesurer);
-    return () => { ro?.disconnect(); window.removeEventListener('resize', mesurer); };
+    window.addEventListener('resize', planifier);
+    defilement?.addEventListener('scroll', planifier, { passive: true });
+    return () => {
+      if (image) cancelAnimationFrame(image);
+      ro?.disconnect();
+      window.removeEventListener('resize', planifier);
+      defilement?.removeEventListener('scroll', planifier);
+    };
   }, [apercu.actif]);
 
   const superposition = largeurUtile !== null && largeurUtile < SEUIL_SUPERPOSITION;

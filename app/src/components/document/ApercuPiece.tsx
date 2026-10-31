@@ -52,7 +52,7 @@ export default function ApercuPiece({ sens, id, onOuvrir, onFermer }: {
   const enveloppe = (entete: ReactNode, contenu: ReactNode) => (
     <div ref={racine} onKeyDown={surTouche} className="flex-1 flex flex-col min-h-0">
       <div className="flex-none border-b border-line-soft px-4 py-3">{entete}</div>
-      <div ref={corps} className="flex-1 min-h-0 overflow-auto px-4 py-3.5 flex flex-col gap-4">{contenu}</div>
+      <div ref={corps} className="flex-1 min-h-0 overflow-auto px-4 py-3.5 flex flex-col gap-4 [&>*]:shrink-0">{contenu}</div>
     </div>
   );
   const enteteSimple = (titre: ReactNode) => (
@@ -67,14 +67,10 @@ export default function ApercuPiece({ sens, id, onOuvrir, onFermer }: {
     return enveloppe(enteteSimple('Aperçu'), (
       <EmptyState icon="eye" size="sm" title="Sélectionnez une pièce"
                   description={(
-                    <span className="inline-flex flex-col gap-1.5 items-center">
-                      <span>
-                        Cliquez sur une ligne ou parcourez la liste avec{' '}
-                        <Kbd><Icon name="arrowUp" size={12} /><span className="sr-only">flèche haut</span></Kbd>{' '}
-                        <Kbd><Icon name="arrowDown" size={12} /><span className="sr-only">flèche bas</span></Kbd>.
-                      </span>
-                      <span>Double-clic ou <Kbd>Entrée</Kbd> pour ouvrir la pièce.</span>
-                    </span>
+                    <>
+                      Cliquez sur une ligne ou parcourez la liste avec les flèches du clavier.
+                      <span className="block mt-1.5">Double-clic ou <Kbd>Entrée</Kbd> pour ouvrir la pièce.</span>
+                    </>
                   )} />
     ));
   }
