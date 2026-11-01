@@ -17,6 +17,18 @@ function estChiffre(v: unknown): v is Chiffre {
   return !!v && typeof v === 'object' && typeof (v as Chiffre).__enc === 'string';
 }
 
+/**
+ * Chiffrement au repos disponible ? Sous Linux, le moteur « basic_text » (pas de trousseau du bureau)
+ * utilise une clé fixe : il ne protège rien, on le considère comme indisponible.
+ */
+function chiffrementFiable(): boolean {
+  if (!safeStorage.isEncryptionAvailable()) return false;
+  if (process.platform === 'linux') {
+    try { return safeStorage.getSelectedStorageBackend() !== 'basic_text'; } catch { return false; }
+  }
+  return true;
+}
+
 function lire(key: string): unknown {
   const brut = store.get(key);
   if (!SECRET_KEYS.has(key)) return brut;
@@ -24,24 +36,28 @@ function lire(key: string): unknown {
     try { return JSON.parse(safeStorage.decryptString(Buffer.from(brut.__enc, 'base64'))); }
     catch { return undefined; } // trousseau changé / données corrompues → reconnexion
   }
-  // Migration : ancienne valeur en clair → réécrite chiffrée
+  // Ancienne valeur en clair : réécrite chiffrée si possible, sinon effacée du disque
+  // (elle reste utilisable pour cette session seulement, en mémoire).
   if (brut !== undefined) ecrire(key, brut);
   return brut;
 }
 
 function ecrire(key: string, value: unknown) {
-  if (SECRET_KEYS.has(key) && safeStorage.isEncryptionAvailable()) {
+  if (!SECRET_KEYS.has(key)) { store.set(key, value); return; }
+  if (chiffrementFiable()) {
     const enc = safeStorage.encryptString(JSON.stringify(value)).toString('base64');
     store.set(key, { __enc: enc } satisfies Chiffre);
   } else {
-    store.set(key, value);
+    // Jamais de jeton en clair sur le disque : la session n'est pas mémorisée (reconnexion au prochain lancement)
+    store.delete(key);
   }
 }
 
 /** N'accepte les IPC que de la fenêtre principale chargée depuis l'app (pas d'une page tierce). */
 function expediteurValide(e: IpcMainInvokeEvent): boolean {
   const url = e.senderFrame?.url ?? '';
-  return !!win && e.sender === win.webContents && (url.startsWith('file://') || url.startsWith('http://localhost:'));
+  const dev = process.env.NODE_ENV === 'development';
+  return !!win && e.sender === win.webContents && (url.startsWith('file://') || (dev && url.startsWith('http://localhost:')));
 }
 
 let win: BrowserWindow | null = null;
@@ -99,6 +115,14 @@ ipcMain.handle('store:set', (e, key: string, value: unknown) => {
 ipcMain.handle('store:delete', (e, key: string) => {
   if (!expediteurValide(e) || !STORE_KEYS.has(key)) return;
   store.delete(key);
+});
+
+// État de la protection locale de la session (écran Diagnostic).
+ipcMain.handle('securite:etat', (e) => {
+  if (!expediteurValide(e)) return null;
+  let moteur: string | undefined;
+  if (process.platform === 'linux') { try { moteur = safeStorage.getSelectedStorageBackend(); } catch { /* ignoré */ } }
+  return { chiffrement: chiffrementFiable(), plateforme: process.platform, moteur };
 });
 
 // Liste des imprimantes système (pour le réglage « imprimante ticket »).

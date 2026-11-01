@@ -30,6 +30,8 @@ declare global {
         ouvrirDossier: () => Promise<void>;
         pdf: (html: string, largeurMm: number, hauteurMm: number, nom: string) => Promise<string | null>;
       };
+      /** Protection locale de la session : chiffrement au repos (trousseau de l'OS) disponible ? */
+      securite?: () => Promise<{ chiffrement: boolean; plateforme: string; moteur?: string } | null>;
       /** Version de l'application installée (Electron uniquement). */
       version?: () => Promise<string>;
       /** Mises à jour automatiques (electron-updater, cf. electron/updater.ts). */

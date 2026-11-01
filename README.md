@@ -13,6 +13,7 @@ connectée à `sos-cloud-server` → agent PC → MariaDB. Portage moderne du de
 4. [docs/04-TODO.md](docs/04-TODO.md) — plan de travail par phases
 5. [docs/07-DEPLOIEMENT.md](docs/07-DEPLOIEMENT.md) — guide de déploiement (ordre cloud → agents → apps, recette, retour arrière)
 6. [docs/09-ANALYSE-UI-UX.md](docs/09-ANALYSE-UI-UX.md) — analyse critique UI/UX et plan de refonte (charte v2)
+7. [docs/10-ANALYSE-CONNEXION.md](docs/10-ANALYSE-CONNEXION.md) — analyse critique de la connexion (cloud Druxamed / agent local) et plan d'action
 
 ## Design
 - [app/src/styles/tokens.css](app/src/styles/tokens.css) — design tokens v2 en vigueur (clair/sombre) ; vitrine des composants dans l'app : *Configuration › Outils › Charte graphique* (`/outils/ui`)

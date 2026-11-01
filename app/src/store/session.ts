@@ -43,7 +43,21 @@ export type SessionState = {
   hydrate: () => Promise<void>;
 };
 
-const DEFAULT_CLOUD_URL = import.meta.env.VITE_CLOUD_URL || 'https://api.druxamed.com/graphql';
+const URL_CLOUD_OFFICIELLE = 'https://api.druxamed.com/graphql';
+
+/**
+ * URL de serveur cloud acceptable : HTTPS obligatoire (jetons et données ne doivent jamais circuler
+ * en clair). En développement seulement, `http://localhost` / `127.0.0.1` est toléré (serveur local).
+ */
+export function urlCloudValide(u: unknown, dev: boolean = import.meta.env.DEV): u is string {
+  if (typeof u !== 'string' || !u.trim()) return false;
+  let url: URL;
+  try { url = new URL(u); } catch { return false; }
+  if (url.protocol === 'https:') return true;
+  return dev && url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+}
+
+const DEFAULT_CLOUD_URL = urlCloudValide(import.meta.env.VITE_CLOUD_URL) ? import.meta.env.VITE_CLOUD_URL : URL_CLOUD_OFFICIELLE;
 
 const PERSIST_KEY = 'session';
 
@@ -66,7 +80,8 @@ export const useSession = create<SessionState>((set, get) => ({
   dossierUser: null,
   accessError: null,
 
-  setCloudUrl: (cloudUrl) => { set({ cloudUrl }); persist(get()); },
+  // URL non HTTPS refusée (hors développement local) : on garde la précédente
+  setCloudUrl: (cloudUrl) => { if (!urlCloudValide(cloudUrl)) return; set({ cloudUrl }); persist(get()); },
   setAuth: (token, agent) => { set({ token, agent, accessError: null }); persist(get()); },
   setDossier: (dossier) => { set({ dossier }); persist(get()); },
   setDossierUser: (dossierUser) => { set({ dossierUser }); persist(get()); },
@@ -82,7 +97,8 @@ export const useSession = create<SessionState>((set, get) => ({
     const saved = (await window.gc?.store.get(PERSIST_KEY)) as Partial<SessionState> | undefined;
     set({
       hydrated: true,
-      cloudUrl: saved?.cloudUrl || DEFAULT_CLOUD_URL,
+      // URL mémorisée non HTTPS (ancienne version, poste modifié) : retour au serveur officiel
+      cloudUrl: urlCloudValide(saved?.cloudUrl) ? saved!.cloudUrl! : DEFAULT_CLOUD_URL,
       token: saved?.token ?? null,
       agent: saved?.agent ?? null,
       dossier: saved?.dossier ?? null,

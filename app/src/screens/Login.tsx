@@ -3,10 +3,11 @@ import { useMutation, useLazyQuery } from '@apollo/client';
 import { LOGIN_IDENTIFY, LOGIN_WITH_AGENT, DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER, LOGIN_WITH_API_KEY } from '../api/auth';
 import { useSession, getDeviceId, AgentInfo, dossierUserDepuisLogin } from '../store/session';
 import { Button, IconButton } from '../components/ui/Button';
-import { Field, Select, TextInput, Textarea } from '../components/ui/Field';
+import { Field, Select, TextInput } from '../components/ui/Field';
 import { Alert } from '../components/ui/States';
 import { Badge } from '../components/ui/atoms';
 import { Icon, IconBadge } from '../components/ui/Icon';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 type Step = 'credentials' | 'agent' | 'dossier';
 
@@ -31,9 +32,12 @@ export default function Login() {
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentInfo | null>(null);
   const [needsForce, setNeedsForce] = useState(false);
+  // Confirmation explicite avant d'éjecter la session ouverte sur un autre poste
+  const [confirmerForce, setConfirmerForce] = useState(false);
   // Connexion alternative : code d'appairage copié depuis le tray de l'agent
   const [modeAppairage, setModeAppairage] = useState(false);
   const [codeAppairage, setCodeAppairage] = useState('');
+  const [voirCode, setVoirCode] = useState(false);
   // Affichage du mot de passe en clair (bouton œil)
   const [voirMdp, setVoirMdp] = useState(false);
 
@@ -67,6 +71,10 @@ export default function Login() {
       }
       const agent: AgentInfo = { agentId: code.a, label: code.a, isOnline: true };
       session.setAuth(res.access_token, agent);
+      // Le code contient la clé d'API : on ne le laisse ni à l'écran ni dans le presse-papiers
+      void viderPressePapiers(codeAppairage);
+      setCodeAppairage('');
+      setVoirCode(false);
       setSelectedAgent(agent);
       setStep('dossier');
       void loadDossiers();
@@ -257,9 +265,12 @@ export default function Login() {
             {step === 'credentials' && modeAppairage && (
               <form onSubmit={handleAppairage} className="flex flex-col gap-4">
                 <Field label="Code d’appairage" help="Dans l’agent de l’établissement, cliquez sur « Copier le code d’appairage », puis collez-le ici.">
-                  <Textarea className="money text-xs h-24" rows={4}
-                            value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
-                            placeholder='{"u":"…","k":"…","a":"…"}' />
+                  <TextInput size="lg" leading="lock" mono type={voirCode ? 'text' : 'password'}
+                             autoComplete="off" spellCheck={false}
+                             value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
+                             placeholder="Collez le code ici (Ctrl+V)"
+                             trailing={<IconButton icon={voirCode ? 'eyeOff' : 'eye'} size="xs" label={voirCode ? 'Masquer le code' : 'Afficher le code'}
+                                                   onClick={() => setVoirCode((v) => !v)} />} />
                 </Field>
                 <Button type="submit" variant="primary" size="lg" block loading={appairage} disabled={!codeAppairage.trim()} iconRight="arrowRight">
                   {appairage ? 'Connexion…' : 'Se connecter'}
@@ -314,7 +325,8 @@ export default function Login() {
                 <div className="flex gap-2 mt-3">
                   <Button icon="arrowLeft" onClick={() => setStep('credentials')} size="lg">Retour</Button>
                   <Button variant={needsForce ? 'danger-solid' : 'primary'} size="lg" block iconRight="arrowRight"
-                          onClick={() => handleConnectAgent(needsForce)} disabled={!selectedAgent} loading={connecting}>
+                          onClick={() => (needsForce ? setConfirmerForce(true) : void handleConnectAgent())}
+                          disabled={!selectedAgent} loading={connecting}>
                     {connecting ? 'Connexion…' : needsForce ? 'Forcer la connexion' : 'Continuer'}
                   </Button>
                 </div>
@@ -359,6 +371,30 @@ export default function Login() {
           <p className="text-center text-xs text-ink-muted mt-5">Besoin d’aide ? Contactez le support SOFTLY.</p>
         </div>
       </main>
+
+      {confirmerForce && (
+        <ConfirmDialog danger title="Forcer la connexion ?" confirmLabel="Forcer la connexion" cancelLabel="Annuler"
+                       loading={connecting}
+                       message={(
+                         <>
+                           <p>Une autre session utilise déjà <strong>{selectedAgent?.label || selectedAgent?.agentId}</strong>.</p>
+                           <p className="mt-2">Si vous continuez, ce poste sera <strong>déconnecté</strong> : une vente ou une saisie en cours y sera interrompue.</p>
+                         </>
+                       )}
+                       onCancel={() => setConfirmerForce(false)}
+                       onConfirm={() => { setConfirmerForce(false); void handleConnectAgent(true); }} />
+      )}
     </div>
   );
+}
+
+/**
+ * Vide le presse-papiers s'il contient encore le code d'appairage (clé d'API) qui vient d'être utilisé.
+ * Sans effet si l'utilisateur a copié autre chose entre-temps ou si l'accès est refusé.
+ */
+async function viderPressePapiers(code: string) {
+  try {
+    const actuel = await navigator.clipboard.readText();
+    if (actuel.trim() && actuel.trim() === code.trim()) await navigator.clipboard.writeText('');
+  } catch { /* presse-papiers inaccessible : rien à faire */ }
 }
