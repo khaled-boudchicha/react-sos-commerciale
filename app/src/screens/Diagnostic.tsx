@@ -31,6 +31,17 @@ export default function Diagnostic() {
   const dossierUser = useSession((s) => s.dossierUser);
   const [checks, setChecks] = useState<Check[]>([]);
   const [running, setRunning] = useState(false);
+  // Protection de la session sur ce poste (application de bureau uniquement)
+  const [protection, setProtection] = useState<string>('—');
+
+  useEffect(() => {
+    if (!window.gc?.securite) { setProtection('navigateur — non mémorisée'); return; }
+    window.gc.securite()
+      .then((r) => setProtection(!r ? '—' : r.chiffrement
+        ? 'chiffrée (coffre du système)'
+        : `non mémorisée — chiffrement indisponible${r.moteur ? ` (${r.moteur})` : ''}`))
+      .catch(() => setProtection('—'));
+  }, []);
 
   const lancer = useCallback(async () => {
     setRunning(true);
@@ -145,10 +156,11 @@ export default function Diagnostic() {
       </Card>
 
       <Card>
-        <DescriptionList columns={3} items={[
+        <DescriptionList columns={4} items={[
           { label: 'Agent associé', value: agent?.label ?? agent?.agentId ?? '—' },
           { label: 'Dossier', value: dossier ?? '—' },
           { label: 'Utilisateur du dossier', value: dossierUser?.username ?? '—' },
+          { label: 'Session sur ce poste', value: protection },
         ]} />
       </Card>
     </div>

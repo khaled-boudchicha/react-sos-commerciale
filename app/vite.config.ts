@@ -4,15 +4,15 @@ import { fileURLToPath } from 'node:url';
 
 // Content-Security-Policy du renderer, injectée uniquement au build (le serveur
 // de dev Vite a besoin de scripts inline pour le HMR). `file:` couvre le
-// chargement Electron (loadFile) ; connect-src reste ouvert car l'URL du
-// serveur cloud est configurable par l'utilisateur.
+// chargement Electron (loadFile). connect-src : HTTPS uniquement (le serveur cloud
+// est toujours en https:, cf. store/session.ts) ; polices embarquées, aucun domaine tiers.
 const CSP = [
   "default-src 'self'",
   "script-src 'self' file:",
-  "style-src 'self' file: 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' file: data: https://fonts.gstatic.com",
+  "style-src 'self' file: 'unsafe-inline'",
+  "font-src 'self' file: data:",
   "img-src 'self' file: data: blob: https:",
-  "connect-src 'self' https: http:",
+  "connect-src 'self' https:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'none'",

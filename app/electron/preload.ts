@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('gc', {
   printSilent: (html: string, opts?: { deviceName?: string; silent?: boolean }) =>
     ipcRenderer.invoke('print:silent', html, opts ?? {}),
   version: () => ipcRenderer.invoke('app:version'),
+  securite: () => ipcRenderer.invoke('securite:etat'),
   modeles: {
     dossier: () => ipcRenderer.invoke('modeles:dossier'),
     liste: () => ipcRenderer.invoke('modeles:liste'),

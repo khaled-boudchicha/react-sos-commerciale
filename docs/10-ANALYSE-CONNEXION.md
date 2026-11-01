@@ -496,6 +496,16 @@ local des connexions LAN (poste, utilisateur, heure) remonté au cloud par le he
 | `expediteurValide` strict en prod | S | nul | IPC refusé depuis une URL `http://localhost` en prod |
 | Activer `exiger_jeton_utilisateur` sur les agents (côté exploitation) | S | mobile non à jour bloqué | commande sans `X-Druxamed-User` refusée (déjà couvert par l'e2e `:52`) |
 
+**État d'avancement (01/11/2026) — partie application livrée :**
+
+- ✅ Polices embarquées (`@fontsource`, aucun appel à Google Fonts) ; CSP de production `connect-src 'self' https:`, `font-src 'self' file: data:`.
+- ✅ URL cloud validée (`urlCloudValide`, `store/session.ts`) : `https:` seule en production, `http://localhost` / `127.0.0.1` tolérés en développement ; une valeur invalide (variable d'environnement ou session mémorisée) retombe sur l'URL officielle. Tests : `src/__tests__/securite.test.ts`.
+- ✅ Jetons : plus aucune écriture en clair. Sans chiffrement fiable (`safeStorage` indisponible ou moteur Linux `basic_text`), la session n'est pas mémorisée (reconnexion au lancement) ; une ancienne session en clair est rechiffrée ou purgée. L'état s'affiche dans `/diagnostic` (« Session sur ce poste »), via l'IPC `securite:etat`.
+- ✅ `expediteurValide` : `http://localhost` accepté seulement si `NODE_ENV=development`.
+- ✅ Code d'appairage masqué (bouton œil), effacé du champ et du presse-papiers après succès (si le presse-papiers contient encore ce code).
+- ✅ « Forcer la connexion » : fenêtre de confirmation (danger, focus sur « Annuler ») nommant l'établissement et prévenant que l'autre poste sera déconnecté. *Le nom du poste concurrent (`deviceName`) n'est pas renvoyé par le cloud aujourd'hui : à ajouter côté serveur.*
+- ⏳ Hors application : signature Authenticode + `publisherName` (achat du certificat), restriction de la clé SSH de CI, activation de `exiger_jeton_utilisateur` sur les agents (exploitation).
+
 ### Lot 1 — Résilience (effort M, 3–5 semaines, app + agent)
 | Action | Effort | Risque | Recette |
 |---|---|---|---|
