@@ -15,6 +15,7 @@ connectée à `sos-cloud-server` → agent PC → MariaDB. Portage moderne du de
 6. [docs/09-ANALYSE-UI-UX.md](docs/09-ANALYSE-UI-UX.md) — analyse critique UI/UX et plan de refonte (charte v2)
 7. [docs/10-ANALYSE-CONNEXION.md](docs/10-ANALYSE-CONNEXION.md) — analyse critique de la connexion (cloud Druxamed / agent local) et plan d'action
 8. [docs/11-CAHIER-DES-CHARGES-AGENT-CLOUD.md](docs/11-CAHIER-DES-CHARGES-AGENT-CLOUD.md) — cahier des charges agent / tray / cloud : idempotence, sessions et appairage, mode LAN
+9. [docs/12-DEMANDES-AGENT-CLOUD.md](docs/12-DEMANDES-AGENT-CLOUD.md) — **demandes en attente** côté agent / tray / cloud / exploitation, par priorité, et questions à trancher
 
 ## Design
 - [app/src/styles/tokens.css](app/src/styles/tokens.css) — design tokens v2 en vigueur (clair/sombre) ; vitrine des composants dans l'app : *Configuration › Outils › Charte graphique* (`/outils/ui`)

@@ -401,3 +401,8 @@ export const ADD_LOT = gql`
   }
 `;
 export const DELETE_LOT = gql`mutation DeleteLot($lot_id: Int!) { deleteLot(lot_id: $lot_id) }`;
+
+// ─── Partagées (anciennement dupliquées dans plusieurs écrans) ───────────────────
+/** Modes de paiement du dossier (éditeurs de pièces, règlement d'une pièce). */
+export const MODES_PAYEMENT = gql`query ModesPayement { modesPayement }`;
+export const TRANSFERT_COMPTE = gql`mutation TransfertCompte($input: JSON!) { transfertCompte(input: $input) }`;

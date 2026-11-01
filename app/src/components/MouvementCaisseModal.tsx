@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
-import { SOLDES_COMPTES, REFERENTIELS } from '../api/queries';
+import { SOLDES_COMPTES, REFERENTIELS, TRANSFERT_COMPTE } from '../api/queries';
 import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
 import { useToast } from './ui/Toast';
@@ -13,7 +13,6 @@ import type { IconName, Tone } from './ui/Icon';
 
 const ADD_ENCAISSEMENT = gql`mutation AddEncaissement($input: JSON!) { addEncaissement(input: $input) }`;
 const ADD_DECAISSEMENT = gql`mutation AddDecaissement($input: JSON!) { addDecaissement(input: $input) }`;
-const TRANSFERT_COMPTE = gql`mutation TransfertCompte($input: JSON!) { transfertCompte(input: $input) }`;
 
 export type MouvementKind = 'encaissement' | 'decaissement' | 'transfert';
 

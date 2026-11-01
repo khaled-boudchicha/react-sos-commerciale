@@ -26,7 +26,7 @@ export const VALIDITE_REFERENTIELS_MS = 7 * 24 * 3600_000;
 export const VALIDITE_ARTICLES_MS = 24 * 3600_000;
 
 /** Lectures servies telles quelles (réponse complète) quand le serveur est injoignable. */
-const REPONSES_COMPLETES = new Set(['Referentiels', 'CoordonneesSociete', 'SousFamilles', 'Rayons']);
+const REPONSES_COMPLETES = new Set(['Referentiels', 'CoordonneesSociete', 'SousFamilles', 'Rayons', 'ModesPayement']);
 /** Lectures d'articles : alimentent l'index local et sont rejouées dessus hors ligne. */
 const RECHERCHE_ARTICLES = new Set(['Articles']);
 const ARTICLE_PAR_CODE_BARRE = new Set(['ArticleParCodeBarre', 'ArticleParCodeBarreComptoir']);

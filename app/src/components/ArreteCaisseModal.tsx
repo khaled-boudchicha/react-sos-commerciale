@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { gql, useMutation, useQuery } from '@apollo/client';
-import { ARRETE_CAISSE, CLOTURER_CAISSE, SOLDES_COMPTES, COORDONNEES_SOCIETE } from '../api/queries';
+import { useMutation, useQuery } from '@apollo/client';
+import { ARRETE_CAISSE, CLOTURER_CAISSE, SOLDES_COMPTES, COORDONNEES_SOCIETE, TRANSFERT_COMPTE } from '../api/queries';
 import { SoldeCompte } from '../api/types';
 import { fmtMoney, isoToday } from '../lib/format';
 import { useSession } from '../store/session';
@@ -19,7 +19,6 @@ import { Alert, Loading } from './ui/States';
 import { Money } from './ui/atoms';
 import type { Tone } from './ui/Icon';
 
-const TRANSFERT_COMPTE = gql`mutation TransfertCompte($input: JSON!) { transfertCompte(input: $input) }`;
 
 /**
  * Arrêté de caisse d'une journée : solde d'ouverture, entrées/sorties par mode,

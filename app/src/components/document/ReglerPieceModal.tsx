@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { gql, useMutation, useQuery } from '@apollo/client';
-import { ADD_REGLEMENT_CLIENT, ADD_REGLEMENT_FOURNISSEUR, SOLDES_COMPTES } from '../../api/queries';
+import { ADD_REGLEMENT_CLIENT, ADD_REGLEMENT_FOURNISSEUR, SOLDES_COMPTES, MODES_PAYEMENT } from '../../api/queries';
 import { useSession } from '../../store/session';
 import { useDroits } from '../../lib/droits';
 import { fmtMoney, isoToday } from '../../lib/format';
@@ -9,9 +9,6 @@ import { Button } from '../ui/Button';
 import { Field, Select, TextInput } from '../ui/Field';
 import { Alert } from '../ui/States';
 
-const MODES = gql`
-  query ModesPayementPiece { modesPayement }
-`;
 
 /**
  * Règlement ciblé d'une pièce (sans lettrage FIFO, contrairement à
@@ -50,7 +47,7 @@ export default function ReglerPieceModal({ sens, pieceId, numero, reste, onClose
       setCompteId(comptes[0] ? String(comptes[0].compte_id) : '');
     }
   }, [soldesData, comptes, compteId]);
-  const { data: refs } = useQuery(MODES);
+  const { data: refs } = useQuery(MODES_PAYEMENT);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
   const [ajouter, { loading }] = useMutation(sens === 'vente' ? ADD_REGLEMENT_CLIENT : ADD_REGLEMENT_FOURNISSEUR);
   const verbe = sens === 'vente' ? 'Encaisser' : 'Payer';
