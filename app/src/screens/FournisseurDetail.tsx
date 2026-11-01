@@ -13,7 +13,7 @@ import { Alert, Skeleton } from '../components/ui/States';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeEtatFournisseur } from '../impression/demandes';
-import type { EtatFournisseurSolde, EtatFournisseurLigne } from '../print/templates/etatFournisseur';
+import type { EtatFournisseurSolde, EtatFournisseurLigne } from '../impression/donnees';
 import ReglerTiersModal from '../components/ReglerTiersModal';
 import AvancesPanel from '../components/AvancesPanel';
 

@@ -1,52 +1,84 @@
 # Impression — architecture et modèles
 
-> Documentation développeur complète : [`app/src/print/README.md`](../app/src/print/README.md).
-> Ce document résume l'architecture pour le dossier projet.
+> État au 1er novembre 2026. Documentation développeur du moteur : [`packages/report/README.md`](../packages/report/README.md).
+> Ancien moteur HTML (aperçu Paged.js) : [`app/src/print/README.md`](../app/src/print/README.md), encore utilisé pour deux cas (voir § 5).
 
-## Principe
+## 1. Principe
 
-Un seul moteur générique, des modèles par domaine :
+Toutes les impressions de l'application passent par le **moteur d'états `@softly/report`** (paquet du dépôt, `packages/report`),
+un générateur façon FastReport :
 
 ```
-Écran ──buildXxxPrint(données, societe)──▶ PrintDocument { title, html, css }
-                                              │
-                                              ▼
-                              <PrintPreview doc={…} onClose={…}/>
-                                              │
-                              IFRAME isolée (srcDoc) ── aucun conflit avec le CSS de l'app
-                                              │
-                              Paged.js (polyfill DANS l'iframe)
-                              → pagination @page A4, compteur « Page n / N »,
-                                référence du doc en marge basse (string-set),
-                                lignes insécables, thead répétés
-                                              │
-                              postMessage 'paged:rendered' → bouton Imprimer/PDF actif
-                                              │
-                              iframe.contentWindow.print() → dialogue natif
-                              (imprimante ou « Enregistrer en PDF »)
+Écran ── demandeXxx(données, société) ──▶ DemandeImpression { kind, data, titre, modele? }
+                                               │
+                         ImprimerDocument : choix du modèle
+                         (imposé par la demande › défaut de l'utilisateur › premier modèle livré)
+                                               │
+                    ┌──────────────────────────┴──────────────────────────┐
+                    ▼                                                     ▼
+     Aperçu (ReportPreview, chargé à la demande)            Impression directe (tickets)
+     zoom, miniatures, pages, « Modifier le modèle »         documentDeDemande → imprimerSilencieux
+     → Imprimer · PDF · HTML                                  → Electron print:silent (imprimante ticket)
 ```
 
-- **Isolation iframe** : le thème/Tailwind de l'app n'atteint jamais le document, et le CSS du modèle ne fuit pas dans l'app (exigence : zéro conflit).
-- **Polyfill embarqué** : `public/vendor/paged.polyfill.js`, synchronisé depuis node_modules par le script npm `sync:pagedjs` (exécuté au build) — l'export map du package pagedjs n'autorise pas l'import direct du dist.
-- **Hors-ligne** : tout est local (polyfill vendorisé) ; les Google Fonts de l'iframe retombent sur `system-ui` sans réseau.
+- **Modèles `.gcr`** : JSON versionné, unités en millimètres, bandes (en-tête, détail, groupes, pied…), objets (texte,
+  image, code-barres, ligne, cadre), langage d'expressions sans `eval` (agrégats, formats, fonctions).
+- **Pagination exacte** : en-têtes répétés, groupes, tickets à hauteur continue, formats A4 / A5 / 80 mm / 58 mm / paysage.
+- **Types de documents** déclarés par l'application (`app/src/impression/types.ts`, 17 types : pièce de vente, pièce
+  d'achat, articles, relevés client / fournisseur, impayés, créances, recouvrement, trésorerie, arrêté de caisse, bon de
+  stock, bordereau, journal, inventaire, État 104, tickets…) avec leurs jeux de données et un exemple pour le designer.
+- **Fonction métier** `ARRETE(montant)` : « Arrêtée la présente facture à la somme de … » (`lib/enLettres.ts`).
+- **Chargement** : le moteur sans interface (`@softly/report/core`) est chargé au démarrage ; l'aperçu, le designer et
+  la bibliothèque ne sont chargés qu'à la première impression (`impression/ImpressionModeleDiffere.tsx`).
 
-## Modèles disponibles
+## 2. Modèles livrés (33, lecture seule)
 
-| Modèle | Fichier | Écran(s) branché(s) |
+Déclarés dans `app/src/impression/modelesIntegres.ts`. Pour un même type, le **premier** est proposé par défaut ;
+l'utilisateur peut en choisir un autre comme défaut, ou **dupliquer** un modèle livré pour le modifier dans le designer.
+
+| Famille | Fichier | Modèles |
 |---|---|---|
-| Pièce de **vente** (FA/BL/BCT/BC/FP/avoir/retour) | `app/src/print/templates/vente.tsx` | Fiche vente (`/ventes/:id`) |
-| Pièce d'**achat** (FA/BR/BC/DO/avoir/retour) | `app/src/print/templates/achat.tsx` | Fiche achat (`/achats/:id`) |
-| **État / relevé client** (chronologie + solde cumulé + synthèse) | `app/src/print/templates/etatClient.tsx` | Fiche client (`/tiers/client/:code`) |
-| Blocs partagés + CSS de base A4 | `app/src/print/templates/partials.tsx` | — |
+| Pièces (9) | `modelesPieces.ts` | Facture A4 Moderne / Classique / Prestige, BL A4, BL avec lot et péremption, BL sans prix, bon de comptoir A5, pièce d'achat Moderne / Classique |
+| Tickets (4) | `modelesTickets.ts` | Ticket 80 mm, ticket 58 mm, ticket « articles / familles vendus », reçu de transfert d'espèces |
+| États (17) | `modelesEtats.ts` | Relevés client et fournisseur (moderne, classique), impayés, créances, recouvrement, trésorerie, arrêté de caisse, état du stock, bon de stock, inventaire (état chiffré, feuille de comptage), bordereau, journaux des ventes / achats, État 104 |
+| Étiquettes (3) | `modelesEtiquettes.ts` | Étiquettes de prix 2, 3 ou 4 colonnes sur A4 (code-barres) |
 
-Chaque modèle est une fonction pure `(données, societe) → PrintDocument` rendue via `renderToStaticMarkup` — voir le README pour en ajouter un (relevé fournisseur, ticket 80 mm via `@page { size: 80mm auto }`, bordereau, inventaire…).
+Le kit `impression/kit.ts` fournit les briques communes (en-tête société, cadre tiers, tableau, totaux, signatures, thèmes).
 
-## Validé E2E (25/08/2026, stack locale, données réelles)
+## 3. Modèles personnels et stockage
 
-- BL `1008/2026` (15 lignes, lots) → 1 page, aperçu conforme, bouton Imprimer/PDF actif.
-- Relevé client 131 (UMC LAB, historique long) → **2 pages** : pied de page « Relevé client N° 131 » + « Page 1/2 », coupure propre entre pages, lignes insécables.
+- **Application de bureau** : fichiers `.gcr` dans `Documents/Gestion Commerciale/Modeles` (IPC `modeles:*` de
+  `electron/modeles.ts` : liste, lecture, écriture, suppression, import, export, ouverture du dossier). Noms de fichiers
+  validés, contenu vérifié (`format: 'gcr'`) avant écriture.
+- **Navigateur (développement)** : `localStorage`, espace de noms `gc.modeles`.
+- Écran **Paramètres › Modèles d'impression** (`/modeles`) : bibliothèque avec miniatures, aperçu, duplication, import /
+  export, modèle par défaut. Accès soumis au droit « Paramètres ».
 
-## Pièges connus
+## 4. Sorties
 
-- La pagination utilise le rendu du navigateur : dans un onglet/panneau **masqué**, Chromium throttle le travail → la mise en page peut sembler bloquée tant que la fenêtre n'est pas visible (sans conséquence en usage réel Electron).
-- Ne jamais remettre de règles `@media print` globales dans le CSS de l'app : l'impression passe uniquement par l'iframe.
+| Sortie | Mise en œuvre | Remarques |
+|---|---|---|
+| Impression avec dialogue | aperçu › « Imprimer » (iframe isolée) | CSS de l'application jamais appliqué au document |
+| **PDF** | IPC `modeles:pdf` → `webContents.printToPDF` | page à la taille exacte du modèle, marges nulles (Electron 44 : `margins` à 0) ; testé (`npm run test:electron`) |
+| **Impression directe** (tickets) | IPC `print:silent` → imprimante ticket choisie dans Paramètres (`gc.imprimanteTicket`) | sans aperçu ni dialogue ; ☐ à valider sur Windows avec une imprimante thermique |
+| HTML | aperçu › « HTML » | pour archivage ou envoi |
+| Liste des imprimantes | IPC `printers:list` | imprimante par défaut déduite des options système (Electron 44) |
+
+## 5. Ancien moteur HTML (`app/src/print`)
+
+Encore utilisé pour :
+
+- l'export **PDF / Imprimer des grilles** (menu « Exporter » : `components/grille/exportGrille.ts` › `PrintPreview`, Paged.js
+  vendorisé dans `public/vendor/paged.polyfill.js`, synchronisé par `npm run sync:pagedjs`) ;
+- les **modèles « du desktop (Delphi) »** proposés à côté des modèles du moteur dans « Imprimer la pièce »
+  (`components/document/ImprimerPieceDialog.tsx` › `print/templates/venteModeles.tsx`).
+
+Les anciens gabarits HTML des autres documents ont été **supprimés** (novembre 2026) : leurs formes de données sont
+dans `app/src/impression/donnees.ts`.
+
+## 6. Pièges connus
+
+- Ne jamais ajouter de règles `@media print` globales au CSS de l'application : l'impression passe par l'iframe du document.
+- Dans un onglet ou une fenêtre **masqué**, Chromium ralentit la mise en page de l'ancien moteur (Paged.js) : sans
+  conséquence en usage réel.
+- État 104 en paysage : contrôle visuel de l'impression physique à faire (voir `04-TODO.md`).

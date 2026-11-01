@@ -16,7 +16,7 @@ import ImprimerDocument from '../../impression/ImprimerDocument';
 import { documentDeDemande } from '../../impression';
 import { demandeTicket, type DemandeImpression } from '../../impression/demandes';
 import { getImprimanteTicket, imprimerSilencieux, supporteImpressionDirecte } from '../../print/engine/silentPrint';
-import type { TicketExtras } from '../../print/templates/ticket';
+import type { TicketExtras } from '../../impression/donnees';
 import { D, useDroits } from '../../lib/droits';
 import { fmtMoney, fmtQte, isoToday } from '../../lib/format';
 import { useHotkeys } from '../../lib/useHotkeys';

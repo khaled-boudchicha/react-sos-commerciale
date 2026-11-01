@@ -25,7 +25,7 @@ const PAGEDJS_POLYFILL = 'vendor/paged.polyfill.js';
  *
  * Usage (voir src/print/README.md) :
  *   const [doc, setDoc] = useState<PrintDocument | null>(null);
- *   <button onClick={() => setDoc(buildVentePrint(vente, societe))}>Imprimer</button>
+ *   <button onClick={() => setDoc(buildVenteModelePrint(vente, societe, modele))}>Imprimer</button>
  *   {doc && <PrintPreview doc={doc} onClose={() => setDoc(null)} />}
  */
 

@@ -1,29 +1,8 @@
-/** Bibliothèque des modèles d'impression — voir src/print/README.md. */
-export { buildVentePrint } from './vente';
-export { buildTicketPrint } from './ticket';
-export { buildAchatPrint } from './achat';
-export { buildEtatClientPrint } from './etatClient';
-export { buildEtatFournisseurPrint } from './etatFournisseur';
-export { buildFacturesNonRegleesPrint } from './facturesNonReglees';
-export { buildDebiteursPrint } from './debiteurs';
-export { buildTresoreriePrint } from './tresorerie';
-export { buildStockPrint } from './stock';
-export { buildBordereauPrint } from './bordereau';
-export type { BordereauLigne } from './bordereau';
-export { buildJournalPrint } from './journal';
-export type { JournalLigne } from './journal';
-export { buildInventairePrint } from './inventaire';
+/**
+ * Anciens modèles HTML encore utilisés : modèles « du desktop (Delphi) » des pièces de vente (dialogue « Imprimer la
+ * pièce ») et blocs partagés (export PDF des grilles). Tous les autres états passent par le moteur `@softly/report`
+ * (`src/impression`, voir docs/05-IMPRESSION.md).
+ */
 export type { Societe } from './partials';
-export { buildArreteCaissePrint } from './arreteCaisse';
-export type { ArreteCaisseData, ArreteCaisseMouvement } from './arreteCaisse';
-export { buildBonStockPrint } from './bonStock';
-export type { BonStock, BonStockLigne } from './bonStock';
-export { buildRecouvrementPrint } from './recouvrement';
-export type { RecouvrementLigne, RecouvrementTotaux } from './recouvrement';
-export { buildEtat104Print } from './etat104';
-export type { Etat104Ligne, Etat104Totaux } from './etat104';
 export { buildVenteModelePrint, MODELES_VENTE, modelesPour } from './venteModeles';
 export type { ModeleVenteId, ModeleVente, OptionsImpression } from './venteModeles';
-export { buildTicketVentesPrint } from './ticketVentes';
-export type { TicketVentesLigne } from './ticketVentes';
-export { buildRecuTransfertPrint } from './recuTransfert';
