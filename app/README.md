@@ -12,6 +12,7 @@ npm run dist       # installeur plateforme courante (NSIS / DMG / AppImage+deb)
 npm test           # tests unitaires (vitest)
 npm run lint:ui    # garde-fou de la charte graphique
 npm run test:ui    # parcours d'interface : build de production + GraphQL simulé (Playwright)
+npm run test:electron  # application de bureau réelle (Electron) ; Linux sans écran : xvfb-run -a npm run test:electron
 npm run test:e2e   # chaîne complète app → cloud → agent → base (dossier gc_test… uniquement)
 ```
 
@@ -38,3 +39,10 @@ l'image CI `mcr.microsoft.com/playwright`) ; en local, `npx playwright install c
 - `src/styles/tokens.css` — design tokens (source : `../design/tokens.css`, ne pas hardcoder de hex ailleurs)
 
 Design & specs : voir `../docs/` et les maquettes `../design/maquettes.html`.
+
+### Application de bureau (`e2e/electron/`)
+Lance le **vrai Electron** sur le build de production, dans un profil isolé (`XDG_CONFIG_HOME` temporaire) :
+écran de connexion servi en `file://`, pont `window.gc` limité (pas de `require` / `process` dans l'écran),
+stockage restreint aux clés autorisées, **session jamais écrite en clair** sur le disque, CSP de production
+(requête `http` bloquée), lien externe ouvert dans le navigateur du système (intercepté pendant le test),
+**rechargement automatique après un plantage de l'écran**, taille de fenêtre retrouvée au lancement suivant.

@@ -53,6 +53,16 @@ ui:
   script:
     - npm run test:ui
 
+# Application de bureau réelle (Electron sous écran virtuel) : sécurité du pont, stockage, CSP,
+# rechargement après plantage, fenêtre. Non bloquant tant qu'il n'a pas tourné sur GitLab.
+electron:
+  stage: check
+  image: mcr.microsoft.com/playwright:v1.63.0-noble
+  <<: *npm
+  allow_failure: true
+  script:
+    - xvfb-run -a npm run test:electron
+
 # Aligne la version de l'app sur le tag puis construit ; l'URL de mise à jour
 # n'est injectée que si GC_UPDATE_URL est défini.
 .build: &build
