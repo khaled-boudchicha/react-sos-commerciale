@@ -56,7 +56,7 @@
   --info-solid:    #0E7490; --info-text:    #0E7490; --info-soft:    #E0F5FA; --info-line:    #9ADCEB;
   --teal-solid:    #14B8A6; --teal-text:    #0F766E; --teal-soft:    #E4F7F4; --teal-line:    #99DED4;
   --violet-solid:  #8B5CF6; --violet-text:  #6D28D9; --violet-soft:  #F1EBFD; --violet-line:  #CDB8F7;
-  --orange-solid:  #F97316; --orange-text:  #C2410C; --orange-soft:  #FEF0E5; --orange-line:  #F3B58C;
+  --orange-solid:  #F97316; --orange-text:  #A8380C; /* AA (≥ 4,5:1) aussi sur les fonds teintés des palettes (Sauge…) */ --orange-soft:  #FEF0E5; --orange-line:  #F3B58C;
   --neutral-solid: #5F6D87; --neutral-text: #42536F; --neutral-soft: #EDF1F8; --neutral-line: #C9D3E4;
   --brand-solid:   #2450E0;
 
@@ -183,6 +183,7 @@
   --focus-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-300);
 
   --pos-ok-text:     #86EFAC;
+  --pos-return-deep: #FDBA74;   /* texte « retour » lisible sur fond sombre */
   --pos-return-soft: #2A1709;
   --pos-return-line: #7C3514;
 }

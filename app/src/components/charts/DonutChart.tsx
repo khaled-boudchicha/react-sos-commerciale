@@ -32,7 +32,8 @@ export default function DonutChart({ data, format, titreCentre = 'Total', max = 
 
   return (
     <div className="flex items-center gap-5 flex-wrap">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" style={{ flex: 'none' }}>
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" style={{ flex: 'none' }}
+           aria-label={`Répartition : ${items.map((it) => `${it.label} ${format(it.value)}`).join(', ') || 'aucune donnée'}`}>
         <circle cx={C} cy={C} r={R} fill="none" stroke="var(--line-soft)" strokeWidth={STROKE} />
         {segments.map((s) => (
           <circle key={s.i} cx={C} cy={C} r={R} fill="none"

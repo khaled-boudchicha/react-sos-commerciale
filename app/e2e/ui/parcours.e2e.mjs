@@ -58,21 +58,37 @@ describe('navigation', () => {
   });
 });
 
-describe('accessibilité (axe-core, WCAG 2 A / AA)', () => {
+describe('accessibilité (axe-core, WCAG 2 A / AA), thèmes clair et sombre', () => {
   const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
-  for (const [nom, route, session] of [
-    ['tableau de bord', '/', true], ['liste des ventes', '/ventes?type=FA', true], ['comptoir', '/comptoir', true],
-    ['éditeur de facture', '/ventes/nouvelle?type=FA', true], ['diagnostic', '/diagnostic', true], ['connexion', '/', false],
-  ]) {
-    test(`${nom} : aucune violation`, async () => {
-      const page = await ouvrir(navigateur, { route, gql: serveur(), ...(session ? {} : { session: null }) });
-      // Injecté par le protocole du navigateur : la CSP de l'app interdit (à raison) les scripts en ligne
-      await page.evaluate(AXE);
-      const violations = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))
-        .violations.map((v) => `${v.id} (${v.impact}) : ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')}`));
-      assert.deepEqual(violations, []);
-      await page.context().close();
-    });
+  // Données minimales pour que chaque écran affiche son contenu réel (tableaux, onglets, graphiques)
+  const donnees = serveur({
+    Ventes: { ventes: { data: [{ id: 1, numero: 'FA-0001', type_doc: 'FA', date: '2026-11-01', raison: 'Client A', net_a_payer: 1200, regler: 0, reste_a_payer: 1200 }], total: 1 } },
+    Achats: { achats: { data: [], total: 0 } },
+    Clients: { clients: { data: [{ id: 1, code: 'C01', nom: 'Client A', solde: 100 }], total: 1 } },
+    Referentiels: { familles: [{ id: 1, code: 'ANT', designation: 'Antalgiques' }], depots: [], banques: [], modesPayement: ['Espece'], tauxTVA: [19], unitesMesure: [] },
+    SoldesComptes: { soldesComptes: [{ compte_id: 4, compte: 'CAISSE 1', solde: 1000 }] },
+    DossierUsers: { dossierUsers: [{ id: 1, username: 'caisse1', typeuser: 'user' }] },
+  });
+  const ECRANS = [
+    ['tableau de bord', '/'], ['ventes', '/ventes?type=FA'], ['achats', '/achats'], ['stock', '/stock'], ['tiers', '/tiers'],
+    ['échéances', '/echeances'], ['trésorerie', '/tresorerie'], ['statistiques', '/statistiques'], ['référentiels', '/referentiels'],
+    ['paramètres', '/parametres'], ['utilisateurs', '/parametres/utilisateurs'], ['mouvements de stock', '/stock/mouvements'],
+    ['inventaires', '/stock/inventaires'], ['comptoir', '/comptoir'], ['éditeur de facture', '/ventes/nouvelle?type=FA'],
+    ['éditeur d’achat', '/achats/nouvelle?type=BR'], ['diagnostic', '/diagnostic'], ['connexion', null],
+  ];
+  for (const theme of ['light', 'dark']) {
+    for (const [nom, route] of ECRANS) {
+      test(`${nom} (${theme === 'light' ? 'clair' : 'sombre'}) : aucune violation`, async () => {
+        const page = await ouvrir(navigateur, { route: route ?? '/', gql: donnees, theme, ...(route ? {} : { session: null }) });
+        // Injecté par le protocole du navigateur : la CSP de l'app interdit (à raison) les scripts en ligne
+        await page.evaluate(AXE);
+        const violations = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))
+          .violations.map((v) => `${v.id} (${v.impact}) : ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')}`));
+        assert.deepEqual(violations, []);
+        assert.deepEqual(page.erreurs, []);
+        await page.context().close();
+      });
+    }
   }
 });
 

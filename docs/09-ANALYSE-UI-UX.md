@@ -225,7 +225,7 @@ Règle : `*-solid` = aplat sous `--text-inverse` ; `*-text` = texte/icône sur s
 | | soft | `#E4F7F4` | `#0F2A27` | |
 | violet | text | `#6D28D9` | `#A78BFA` | 7,1 · 6,1 / 6,4 · 6,1 |
 | | soft | `#F1EBFD` | `#221A38` | |
-| orange | text | `#C2410C` | `#FB923C` | 5,18 · 4,64 / 7,7 · 7,1 |
+| orange | text | `#A8380C` (01/11/2026, était `#C2410C` : 4,43:1 sur le fond Sauge) | `#FB923C` | ≥ 4,5 sur tous les fonds de palette / 7,7 · 7,1 |
 | | soft | `#FEF0E5` | `#2E1D10` | |
 | neutral | text | `#42536F` | `#B7C3D9` | badge FP, « Brouillon » |
 | | soft | `#EDF1F8` | `#1C2942` | |

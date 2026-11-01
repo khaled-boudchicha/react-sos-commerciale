@@ -33,7 +33,7 @@ export const lancerNavigateur = () => chromium.launch();
  * simulé : `gql(operationName, variables)` renvoie `data`, ou `{ panne: true }` (connexion refusée),
  * ou `{ http: 503 }`, ou `{ erreurs: [...] }`.
  */
-export async function ouvrir(navigateur, { route = '/', session = SESSION, droits, gql = () => null, viewport = { width: 1366, height: 800 } } = {}) {
+export async function ouvrir(navigateur, { route = '/', session = SESSION, droits, gql = () => null, viewport = { width: 1366, height: 800 }, theme = 'light' } = {}) {
   const contexte = await navigateur.newContext({ viewport });
   const page = await contexte.newPage();
   page.erreurs = [];
@@ -51,10 +51,10 @@ export async function ouvrir(navigateur, { route = '/', session = SESSION, droit
     return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: rep ?? null }) });
   });
   const s = session ? { ...session, dossierUser: { ...session.dossierUser, ...(droits ? { droits } : {}) } } : undefined;
-  await page.addInitScript((sess) => {
-    const store = { session: sess, theme: 'light', navigation: { disposition: 'lateral' } };
+  await page.addInitScript(([sess, theme]) => {
+    const store = { session: sess, theme, navigation: { disposition: 'lateral' } };
     window.gc = { platform: 'linux', store: { get: async (k) => store[k], set: async () => {}, delete: async () => {} } };
-  }, s);
+  }, [s, theme]);
   await page.goto(`${BASE}#${route}`);
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(600);

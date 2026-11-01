@@ -21,8 +21,8 @@ simulé : aucun agent ni donnée réelle. Couvrent la navigation (écrans charg�
 expirée, l'appairage par fichier, le comptoir (Internet coupé, réponse perdue sans doublon même après
 rechargement, Ctrl+Q, recherche hors ligne depuis le cache), les droits (PMP / marges masqués), la garde de
 saisie, les erreurs de liste avec « Réessayer », les brouillons de pièces, le rapport de diagnostic, et un
-audit d'accessibilité **axe-core** (WCAG 2 A / AA) sur le tableau de bord, les ventes, le comptoir, l'éditeur de
-facture, le diagnostic et la connexion : aucune violation tolérée. Navigateur : celui de `playwright` (même version que
+audit d'accessibilité **axe-core** (WCAG 2 A / AA) sur 18 écrans (listes, éditeurs, comptoir, trésorerie,
+statistiques, paramètres, connexion…) en thèmes **clair et sombre** : aucune violation tolérée. Navigateur : celui de `playwright` (même version que
 l'image CI `mcr.microsoft.com/playwright`) ; en local, `npx playwright install chromium` si besoin.
 
 ## Configuration

@@ -29,9 +29,9 @@ export default function TuilesArticles({ niveau, onArticle, onMasquer }: {
 
   return (
     <div className="flex-none rounded-xl bg-surface border border-line-soft shadow-soft p-2.5 flex flex-col gap-2.5">
-      <div role="tablist" aria-label="Familles" className="flex gap-1.5 items-center">
-        <div className="flex gap-1.5 overflow-x-auto min-w-0">
-          {familles.map((f) => {
+      <div className="flex gap-1.5 items-center">
+        <div role="tablist" aria-label="Familles" className="flex gap-1.5 overflow-x-auto min-w-0">
+          {familles.filter((f) => String(f.designation ?? '').trim() !== '').map((f) => {
             const sel = courante === f.designation;
             return (
               <button key={f.id} type="button" role="tab" aria-selected={sel} onClick={() => setFamille(f.designation)}

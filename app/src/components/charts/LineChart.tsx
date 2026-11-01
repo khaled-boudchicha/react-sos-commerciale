@@ -56,7 +56,7 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
 
   return (
     <div className="relative w-full" style={{ userSelect: 'none' }}>
-      <svg viewBox={`0 0 ${W} ${hauteur}`} width="100%" role="img" preserveAspectRatio="none"
+      <svg viewBox={`0 0 ${W} ${hauteur}`} width="100%" role="img" preserveAspectRatio="none" aria-label={resumeSerie(data, format)}
            style={{ display: 'block', overflow: 'visible' }}>
         <defs>
           <linearGradient id={`g${uid}`} x1="0" y1="0" x2="0" y2="1">
@@ -109,4 +109,12 @@ export default function LineChart({ data, format, couleur = SERIE_PRINCIPALE, ha
       )}
     </div>
   );
+}
+
+/** Résumé textuel de la courbe pour les lecteurs d'écran (le détail reste dans le tableau voisin). */
+function resumeSerie(data: PointSerie[], format: (v: number) => string): string {
+  if (!data.length) return 'Courbe sans donnée';
+  const valeurs = data.map((d) => Number(d.value) || 0);
+  const max = Math.max(...valeurs), min = Math.min(...valeurs);
+  return `Courbe de ${data.length} point(s), du ${data[0].label} au ${data[data.length - 1].label} : minimum ${format(min)}, maximum ${format(max)}`;
 }
