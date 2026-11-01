@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { messageEchecCreation, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VENTE, UPDATE_VENTE, ADD_REGLEMENT_CLIENT } from '../api/queries';
@@ -177,9 +178,10 @@ export default function VenteEditor() {
       }
       toast.success(`Pièce ${created.numero} enregistrée${recu > 0 ? ` · encaissé ${fmtMoney(recu)}` : ''}.`);
       navigate(`/ventes/${created.id}`);
-    } catch (e: any) {
-      setError(e.message ?? 'Erreur à l’enregistrement.');
-      toast.error(`Enregistrement échoué : ${e.message ?? 'erreur'}`);
+    } catch (e: unknown) {
+      const m = messageEchecCreation(e, 'la liste des ventes');
+      setError(m);
+      toast.error(resultatIncertain(e) ? m : `Enregistrement échoué : ${m}`);
     }
   }
 

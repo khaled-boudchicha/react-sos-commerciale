@@ -33,6 +33,8 @@ export type SessionState = {
   dossierUser: DossierUser | null;
   /** Code d'erreur d'accès poussé par le serveur (ACCOUNT_BLOCKED / SUBSCRIPTION_*) */
   accessError: string | null;
+  /** Raison de la dernière déconnexion subie (affichée à l'écran de connexion), null si volontaire. */
+  motifDeconnexion: string | null;
 
   setCloudUrl: (url: string) => void;
   setAuth: (token: string, agent: AgentInfo) => void;
@@ -40,6 +42,9 @@ export type SessionState = {
   setDossierUser: (u: DossierUser) => void;
   setAccessError: (code: string | null) => void;
   logout: () => void;
+  /** Déconnexion imposée (jeton expiré ou révoqué) : même effet que logout, avec une explication. */
+  expirerSession: (motif?: string) => void;
+  effacerMotifDeconnexion: () => void;
   hydrate: () => Promise<void>;
 };
 
@@ -79,6 +84,7 @@ export const useSession = create<SessionState>((set, get) => ({
   dossier: null,
   dossierUser: null,
   accessError: null,
+  motifDeconnexion: null,
 
   // URL non HTTPS refusée (hors développement local) : on garde la précédente
   setCloudUrl: (cloudUrl) => { if (!urlCloudValide(cloudUrl)) return; set({ cloudUrl }); persist(get()); },
@@ -93,6 +99,12 @@ export const useSession = create<SessionState>((set, get) => ({
     // pour éviter un cycle store ↔ client).
     void import('../api/client').then((m) => m.apollo.clearStore()).catch(() => undefined);
   },
+  expirerSession: (motif = 'Votre session a expiré ou a été fermée depuis un autre poste. Reconnectez-vous pour continuer.') => {
+    if (!get().token) return;
+    get().logout();
+    set({ motifDeconnexion: motif });
+  },
+  effacerMotifDeconnexion: () => set({ motifDeconnexion: null }),
   hydrate: async () => {
     const saved = (await window.gc?.store.get(PERSIST_KEY)) as Partial<SessionState> | undefined;
     set({

@@ -1130,11 +1130,19 @@ export default function Grille<T>(props: GrilleProps<T>) {
         </table>
         {!chargement && !distant.chargement && elementsPage.length === 0 && !ligneEditee?.nouvelle && (
           (erreur ?? distant.erreur)
-            ? <div className="sticky left-0 p-4 max-w-full"><Alert tone="danger">{erreur ?? distant.erreur}</Alert></div>
+            ? (
+              <div className="sticky left-0 p-4 max-w-full">
+                <Alert tone="danger" action={!erreur && distant.actif ? <Button size="sm" icon="refresh" onClick={distant.recharger}>Réessayer</Button> : undefined}>
+                  {erreur ?? distant.erreur}
+                </Alert>
+              </div>
+            )
             : <div className="sticky left-0 max-w-full"><EmptyState icon="inbox" size="sm" title={messageVide} /></div>
         )}
         {distant.erreur && elementsPage.length > 0 && (
-          <div className="sticky left-0 px-3 py-2 max-w-full"><Alert tone="danger" compact>{distant.erreur}</Alert></div>
+          <div className="sticky left-0 px-3 py-2 max-w-full">
+            <Alert tone="danger" compact action={<Button size="sm" icon="refresh" onClick={distant.recharger}>Réessayer</Button>}>{distant.erreur}</Alert>
+          </div>
         )}
         {(chargement || distant.chargement) && !premierChargement && <LoadingOverlay />}
       </div>

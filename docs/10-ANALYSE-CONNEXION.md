@@ -516,6 +516,32 @@ local des connexions LAN (poste, utilisateur, heure) remonté au cloud par le he
 | Un seul poller `myAgents` (sortir le hook de `AppShell` quand `/comptoir`) ; `refetchJour` différé | S | nul | trafic de fond ≤ 3 req/min/poste |
 | Journal local des erreurs de transport consultable dans `/diagnostic` | S | nul | après coupure : liste horodatée des échecs |
 
+**État d'avancement (01/11/2026) — partie application livrée :**
+
+- ✅ **Store réseau tri-état** (`store/reseau.ts`) : Internet du poste (`online`/`offline`), serveur (pannes de transport comptées par les liens Apollo, seuil de 2 ; une réponse le rétablit), agent (sonde `myAgents`). Libellés distincts « Pas d’Internet », « Serveur injoignable », « Agent hors ligne » dans l'en-tête, le ruban, le menu Fichier et le comptoir (bandeau avec explication et bouton « Réessayer »). L'ancien repli `live?.isOnline ?? agent.isOnline` ne masque plus une panne : un serveur injoignable bloque l'encaissement.
+- ✅ **Une seule sonde** (`api/useSurveillanceReseau.ts`, montée dans `AppShell`) : 20 s en régime normal, 6 s pendant une panne, immédiate au retour d'Internet. Le comptoir n'a plus son propre `myAgents` (trafic de fond divisé par deux sur `/comptoir`). Mesuré avec un serveur simulé : panne du serveur détectée en ~21 s, perte d'Internet immédiate.
+- ✅ **Délais client** (`delaiLink`) calés juste au-dessus de ceux du cloud, pour ne jamais couper une requête qu'il aurait servie : 35 s lectures, 65 s lectures volumineuses (`limit` ≥ 1000) et écritures, 10 s pour la sonde. *Les 15 s / 45 s proposés plus haut couperaient des exports légitimes tant que le cloud accepte 60 s.*
+- ✅ **Relances des lectures uniquement** (`RetryLink`, 2 relances, 400 ms → 3 s avec gigue) sur panne de transport franche (pas de réponse, 502/503/504) ; jamais d'écriture, jamais sur délai dépassé, ni hors ligne.
+- ✅ **Messages** : `api/erreurs.ts` remplace « Failed to fetch » par des phrases utiles (connexion, comptoir) et classe les échecs d'écriture « incertains » (réponse perdue, délai, délai signalé par le cloud).
+- ✅ **Anti-doublon au comptoir, sans serveur** (`screens/comptoir/reprise.ts`) : après un encaissement resté sans réponse, le ticket est conservé ; au réencaissement du même ticket, l'application relit les ventes du jour et, si un ticket du même montant et du même caissier est apparu depuis, demande confirmation (« Ne pas encaisser » par défaut). *Couvre les BCT ; pour les retours (BRT) et les éditeurs de pièces, seul un message invite à vérifier.*
+- ✅ **Journal des incidents réseau** dans `/diagnostic` (50 derniers, répétitions regroupées, conservé sur le poste) + état de la connexion et heure de la dernière réponse du serveur.
+- ✅ Rafraîchissement des ventes du jour différé de 1,5 s après un encaissement (l'impression passe d'abord).
+- ⏳ **Côté agent / cloud** : `client_request_id` + table d'idempotence + commande atomique `createVenteEncaissee` (seule vraie garantie anti-doublon). Un en-tête `X-Druxamed-Request-Id` n'a pas été ajouté côté application : il faut d'abord l'autoriser dans les `allowedHeaders` CORS du cloud, sinon toutes les requêtes échoueraient.
+- ✅ **Cache hors ligne des référentiels** (`api/cacheHorsLigne.ts`, IndexedDB du poste, sans dépendance ajoutée). Plutôt que de persister tout le cache Apollo (ventes, soldes… périmés et sensibles), un cache **ciblé**, servi **uniquement** quand le serveur est injoignable (après les relances) :
+  - référentiels (`Referentiels`, `CoordonneesSociete`, `SousFamilles`, `Rayons`) : dernière réponse complète, valable **7 jours** ;
+  - articles : chaque article reçu (recherche, scan, fiche) est mémorisé ; hors ligne, recherche (tous les mots, sans accents), scan par code-barres et par code se font sur ces articles connus, valables **24 h** ; la liste affiche « Hors ligne : articles déjà consultés — prix et stock au JJ/MM HH:MM » ; un code absent du cache n'est pas déclaré « inconnu » ;
+  - clé agent + dossier ; une réponse en ligne remplace toujours le cache ; une erreur métier n'est jamais masquée ; un filtre non rejouable localement (famille, alertes, grille, pagination) ne reçoit pas de réponse approximative ;
+  - invalidation : toute écriture réussie sur un article, un tarif, un code-barres ou un référentiel vide le cache du dossier ; la déconnexion vide tout le cache du poste ; bouton « Vider » dans `/diagnostic` (compteurs et date de l'article le plus ancien) ;
+  - usage : continuer à **préparer** des tickets et à consulter pendant une coupure ; l'encaissement reste suspendu.
+  - *Limite connue* : un prix modifié depuis un autre poste (ou le Delphi) n'est connu qu'à la prochaine lecture en ligne ; le cache est donc limité à 24 h et clairement signalé.
+- ✅ **Messages d'erreur lisibles partout** (`traductionLink`, `api/erreurs.ts › traduireErreurTransport`) : « Failed to fetch », « Received status code 503 », « Unexpected token < » deviennent des phrases utiles à la source, pour la soixantaine d'écrans qui affichent `e.message` ; le message d'origine reste dans `messageOriginal`.
+- ✅ **Listes** : bouton « Réessayer » sur les erreurs de chargement des grilles distantes.
+- ✅ **Session expirée** : `UNAUTHENTICATED` ⇒ retour à la connexion **avec une explication** (au lieu d'un retour muet à l'écran de connexion).
+- ✅ **Appairage robuste** (`lib/appairage.ts`) : code abîmé par une messagerie réparé (guillemets typographiques, espaces insécables, texte autour, clés sans guillemets, base64) ; import d'un fichier `.druxamed-pairing` / `.json` / `.txt` (bouton ou glisser-déposer).
+- ✅ **Conflit de session** : le message et la confirmation expliquent qu'un compte se partage mal entre deux caisses (« créez un compte par personne »).
+- ✅ **Anti-doublon persistant** : la tentative incertaine est enregistrée avec le ticket (stockage du comptoir) et survit à un redémarrage ; bandeau sur le ticket concerné.
+- ✅ **Éditeurs de pièces** (vente, achat) : une création restée sans réponse affiche « la pièce a peut-être été enregistrée — vérifiez la liste avant de réenregistrer ».
+
 ### Lot 2 — Mode LAN / hybride (effort L, 6–10 semaines, agent + cloud + app)
 | Action | Effort | Risque | Recette |
 |---|---|---|---|

@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import type { EtatConnexion } from '../store/reseau';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDroits } from '../lib/droits';
 import { Icon, Kbd, TONE_VARS } from '../components/ui/Icon';
@@ -28,6 +29,8 @@ import { applyTheme } from '../screens/Parametres';
 
 export type InfosSession = {
   online: boolean;
+  /** État détaillé (Internet / serveur / agent) ; à défaut, seul `online` est affiché. */
+  connexion?: EtatConnexion;
   agent: string;
   dossier: string;
   utilisateur: string;
@@ -385,7 +388,8 @@ function BarreTitre({ session, executer, ouvrirFichier, basculerMenu, menuOuvert
   const definirDisposition = usePreferencesNavigation((s) => s.definirDisposition);
   const compte = useRef<HTMLButtonElement>(null);
   const initiales = (session.utilisateur || '?').split(/[\s._-]+/).filter(Boolean).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || '?';
-  const etat = session.online ? 'Agent connecté' : 'Agent hors ligne';
+  const etat = session.connexion ? `${session.connexion.libelle} — ${session.connexion.detail}` : session.online ? 'Agent connecté' : 'Agent hors ligne';
+  const libelleEtat = session.connexion?.libelle ?? (session.online ? 'Connecté' : 'Hors ligne');
 
   const menuCompte = (bouton: HTMLElement) => basculerMenu(bouton, {
     label: 'Compte', aligner: 'end', largeur: 290,
@@ -417,8 +421,8 @@ function BarreTitre({ session, executer, ouvrirFichier, basculerMenu, menuOuvert
         <span className="ml-auto flex items-center gap-0.5 flex-none"><Kbd tone="inverse">Ctrl</Kbd><Kbd tone="inverse">K</Kbd></span>
       </button>
       <div className="flex items-center gap-1.5 flex-none text-xs font-semibold">
-        <span className="inline-flex items-center rounded-full px-2.5 h-6 bg-white/15" title={`${etat} — ${session.agent}`}>
-          <StatusDot online={session.online} label={<span className="sr-only xl:not-sr-only">{session.online ? 'Connecté' : 'Hors ligne'}</span>} />
+        <span role="status" className="inline-flex items-center rounded-full px-2.5 h-6 bg-white/15" title={`${session.agent}\n${etat}`}>
+          <StatusDot online={session.online} label={<span className={session.online ? 'sr-only xl:not-sr-only' : undefined}>{libelleEtat}</span>} />
         </span>
         <button type="button" onClick={() => executer('dossier')} title="Changer de dossier"
                 className="inline-flex items-center gap-1.5 rounded-sm px-2 h-7 hover:bg-white/15 transition-colors duration-fast">

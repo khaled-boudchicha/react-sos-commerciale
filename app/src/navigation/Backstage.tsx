@@ -72,8 +72,9 @@ export default function Backstage({ session, onClose, lancer }: { session: Infos
               <Carte titre="Agent" icone="server">
                 <div className="flex items-center gap-2 text-lg font-bold text-ink">
                   <StatusDot online={session.online} />
-                  {session.online ? 'Connecté' : 'Hors ligne'}
+                  {session.connexion?.libelle ?? (session.online ? 'Connecté' : 'Hors ligne')}
                 </div>
+                {session.connexion && !session.connexion.ok && <div className="text-sm text-danger-text">{session.connexion.detail}</div>}
                 <div className="text-sm text-ink-muted truncate">{session.agent}</div>
                 {session.plusieursAgents && <Action onClick={() => lancer(C.agent)}>Changer d’agent</Action>}
               </Carte>

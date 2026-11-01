@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useLazyQuery } from '@apollo/client';
 import { LOGIN_IDENTIFY, LOGIN_WITH_AGENT, DOSSIERS, DOSSIER_USERS, LOGIN_DOSSIER_USER, LOGIN_WITH_API_KEY } from '../api/auth';
 import { useSession, getDeviceId, AgentInfo, dossierUserDepuisLogin } from '../store/session';
@@ -8,6 +8,8 @@ import { Alert } from '../components/ui/States';
 import { Badge } from '../components/ui/atoms';
 import { Icon, IconBadge } from '../components/ui/Icon';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { messageErreur } from '../api/erreurs';
+import { lireCodeAppairage } from '../lib/appairage';
 
 type Step = 'credentials' | 'agent' | 'dossier';
 
@@ -26,6 +28,9 @@ export default function Login() {
   // Jeton cloud encore valide (ex. session d'avant les droits serveur) : on reprend au choix du dossier
   const [step, setStep] = useState<Step>(session.token ? 'dossier' : 'credentials');
   const [username, setUsername] = useState('');
+  // Déconnexion subie (jeton expiré, session fermée ailleurs) : expliquée en haut du formulaire
+  const motifDeconnexion = useSession((s) => s.motifDeconnexion);
+  const effacerMotif = useSession((s) => s.effacerMotifDeconnexion);
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [tokenTemp, setTokenTemp] = useState<string | null>(null);
@@ -38,6 +43,7 @@ export default function Login() {
   const [modeAppairage, setModeAppairage] = useState(false);
   const [codeAppairage, setCodeAppairage] = useState('');
   const [voirCode, setVoirCode] = useState(false);
+  const fichierRef = useRef<HTMLInputElement>(null);
   // Affichage du mot de passe en clair (bouton œil)
   const [voirMdp, setVoirMdp] = useState(false);
 
@@ -59,9 +65,10 @@ export default function Login() {
   async function handleAppairage(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    let code: { u?: string; k?: string; a?: string };
-    try { code = JSON.parse(codeAppairage.trim()); } catch { code = {}; }
-    if (!code.k || !code.a) { setError("Code d'appairage illisible : utilisez « Copier le code d'appairage » dans l'agent."); return; }
+    effacerMotif();
+    // Tolérant aux copies abîmées par les messageries (guillemets typographiques, texte autour…)
+    const code = lireCodeAppairage(codeAppairage);
+    if (!code) { setError("Code d'appairage illisible : utilisez « Copier le code d'appairage » dans l'agent, ou importez le fichier d'appairage."); return; }
     try {
       const { data } = await loginWithApiKey({ variables: { input: { apiKey: code.k, agent_id: code.a } } });
       const res = data?.loginWithApiKey;
@@ -80,13 +87,27 @@ export default function Login() {
       void loadDossiers();
       void loadDossierUsers();
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
+    }
+  }
+
+  /** Fichier d'appairage (exporté par l'agent, ou code enregistré dans un .txt) : lu localement. */
+  async function importerFichier(f: File) {
+    setError(null);
+    if (f.size > 64 * 1024) { setError('Fichier trop volumineux pour un code d’appairage.'); return; }
+    try {
+      const texte = await f.text();
+      if (!lireCodeAppairage(texte)) { setError(`Aucun code d’appairage lisible dans « ${f.name} ».`); return; }
+      setCodeAppairage(texte.trim());
+    } catch {
+      setError(`Lecture impossible de « ${f.name} ».`);
     }
   }
 
   async function handleIdentify(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    effacerMotif();
     try {
       const { data } = await identify({ variables: { username, password } });
       const res = data?.loginIdentify;
@@ -99,7 +120,7 @@ export default function Login() {
       if ((res.agents ?? []).length === 1) setSelectedAgent(res.agents[0]);
       setStep('agent');
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
     }
   }
 
@@ -124,7 +145,7 @@ export default function Login() {
     if (!res?.success) {
       if (res?.statut === 'agent_conflit') {
         setNeedsForce(true);
-        setError('Une autre session utilise déjà cet agent. Forcer la connexion ?');
+        setError('Ce compte est déjà connecté à cet établissement sur un autre poste. Chaque personne doit utiliser son propre compte ; sinon, vous pouvez forcer la connexion.');
         return;
       }
       setError(STATUT_MESSAGES[res?.statut ?? ''] ?? res?.message ?? 'Connexion refusée.');
@@ -136,7 +157,7 @@ export default function Login() {
     void loadDossiers();
     void loadDossierUsers();
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
     }
   }
 
@@ -155,7 +176,7 @@ export default function Login() {
       }
       session.setDossierUser(dossierUserDepuisLogin(res));
     } catch (err: any) {
-      setError(err.message ?? 'Erreur de connexion.');
+      setError(messageErreur(err, 'Erreur de connexion.'));
     }
   }
 
@@ -260,11 +281,16 @@ export default function Login() {
               {step === 'dossier' && 'Exercice comptable et utilisateur du dossier.'}
             </p>
 
+            {motifDeconnexion && step === 'credentials' && !error && (
+              <Alert tone="warning" compact className="mb-4" onClose={effacerMotif}>{motifDeconnexion}</Alert>
+            )}
             {error && <Alert tone="danger" compact className="mb-4">{error}</Alert>}
 
             {step === 'credentials' && modeAppairage && (
-              <form onSubmit={handleAppairage} className="flex flex-col gap-4">
-                <Field label="Code d’appairage" help="Dans l’agent de l’établissement, cliquez sur « Copier le code d’appairage », puis collez-le ici.">
+              <form onSubmit={handleAppairage} className="flex flex-col gap-4"
+                    onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) e.preventDefault(); }}
+                    onDrop={(e) => { const f = e.dataTransfer.files?.[0]; if (f) { e.preventDefault(); void importerFichier(f); } }}>
+                <Field label="Code d’appairage" help="Dans l’agent de l’établissement, cliquez sur « Copier le code d’appairage », puis collez-le ici — ou importez / glissez le fichier d’appairage.">
                   <TextInput size="lg" leading="lock" mono type={voirCode ? 'text' : 'password'}
                              autoComplete="off" spellCheck={false}
                              value={codeAppairage} onChange={(e) => setCodeAppairage(e.target.value)} autoFocus
@@ -272,6 +298,9 @@ export default function Login() {
                              trailing={<IconButton icon={voirCode ? 'eyeOff' : 'eye'} size="xs" label={voirCode ? 'Masquer le code' : 'Afficher le code'}
                                                    onClick={() => setVoirCode((v) => !v)} />} />
                 </Field>
+                <input ref={fichierRef} type="file" accept=".druxamed-pairing,.json,.txt" className="sr-only" tabIndex={-1} aria-hidden="true"
+                       onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importerFichier(f); }} />
+                <Button icon="upload" block onClick={() => fichierRef.current?.click()}>Importer un fichier d’appairage</Button>
                 <Button type="submit" variant="primary" size="lg" block loading={appairage} disabled={!codeAppairage.trim()} iconRight="arrowRight">
                   {appairage ? 'Connexion…' : 'Se connecter'}
                 </Button>
@@ -378,7 +407,8 @@ export default function Login() {
                        message={(
                          <>
                            <p>Une autre session utilise déjà <strong>{selectedAgent?.label || selectedAgent?.agentId}</strong>.</p>
-                           <p className="mt-2">Si vous continuez, ce poste sera <strong>déconnecté</strong> : une vente ou une saisie en cours y sera interrompue.</p>
+                           <p className="mt-2">Si vous continuez, l’autre poste sera <strong>déconnecté</strong> : une vente ou une saisie en cours y sera interrompue.</p>
+                           <p className="mt-2 text-sm text-ink-muted">Deux caisses ouvertes avec le même compte se déconnectent mutuellement : créez un compte par personne.</p>
                          </>
                        )}
                        onCancel={() => setConfirmerForce(false)}

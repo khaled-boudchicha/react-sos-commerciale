@@ -29,11 +29,13 @@ export default function ChampScan({ id, retour, onArticle }: {
   const [hi, setHi] = useState(0);
   const [erreur, setErreur] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [chercher, { data, loading }] = useLazyQuery(ARTICLES, { fetchPolicy: 'network-only' });
+  const [chercher, { data, loading, error }] = useLazyQuery(ARTICLES, { fetchPolicy: 'network-only' });
   const [parCodeBarre] = useLazyQuery(PAR_CODE_BARRE, { fetchPolicy: 'network-only' });
   const [parCode] = useLazyQuery(PAR_CODE, { fetchPolicy: 'network-only' });
 
   const resultats: Article[] = data?.articles?.data ?? [];
+  // Réponse servie par le cache hors ligne (articles déjà consultés sur ce poste) : date de la donnée
+  const horsLigne: number | null = typeof data?.articles?.horsLigne === 'number' ? data.articles.horsLigne : null;
   const differe = useDebouncedValue(term, 250);
 
   useEffect(() => {
@@ -59,16 +61,22 @@ export default function ChampScan({ id, retour, onArticle }: {
     const surligne = ouvert ? resultats[hi] : undefined;
     const numerique = /^[0-9]{6,}$/.test(code);
     if (numerique || !surligne || mode === 'code') {
+      // Serveur injoignable et article absent du cache local : on ne peut pas conclure « inconnu »
+      let injoignable = false;
       try {
-        const { data: d } = await parCodeBarre({ variables: { code } });
-        if (d?.articleParCodeBarre) { choisir(d.articleParCodeBarre as Article); return; }
+        const r = await parCodeBarre({ variables: { code } });
+        if (r.data?.articleParCodeBarre) { choisir(r.data.articleParCodeBarre as Article); return; }
+        injoignable = !!r.error?.networkError;
         if (mode === 'code') {
-          const { data: c } = await parCode({ variables: { code } });
-          if (c?.articleParCode) { choisir(c.articleParCode as Article); return; }
+          const c = await parCode({ variables: { code } });
+          if (c.data?.articleParCode) { choisir(c.data.articleParCode as Article); return; }
+          injoignable = injoignable || !!c.error?.networkError;
         }
       } catch { /* pas de correspondance exacte → liste */ }
       if (numerique || (mode === 'code' && !surligne)) {
-        setErreur(`${numerique ? 'Code-barres' : 'Code'} « ${code} » inconnu`);
+        setErreur(injoignable
+          ? `Serveur injoignable : « ${code} » ne fait pas partie des articles déjà consultés sur ce poste.`
+          : `${numerique ? 'Code-barres' : 'Code'} « ${code} » inconnu`);
         inputRef.current?.select();
         return;
       }
@@ -122,7 +130,17 @@ export default function ChampScan({ id, retour, onArticle }: {
       {ouvert && (
         <div className="absolute z-30 left-0 right-0 mt-2 bg-surface border border-line rounded-xl shadow-lifted max-h-[360px] overflow-auto">
           {loading && <div className="px-4 py-3 text-base leading-[1.45] text-ink-muted">Recherche…</div>}
-          {!loading && resultats.length === 0 && <div className="px-4 py-3 text-base leading-[1.45] text-ink-muted">Aucun article.</div>}
+          {!loading && horsLigne !== null && (
+            <div className="flex items-center gap-2 px-4 py-2 text-sm leading-[1.45] font-semibold bg-warning-soft text-warning-text border-b border-line-soft">
+              <Icon name="alert" size={16} />
+              Hors ligne : articles déjà consultés sur ce poste — prix et stock au {new Date(horsLigne).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+          {!loading && resultats.length === 0 && (
+            <div className="px-4 py-3 text-base leading-[1.45] text-ink-muted">
+              {error?.networkError ? 'Recherche impossible : serveur injoignable, et aucun article correspondant dans le cache du poste.' : 'Aucun article.'}
+            </div>
+          )}
           {resultats.map((a, i) => {
             const epuise = Number(a.qte_reale) <= 0;
             return (

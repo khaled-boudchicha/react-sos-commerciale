@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { gql, useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Link } from 'react-router-dom';
 import { ADD_REGLEMENT_CLIENT, COORDONNEES_SOCIETE, LOTS, VENTE, VENTES } from '../../api/queries';
-import { MY_AGENTS } from '../../api/auth';
+import { messageErreur, resultatIncertain } from '../../api/erreurs';
+import { sonderReseau, useConnexion } from '../../api/useSurveillanceReseau';
 import { Article, Client, Vente } from '../../api/types';
 import ClientSearch from '../../components/ClientSearch';
 import ArreteCaisseModal from '../../components/ArreteCaisseModal';
@@ -28,6 +29,7 @@ import PaiementDialog, { ResultatPaiement } from './PaiementDialog';
 import RemiseDialog from './RemiseDialog';
 import TuilesArticles from './TuilesArticles';
 import VentesJourDialog from './VentesJourDialog';
+import { ventesSuspectes, type TentativeIncertaine } from './reprise';
 
 const CREATE_VENTE = gql`mutation CreateVenteComptoir($input: JSON!) { createVente(input: $input) }`;
 const ID_SCAN = 'comptoir-scan';
@@ -48,9 +50,9 @@ type Dialogue = 'paiement' | 'remise' | 'ventes' | 'caisse' | 'annuler' | 'retou
 export default function Comptoir() {
   const toast = useToast();
   const apollo = useApolloClient();
-  const { dossier, dossierUser, agent } = useSession();
+  const { dossier, dossierUser } = useSession();
   const { peut, peutDoc, restreintAuxSiennes } = useDroits();
-  const { tickets, actif, options, charger, setActif, majTicket, viderTicket, patchLigne, setOptions } = useComptoir();
+  const { tickets, actif, options, charger, setActif, majTicket, majTicketA, viderTicket, patchLigne, setOptions } = useComptoir();
 
   useEffect(() => { if (dossier) charger(dossier); }, [dossier, charger]);
 
@@ -73,10 +75,11 @@ export default function Comptoir() {
   const peutImprimer = peut('vente', D.vente.impression);
   const caissier = (dossierUser?.name as string | undefined) || dossierUser?.username || '';
 
-  // Statut agent (même source que l'en-tête de l'application)
-  const { data: agentsData } = useQuery(MY_AGENTS, { pollInterval: 20_000, fetchPolicy: 'network-only' });
-  const enLigne = (agentsData?.myAgents as { agentId: string; isOnline: boolean }[] | undefined)
-    ?.find((a) => a.agentId === agent?.agentId)?.isOnline ?? agent?.isOnline ?? false;
+  // État de la connexion (Internet / serveur / agent) : même source que l'en-tête de l'application
+  const connexion = useConnexion();
+  const enLigne = connexion.ok;
+  const [verification, setVerification] = useState(false);
+  const [doublon, setDoublon] = useState<{ vente: Vente; paiement: ResultatPaiement } | null>(null);
 
   // Caisse du jour : tickets BCT d'aujourd'hui (les siens seulement si le droit l'impose)
   const { data: jourData, refetch: refetchJour } = useQuery(VENTES, {
@@ -149,8 +152,8 @@ export default function Comptoir() {
   const bloque = !enLigne;
 
   function demanderValidation(mode: 'dialogue' | 'sansTicket' | 'avecTicket') {
-    if (ticket.lignes.length === 0 || creation) return;
-    if (bloque) { toast.error('Agent hors ligne : l’encaissement reprendra dès le retour de la connexion. Le ticket est conservé.'); return; }
+    if (ticket.lignes.length === 0 || creation || verification) return;
+    if (bloque) { toast.error(`${connexion.libelle} : l’encaissement reprendra dès le retour de la connexion. Le ticket est conservé.`); return; }
     if (retour) { setDialogue('retour'); return; }
     // F11 / F12 : paiement exact immédiat pour le client de passage (étape 4 sautée)
     if (mode !== 'dialogue' && !ticket.client) {
@@ -160,9 +163,35 @@ export default function Comptoir() {
     setDialogue('paiement');
   }
 
-  async function enregistrer(p: ResultatPaiement) {
+  /**
+   * Après un encaissement resté sans réponse sur ce ticket : un ticket du même montant est-il apparu
+   * depuis dans les ventes du jour ? Renvoie false si l'encaissement doit être suspendu.
+   */
+  async function verifierTentativePrecedente(p: ResultatPaiement): Promise<boolean> {
+    const tentative = ticket.incertain;
+    if (!tentative || retour) return true;
+    setVerification(true);
+    try {
+      const r = await refetchJour();
+      const suspecte = ventesSuspectes(tentative, (r.data?.ventes?.data ?? []) as Vente[])[0];
+      if (suspecte) { setDoublon({ vente: suspecte, paiement: p }); return false; }
+      majTicketA(actif, (t) => ({ ...t, incertain: undefined }));
+      return true;
+    } catch (e) {
+      toast.error(`Vérification impossible (${messageErreur(e)}). Le ticket précédent a peut-être été enregistré : réessayez quand la connexion sera rétablie.`);
+      return false;
+    } finally {
+      setVerification(false);
+    }
+  }
+
+  async function enregistrer(p: ResultatPaiement, forcer = false) {
     if (!dossierUser) { toast.error('Utilisateur dossier manquant — reconnectez-vous.'); return; }
+    if (!forcer && !(await verifierTentativePrecedente(p))) return;
     const date = isoToday();
+    const slot = actif;
+    // Ventes déjà connues avant l'envoi : base de comparaison si la réponse se perd
+    const connus = ventesJour.map((v) => Number(v.id));
     try {
       const { data } = await creer({
         variables: {
@@ -192,7 +221,7 @@ export default function Comptoir() {
             } },
           });
         } catch (e: any) {
-          toast.error(`Ticket ${cree.numero} enregistré, mais l’encaissement a échoué : ${e.message ?? e}. Réglez-le depuis la pièce.`);
+          toast.error(`Ticket ${cree.numero} enregistré, mais l’encaissement a échoué : ${messageErreur(e)} Réglez-le depuis la pièce.`);
         }
       }
 
@@ -200,14 +229,25 @@ export default function Comptoir() {
       setDernier({ id: cree.id, numero: String(cree.numero), net: Number(cree.net_a_payer), extras });
       viderTicket();
       setDialogue(null);
-      void refetchJour();
+      // Rafraîchissement différé : laisse passer l'impression du ticket en priorité
+      setTimeout(() => void refetchJour(), 1_500);
       toast.success(retour
         ? `Retour ${cree.numero} enregistré · à rembourser ${fmtMoney(cree.net_a_payer)} DA`
         : `Ticket ${cree.numero}${p.rendu > 0 ? ` · rendu ${fmtMoney(p.rendu)} DA` : ''}`);
       if (p.imprimer) void imprimer(cree.id, extras);
       setTimeout(focusScan, 0);
-    } catch (e: any) {
-      toast.error(`Enregistrement échoué : ${e.message ?? 'erreur'}`);
+    } catch (e: unknown) {
+      if (resultatIncertain(e)) {
+        if (!retour) {
+          const tentative: TentativeIncertaine = { net: tot.net, connus, utilisateur: String(dossierUser.username ?? ''), moment: Date.now() };
+          majTicketA(slot, (t) => ({ ...t, incertain: tentative }));
+        }
+        toast.error(retour
+          ? 'Pas de réponse du serveur : le retour a peut-être été enregistré. Vérifiez la liste des ventes avant de recommencer.'
+          : 'Pas de réponse du serveur : le ticket a peut-être été enregistré. Il est conservé ; au prochain encaissement, les ventes du jour seront vérifiées pour éviter un doublon.');
+      } else {
+        toast.error(`Enregistrement échoué : ${messageErreur(e)}`);
+      }
     }
   }
 
@@ -228,7 +268,7 @@ export default function Comptoir() {
         setApercu(demande);
       }
     } catch (e: any) {
-      toast.error(`Impression du ticket échouée : ${e.message ?? e}`);
+      toast.error(`Impression du ticket échouée : ${messageErreur(e)}`);
     }
   }
 
@@ -260,7 +300,7 @@ export default function Comptoir() {
     ArrowUp: (e) => { if (horsSaisie(e)) deplacerSelection(-1); },
     Delete: (e) => { if (horsSaisie(e) && selection != null) supprimer(selection); },
     ...Object.fromEntries(Array.from({ length: NB_TICKETS }, (_, i) => [`Ctrl+${i + 1}`, () => setActif(i)])),
-  }, dialogue === null && apercu === null);
+  }, dialogue === null && apercu === null && doublon === null);
 
   if (!peutVendre && !peutRetour) {
     return <div className="p-6 text-base leading-[1.45] text-ink-muted">Accès refusé : droit « Nouveau Bon de Comptoir » requis.</div>;
@@ -316,7 +356,7 @@ export default function Comptoir() {
         <div className="ml-auto flex items-center gap-4 text-sm leading-[1.45] font-semibold text-ink-label">
           <span className="flex items-center gap-[7px]">
             <span className={`w-2 h-2 rounded-full ${enLigne ? 'bg-success-solid' : 'bg-danger-solid'}`} />
-            {enLigne ? 'Agent connecté' : 'Agent hors ligne'}
+            <span role="status" title={connexion.detail}>{enLigne ? 'Agent connecté' : connexion.libelle}</span>
           </span>
           <button type="button" onClick={() => setOptions({ ticketAuto: !options.ticketAuto })} aria-pressed={options.ticketAuto}
                   title="Impression automatique du ticket après l’encaissement (F2)"
@@ -334,8 +374,13 @@ export default function Comptoir() {
       </header>
 
       {bloque && (
-        <div role="alert" className="flex-none px-5 py-2 text-[12.5px] font-bold text-white" style={{ background: 'var(--pos-alert)' }}>
-          Agent hors ligne — l’encaissement est suspendu. Les tickets en attente sont conservés sur ce poste.
+        <div role="alert" className="flex-none flex items-center gap-3 px-5 py-2 text-[12.5px] font-bold text-white" style={{ background: 'var(--pos-alert)' }}>
+          <span className="flex-1">
+            {connexion.libelle} — l’encaissement est suspendu. Les tickets en attente sont conservés sur ce poste.
+            <span className="font-medium opacity-90"> {connexion.detail}</span>
+          </span>
+          <button type="button" onClick={() => void sonderReseau()}
+                  className="flex-none h-7 px-3 rounded-md border border-white/60 hover:bg-white/15">Réessayer</button>
         </div>
       )}
 
@@ -353,6 +398,12 @@ export default function Comptoir() {
                       style={{ border: '1px solid var(--pos-return-line)', color: 'var(--pos-return-deep)' }}>
                 Revenir à la vente
               </button>
+            </div>
+          )}
+          {ticket.incertain && (
+            <div role="status" className="flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-md text-sm leading-[1.45] font-semibold bg-warning-soft text-warning-text border border-warning-line">
+              <Icon name="alert" size={18} />
+              Le dernier encaissement de ce ticket ({fmtMoney(ticket.incertain.net)} DA) n’a pas reçu de réponse : les ventes du jour seront vérifiées avant de réencaisser.
             </div>
           )}
 
@@ -415,7 +466,7 @@ export default function Comptoir() {
             {choixClient && !ticket.client && <ClientSearch value={null} onSelect={setClient} />}
           </div>
 
-          <button type="button" onClick={() => demanderValidation('dialogue')} disabled={vide || creation}
+          <button type="button" onClick={() => demanderValidation('dialogue')} disabled={vide || creation || verification}
                   className="flex-none h-[78px] rounded-[14px] text-white flex items-center gap-3.5 px-5 shadow-[0_4px_12px_rgb(15_26_46/.12)] disabled:opacity-45 disabled:cursor-not-allowed hover:brightness-[1.06]"
                   style={{ background: retour ? 'var(--pos-return)' : 'var(--pos-cash)' }}>
             <Icon name={retour ? 'retour' : 'especes'} size={28} />
@@ -428,11 +479,11 @@ export default function Comptoir() {
 
           {!retour && (
             <div className="flex-none grid gap-2" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>
-              <button type="button" onClick={() => demanderValidation('avecTicket')} disabled={vide || creation || !peutImprimer}
+              <button type="button" onClick={() => demanderValidation('avecTicket')} disabled={vide || creation || verification || !peutImprimer}
                       className="h-[52px] rounded-[11px] border border-brand-700 bg-brand-50 text-brand-text font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
                 Encaisser + ticket <Kbd tone="brand">F12</Kbd>
               </button>
-              <button type="button" onClick={() => demanderValidation('sansTicket')} disabled={vide || creation}
+              <button type="button" onClick={() => demanderValidation('sansTicket')} disabled={vide || creation || verification}
                       className="h-[52px] rounded-[11px] border border-line bg-surface text-ink-label font-bold text-base leading-[1.45] flex items-center justify-between px-3.5 disabled:opacity-45">
                 Sans ticket <Kbd>F11</Kbd>
               </button>
@@ -473,7 +524,7 @@ export default function Comptoir() {
       {dialogue === 'paiement' && (
         <PaiementDialog net={tot.net} ticket={actif + 1} clientNom={clientNom} articles={tot.articles}
                         creditPossible={!!ticket.client} imprimerDefaut={options.ticketAuto && peutImprimer}
-                        imprimante={imprimante} enCours={creation}
+                        imprimante={imprimante} enCours={creation || verification}
                         onValider={(r) => void enregistrer(r)} onClose={() => setDialogue(null)} />
       )}
       {dialogue === 'retour' && (
@@ -499,6 +550,29 @@ export default function Comptoir() {
       )}
       {dialogue === 'caisse' && (
         <ArreteCaisseModal onClose={() => setDialogue(null)} onDone={() => { setDialogue(null); void refetchJour(); }} />
+      )}
+      {doublon && (
+        <ConfirmDialog danger title="Ticket déjà enregistré ?"
+                       confirmLabel="Encaisser quand même" cancelLabel="Ne pas encaisser"
+                       message={(
+                         <>
+                           <p>
+                             La tentative précédente n’a pas reçu de réponse, mais le ticket <strong>{doublon.vente.numero}</strong> de{' '}
+                             <strong className="money">{fmtMoney(doublon.vente.net_a_payer)} DA</strong> a été enregistré depuis.
+                           </p>
+                           <p className="mt-2">
+                             S’il s’agit de cette vente, n’encaissez pas une seconde fois (le stock serait décrémenté deux fois) :
+                             annulez ce ticket (F4) et réimprimez-le depuis les ventes du jour (F10).
+                           </p>
+                         </>
+                       )}
+                       onCancel={() => setDoublon(null)}
+                       onConfirm={() => {
+                         const p = doublon.paiement;
+                         majTicketA(actif, (t) => ({ ...t, incertain: undefined }));
+                         setDoublon(null);
+                         void enregistrer(p, true);
+                       }} />
       )}
       {apercu && <ImprimerDocument demande={apercu} onClose={() => setApercu(null)} />}
     </div>

@@ -6,8 +6,8 @@ import { COULEUR_TON, MENU_LATERAL, estActive, type Action } from '../navigation
 import { usePreferencesNavigation } from '../navigation/preferences';
 import { useEnregistrerRecents } from '../navigation/recents';
 import ErrorBoundary from './ErrorBoundary';
-import { useQuery } from '@apollo/client';
-import { MY_AGENTS } from '../api/auth';
+import { useConnexion, useSurveillanceReseau } from '../api/useSurveillanceReseau';
+import { useReseau } from '../store/reseau';
 import { useSession } from '../store/session';
 import CommandPalette from './CommandPalette';
 import DossierSwitcher from './DossierSwitcher';
@@ -81,13 +81,12 @@ export default function AppShell() {
     applyTheme(t);
   };
 
-  // Statut agent temps quasi-réel : polling myAgents (pas de subscriptions côté cloud)
-  const { data } = useQuery(MY_AGENTS, { pollInterval: 20_000, fetchPolicy: 'network-only' });
+  // Surveillance unique de la connexion (Internet / serveur / agent), partagée avec le comptoir
+  useSurveillanceReseau();
+  const connexion = useConnexion();
+  const online = connexion.ok;
   // Bascule proposée seulement si le compte a plusieurs agents
-  const plusieursAgents = Array.isArray(data?.myAgents) && data.myAgents.length > 1;
-  const live = (data?.myAgents as { agentId: string; isOnline: boolean }[] | undefined)
-    ?.find((a) => a.agentId === agent?.agentId);
-  const online = live?.isOnline ?? agent?.isOnline ?? false;
+  const plusieursAgents = (useReseau((s) => s.agents)?.length ?? 0) > 1;
   const nomAgent = String(agent?.label ?? agent?.agentId ?? '');
   const utilisateur = String(dossierUser?.name || dossierUser?.username || '');
 
@@ -137,7 +136,7 @@ export default function AppShell() {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <Ruban executer={executer} session={{
-          online, agent: nomAgent, dossier: String(dossier ?? ''),
+          online, connexion, agent: nomAgent, dossier: String(dossier ?? ''),
           utilisateur: String(dossierUser?.username ?? ''), plusieursAgents,
         }} />
         {surcouches}
@@ -239,9 +238,9 @@ export default function AppShell() {
           <div className="ml-auto flex items-center gap-1.5">
             <span className={cn('hidden md:inline-flex items-center gap-2 h-8 px-3 rounded-full text-xs font-semibold border',
               online ? 'bg-success-soft border-success-line text-success-text' : 'bg-danger-soft border-danger-line text-danger-text')}
-                  title={`${online ? 'Agent connecté' : 'Agent hors ligne'} — ${nomAgent}`}>
+                  title={`${connexion.libelle} — ${nomAgent}\n${connexion.detail}`} role="status">
               <StatusDot online={online} />
-              <span className="max-w-[200px] truncate">{online ? 'Connecté' : 'Hors ligne'} · {nomAgent}</span>
+              <span className="max-w-[220px] truncate">{connexion.libelle} · {nomAgent}</span>
             </span>
             <IconButton icon={theme === 'dark' ? 'sun' : 'moon'} label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
                         tooltip tooltipSide="bottom" onClick={basculerTheme} />

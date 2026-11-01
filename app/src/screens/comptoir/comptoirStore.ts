@@ -28,6 +28,8 @@ type EtatComptoir = {
   charger: (dossier: string) => void;
   setActif: (i: number) => void;
   majTicket: (f: (t: TicketComptoir) => TicketComptoir) => void;
+  /** Modifie un ticket désigné (réponse asynchrone arrivée après un changement d'onglet). */
+  majTicketA: (index: number, f: (t: TicketComptoir) => TicketComptoir) => void;
   viderTicket: () => void;
   /** Modifie une ligne où qu'elle soit (réponse asynchrone, ex. lot, arrivée après un changement d'onglet). */
   patchLigne: (key: number, p: Partial<LigneDoc>) => void;
@@ -65,9 +67,10 @@ export const useComptoir = create<EtatComptoir>((set, get) => ({
     set({ dossier, tickets: ticketsInitiaux(dossier), actif: 0 });
   },
   setActif: (i) => set({ actif: Math.max(0, Math.min(NB_TICKETS - 1, i)) }),
-  majTicket: (f) => {
-    const { tickets, actif, dossier } = get();
-    const next = tickets.map((t, i) => (i === actif ? f(t) : t));
+  majTicket: (f) => get().majTicketA(get().actif, f),
+  majTicketA: (index, f) => {
+    const { tickets, dossier } = get();
+    const next = tickets.map((t, i) => (i === index ? f(t) : t));
     set({ tickets: next });
     if (dossier) ecrire(cleTickets(dossier), next);
   },
