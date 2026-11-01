@@ -10,6 +10,7 @@ import { useToast } from '../components/ui/Toast';
 import { EmptyState } from '../components/ui/States';
 import { useReseau } from '../store/reseau';
 import { useConnexion } from '../api/useSurveillanceReseau';
+import { etatCacheHorsLigne, viderCacheHorsLigne, VALIDITE_ARTICLES_MS, VALIDITE_REFERENTIELS_MS } from '../api/cacheHorsLigne';
 
 const PING = gql`query DiagPing { __typename }`;
 const SESSION_STATUS = gql`query DiagSession { sessionStatus }`;
@@ -38,6 +39,10 @@ export default function Diagnostic() {
   const journal = useReseau((s) => s.journal);
   const viderJournal = useReseau((s) => s.viderJournal);
   const derniereReponse = useReseau((s) => s.derniereReponse);
+  // Cache hors ligne du dossier courant (articles consultés, référentiels)
+  const [cache, setCache] = useState<Awaited<ReturnType<typeof etatCacheHorsLigne>>>(null);
+  const lireCache = useCallback(() => { void etatCacheHorsLigne().then(setCache); }, []);
+  useEffect(lireCache, [lireCache]);
   // Protection de la session sur ce poste (application de bureau uniquement)
   const [protection, setProtection] = useState<string>('—');
 
@@ -170,6 +175,27 @@ export default function Diagnostic() {
           { label: 'Dossier', value: dossier ?? '—' },
           { label: 'Utilisateur du dossier', value: dossierUser?.username ?? '—' },
           { label: 'Session sur ce poste', value: protection },
+        ]} />
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="flex-1">
+            <div className="font-bold text-base text-ink">Cache hors ligne</div>
+            <div className="text-xs text-ink-muted mt-0.5">
+              Si le serveur est injoignable, la recherche d’articles et les référentiels utilisent les dernières données reçues sur ce poste
+              (articles : {VALIDITE_ARTICLES_MS / 3600_000} h, référentiels : {VALIDITE_REFERENTIELS_MS / 86_400_000} jours). L’encaissement reste suspendu.
+            </div>
+          </div>
+          <Button size="sm" icon="trash" disabled={!cache || (cache.articles === 0 && cache.reponses === 0)}
+                  onClick={() => { void viderCacheHorsLigne().then(() => { lireCache(); toast.success('Cache hors ligne vidé.'); }); }}>
+            Vider
+          </Button>
+        </div>
+        <DescriptionList columns={3} className="mt-3" items={[
+          { label: 'Articles disponibles hors ligne', value: cache ? String(cache.articles) : '—' },
+          { label: 'Référentiels mémorisés', value: cache ? String(cache.reponses) : '—' },
+          { label: 'Article le plus ancien', value: cache?.plusAncien ? new Date(cache.plusAncien).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—' },
         ]} />
       </Card>
 

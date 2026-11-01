@@ -6,6 +6,7 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { useSession } from '../store/session';
 import { useReseau } from '../store/reseau';
 import { DelaiDepasseError, estPanneTransport, messageErreur } from './erreurs';
+import { horsLigneLink } from './cacheHorsLigne';
 
 // Codes poussés par le cloud dans extensions.code (pattern errorLink du mobile)
 const ACCESS_CODES = new Set(['ACCOUNT_BLOCKED', 'SUBSCRIPTION_SUSPENDED', 'SUBSCRIPTION_EXPIRED', 'AGENT_NOT_ALLOWED']);
@@ -118,8 +119,9 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
 });
 
 export const apollo = new ApolloClient({
-  // Ordre : erreurs (vue finale) → relance → sonde de succès → délai par tentative → en-têtes → HTTP
-  link: from([errorLink, retryLink, sondeLink, delaiLink, authLink, httpLink]),
+  // Ordre : cache hors ligne (secours en dernier recours) → erreurs (vue finale, panne comptée) → relance
+  // → sonde de succès → délai par tentative → en-têtes → HTTP
+  link: from([horsLigneLink, errorLink, retryLink, sondeLink, delaiLink, authLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: { fetchPolicy: 'cache-and-network' },

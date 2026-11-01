@@ -527,7 +527,13 @@ local des connexions LAN (poste, utilisateur, heure) remonté au cloud par le he
 - ✅ **Journal des incidents réseau** dans `/diagnostic` (50 derniers, répétitions regroupées, conservé sur le poste) + état de la connexion et heure de la dernière réponse du serveur.
 - ✅ Rafraîchissement des ventes du jour différé de 1,5 s après un encaissement (l'impression passe d'abord).
 - ⏳ **Côté agent / cloud** : `client_request_id` + table d'idempotence + commande atomique `createVenteEncaissee` (seule vraie garantie anti-doublon). Un en-tête `X-Druxamed-Request-Id` n'a pas été ajouté côté application : il faut d'abord l'autoriser dans les `allowedHeaders` CORS du cloud, sinon toutes les requêtes échoueraient.
-- ⏳ **Cache persistant des référentiels** (`apollo3-cache-persist`) : reporté ; à traiter avec la règle de fraîcheur des prix (TTL, invalidation à la connexion).
+- ✅ **Cache hors ligne des référentiels** (`api/cacheHorsLigne.ts`, IndexedDB du poste, sans dépendance ajoutée). Plutôt que de persister tout le cache Apollo (ventes, soldes… périmés et sensibles), un cache **ciblé**, servi **uniquement** quand le serveur est injoignable (après les relances) :
+  - référentiels (`Referentiels`, `CoordonneesSociete`, `SousFamilles`, `Rayons`) : dernière réponse complète, valable **7 jours** ;
+  - articles : chaque article reçu (recherche, scan, fiche) est mémorisé ; hors ligne, recherche (tous les mots, sans accents), scan par code-barres et par code se font sur ces articles connus, valables **24 h** ; la liste affiche « Hors ligne : articles déjà consultés — prix et stock au JJ/MM HH:MM » ; un code absent du cache n'est pas déclaré « inconnu » ;
+  - clé agent + dossier ; une réponse en ligne remplace toujours le cache ; une erreur métier n'est jamais masquée ; un filtre non rejouable localement (famille, alertes, grille, pagination) ne reçoit pas de réponse approximative ;
+  - invalidation : toute écriture réussie sur un article, un tarif, un code-barres ou un référentiel vide le cache du dossier ; la déconnexion vide tout le cache du poste ; bouton « Vider » dans `/diagnostic` (compteurs et date de l'article le plus ancien) ;
+  - usage : continuer à **préparer** des tickets et à consulter pendant une coupure ; l'encaissement reste suspendu.
+  - *Limite connue* : un prix modifié depuis un autre poste (ou le Delphi) n'est connu qu'à la prochaine lecture en ligne ; le cache est donc limité à 24 h et clairement signalé.
 
 ### Lot 2 — Mode LAN / hybride (effort L, 6–10 semaines, agent + cloud + app)
 | Action | Effort | Risque | Recette |
