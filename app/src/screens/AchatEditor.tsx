@@ -3,7 +3,7 @@ import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, messageErreur, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ACHAT, UPDATE_ACHAT, ADD_REGLEMENT_FOURNISSEUR } from '../api/queries';
+import { ACHAT, UPDATE_ACHAT, ADD_REGLEMENT_FOURNISSEUR, MODES_PAYEMENT } from '../api/queries';
 import { Achat, ACHAT_TYPE_CODE, Article, Fournisseur, TYPES_ACHAT } from '../api/types';
 import { useDroits } from '../lib/droits';
 import { fmtMoney, fmtQte, isoToday, isoDate } from '../lib/format';
@@ -24,9 +24,6 @@ import { useSession } from '../store/session';
 
 const CREATE_ACHAT = gql`
   mutation CreateAchat($input: JSON!) { createAchat(input: $input) }
-`;
-const MODES = gql`
-  query ModesPayementAchat { modesPayement }
 `;
 
 type TypeAchat = (typeof TYPES_ACHAT)[number]['code'];
@@ -57,7 +54,7 @@ export default function AchatEditor() {
   const [montantPaye, setMontantPaye] = useState('');
   const dossierUser = useSession((s) => s.dossierUser);
 
-  const { data: refs } = useQuery(MODES);
+  const { data: refs } = useQuery(MODES_PAYEMENT);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
   const [create, { loading: creating }] = useMutation(CREATE_ACHAT);
   const [update, { loading: updating }] = useMutation(UPDATE_ACHAT);

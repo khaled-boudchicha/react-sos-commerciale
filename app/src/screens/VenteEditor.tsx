@@ -3,7 +3,7 @@ import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { VENTE, UPDATE_VENTE, ADD_REGLEMENT_CLIENT } from '../api/queries';
+import { VENTE, UPDATE_VENTE, ADD_REGLEMENT_CLIENT, MODES_PAYEMENT } from '../api/queries';
 import { Article, Client, TYPES_VENTE, Vente, VENTE_TYPE_CODE } from '../api/types';
 import { useSession } from '../store/session';
 import { useDroits } from '../lib/droits';
@@ -24,9 +24,6 @@ import RemiseGlobale from '../components/document/RemiseGlobale';
 
 const CREATE_VENTE = gql`
   mutation CreateVente($input: JSON!) { createVente(input: $input) }
-`;
-const MODES = gql`
-  query ModesPayementEditor { modesPayement }
 `;
 
 type TypeVente = (typeof TYPES_VENTE)[number]['code'];
@@ -65,7 +62,7 @@ export default function VenteEditor() {
   const [error, setError] = useState<string | null>(null);
   const montantRecuRef = useRef<HTMLInputElement>(null);
 
-  const { data: refs } = useQuery(MODES);
+  const { data: refs } = useQuery(MODES_PAYEMENT);
   const modes: any[] = Array.isArray(refs?.modesPayement) ? refs.modesPayement : [];
   const [create, { loading: creating }] = useMutation(CREATE_VENTE);
   const [update, { loading: updating }] = useMutation(UPDATE_VENTE);

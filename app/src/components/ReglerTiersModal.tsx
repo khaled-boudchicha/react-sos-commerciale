@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { REGLER_CLIENT, REGLER_FOURNISSEUR } from '../api/queries';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { fmtMoney, isoToday } from '../lib/format';
 import { StatusPill } from './ui/atoms';
@@ -8,12 +9,6 @@ import { Field, Select, TextInput } from './ui/Field';
 import { Alert } from './ui/States';
 import { useDroits } from '../lib/droits';
 
-const REGLER_CLIENT = gql`
-  mutation ReglerClient($input: JSON!) { reglerClient(input: $input) }
-`;
-const REGLER_FOURNISSEUR = gql`
-  mutation ReglerFournisseur($input: JSON!) { reglerFournisseur(input: $input) }
-`;
 const MODES = gql`
   query ModesEtComptes { modesPayement banques }
 `;

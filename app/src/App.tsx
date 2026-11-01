@@ -1,34 +1,36 @@
+import { lazy, Suspense } from 'react';
 import { Outlet, Route, RouterProvider, createHashRouter, createRoutesFromElements } from 'react-router-dom';
+import { Skeleton } from './components/ui/States';
 import { useSession } from './store/session';
 import Login from './screens/Login';
 import AppShell from './components/AppShell';
 import Dashboard from './screens/Dashboard';
 import Ventes from './screens/Ventes';
-import VenteDetail from './screens/VenteDetail';
+const VenteDetail = lazy(() => import('./screens/VenteDetail'));
 import VenteEditor from './screens/VenteEditor';
 import Comptoir from './screens/comptoir/Comptoir';
 import Achats from './screens/Achats';
-import AchatDetail from './screens/AchatDetail';
+const AchatDetail = lazy(() => import('./screens/AchatDetail'));
 import AchatEditor from './screens/AchatEditor';
 import Stock from './screens/Stock';
-import ArticleDetail from './screens/ArticleDetail';
-import Inventaires from './screens/Inventaires';
-import InventaireDetail from './screens/InventaireDetail';
+const ArticleDetail = lazy(() => import('./screens/ArticleDetail'));
+const Inventaires = lazy(() => import('./screens/Inventaires'));
+const InventaireDetail = lazy(() => import('./screens/InventaireDetail'));
 import Tiers from './screens/Tiers';
-import Echeances from './screens/Echeances';
-import ClientDetail from './screens/ClientDetail';
-import FournisseurDetail from './screens/FournisseurDetail';
-import Tresorerie from './screens/Tresorerie';
-import Statistiques from './screens/Statistiques';
-import Referentiels from './screens/Referentiels';
+const Echeances = lazy(() => import('./screens/Echeances'));
+const ClientDetail = lazy(() => import('./screens/ClientDetail'));
+const FournisseurDetail = lazy(() => import('./screens/FournisseurDetail'));
+const Tresorerie = lazy(() => import('./screens/Tresorerie'));
+const Statistiques = lazy(() => import('./screens/Statistiques'));
+const Referentiels = lazy(() => import('./screens/Referentiels'));
 import Parametres from './screens/Parametres';
-import { ModelesPage } from '@softly/report';
-import Diagnostic from './screens/Diagnostic';
+const ModelesPage = lazy(() => import('@softly/report').then((m) => ({ default: m.ModelesPage })));
+const Diagnostic = lazy(() => import('./screens/Diagnostic'));
 import NotFound from './screens/NotFound';
-import DemoGrille from './screens/DemoGrille';
-import DemoUI from './screens/DemoUI';
-import MouvementsStock from './screens/MouvementsStock';
-import Utilisateurs from './screens/Utilisateurs';
+const DemoGrille = lazy(() => import('./screens/DemoGrille'));
+const DemoUI = lazy(() => import('./screens/DemoUI'));
+const MouvementsStock = lazy(() => import('./screens/MouvementsStock'));
+const Utilisateurs = lazy(() => import('./screens/Utilisateurs'));
 import RequireDroit from './components/RequireDroit';
 import { LIBELLES_REFERENTIELS } from './components/AppShell';
 import { D, useDroits } from './lib/droits';
@@ -36,7 +38,15 @@ import { D, useDroits } from './lib/droits';
 /** Élément de route protégé par un droit (prédicat évalué sur les droits de session). */
 function G({ si, children }: { si: (d: ReturnType<typeof useDroits>) => boolean; children: React.ReactNode }) {
   const d = useDroits();
-  return <RequireDroit si={si(d)}>{children}</RequireDroit>;
+  return <RequireDroit si={si(d)}><Differe>{children}</Differe></RequireDroit>;
+}
+
+/**
+ * Écrans secondaires chargés à la demande (code découpé) : le démarrage ne charge que la coquille,
+ * le tableau de bord, les ventes, les achats, le stock, les tiers et la caisse.
+ */
+function Differe({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<div className="p-2" aria-busy="true"><Skeleton lines={6} /></div>}>{children}</Suspense>;
 }
 import ErrorBoundary from './components/ErrorBoundary';
 import RaccourcisGlobaux from './components/RaccourcisGlobaux';
@@ -80,8 +90,8 @@ const router = createHashRouter(createRoutesFromElements(
       <Route path="modeles" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><ModelesPage /></G>} />
       <Route path="parametres" element={<G si={(d) => d.peut('autre', D.autre.parametres)}><Parametres /></G>} />
       <Route path="parametres/utilisateurs" element={<G si={(d) => d.peut('autre', D.autre.droitsAcces)}><Utilisateurs /></G>} />
-      <Route path="diagnostic" element={<Diagnostic />} />
-      <Route path="outils/ui" element={<DemoUI />} />
+      <Route path="diagnostic" element={<Differe><Diagnostic /></Differe>} />
+      <Route path="outils/ui" element={<Differe><DemoUI /></Differe>} />
       <Route path="outils/grille" element={<G si={(d) => d.peut('stock', D.stock.article)}><DemoGrille /></G>} />
       <Route path="*" element={<NotFound />} />
     </Route>

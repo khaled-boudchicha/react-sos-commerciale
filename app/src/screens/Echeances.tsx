@@ -7,6 +7,7 @@ import { PageHeader, SearchInput, Tabs, Toolbar } from '../components/ui/atoms';
 import { Button } from '../components/ui/Button';
 import { KpiTile } from '../components/ui/Kpi';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import ReglerPieceModal from '../components/document/ReglerPieceModal';
 import { useToast } from '../components/ui/Toast';
 import { useSession } from '../store/session';
 
@@ -34,6 +35,8 @@ export default function Echeances() {
   const [statut, setStatut] = useState<Statut>('tous');
   const [search, setSearch] = useState('');
   const [aPayer, setAPayer] = useState<Echeance | null>(null);
+  // Règlement détaillé : montant partiel, mode, caisse, date (même fenêtre que depuis la pièce)
+  const [aRegler, setARegler] = useState<Echeance | null>(null);
 
   const { data, loading, error, refetch } = useQuery(ECHEANCES, {
     variables: { statut, search: search || undefined, limit: 500, offset: 0 },
@@ -72,10 +75,13 @@ export default function Echeances() {
     { key: 'client', header: 'Client', render: (e) => <><b>{e.raison}</b> <span className="text-ink-muted text-xs">{e.code_cli}</span></> },
     { key: 'net', header: 'Montant', align: 'right', width: '120px', render: (e) => <span className="money">{fmtMoney(e.net_a_payer)}</span> },
     { key: 'reste', header: 'Reste', align: 'right', width: '120px', render: (e) => <span className="money font-semibold" style={{ color: 'var(--danger-text)' }}>{fmtMoney(e.reste)}</span> },
-    { key: 'action', header: '', width: '120px', render: (e) => (
-      <Button size="xs" icon="check" onClick={() => setAPayer(e)}>
-        Marquer payé
-      </Button>
+    { key: 'action', header: '', width: '210px', render: (e) => (
+      <span className="flex gap-1.5 justify-end">
+        <Button size="xs" icon="cash" onClick={() => setARegler(e)} title="Montant partiel, mode de paiement, caisse">Régler…</Button>
+        <Button size="xs" icon="check" onClick={() => setAPayer(e)} title="Solde le reste en espèces, aujourd’hui, dans votre caisse">
+          Tout payé
+        </Button>
+      </span>
     ) },
   ];
 
@@ -102,6 +108,11 @@ export default function Echeances() {
       <DataGrid titre="Pièces à régler" columns={columns} rows={lignes} rowKey={(e) => String(e.id)}
                 loading={loading} error={error?.message} />
 
+      {aRegler && (
+        <ReglerPieceModal sens="vente" pieceId={aRegler.id} numero={`${aRegler.type_doc} ${aRegler.numero}`} reste={Number(aRegler.reste) || 0}
+                          onClose={() => setARegler(null)}
+                          onDone={() => { setARegler(null); void refetch(); }} />
+      )}
       {aPayer && (
         <ConfirmDialog
           title="Marquer la pièce comme payée ?"
