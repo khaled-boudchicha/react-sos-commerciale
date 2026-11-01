@@ -57,6 +57,22 @@ describe('navigation', () => {
   });
 });
 
+describe('assistance', () => {
+  test('Diagnostic : le rapport copié contient l’état du poste, sans aucun jeton', async () => {
+    const page = await ouvrir(navigateur, { route: '/diagnostic', gql: serveur() });
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: 'http://localhost:4317' });
+    await page.locator('h1:has-text("Diagnostic de connexion")').waitFor({ timeout: 8000 });
+    await page.click('button:has-text("Copier le rapport")');
+    await page.waitForTimeout(400);
+    const texte = await page.evaluate(() => navigator.clipboard.readText());
+    assert.match(texte, /RAPPORT DE DIAGNOSTIC/);
+    assert.match(texte, /Pharmacie Centrale/);
+    assert.match(texte, /GC_TEST/);
+    assert.doesNotMatch(texte, /jeton-test/);
+    await page.context().close();
+  });
+});
+
 describe('connexion', () => {
   test('jeton expiré : retour à la connexion avec une explication', async () => {
     const page = await ouvrir(navigateur, { gql: () => ({ erreurs: [{ message: 'jwt expired', extensions: { code: 'UNAUTHENTICATED' } }] }) });

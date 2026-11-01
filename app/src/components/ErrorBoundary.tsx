@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { StatePanel } from './ui/States';
 import { Button } from './ui/Button';
+import { useJournalErreurs } from '../lib/journalErreurs';
 
 type Props = { children: ReactNode; /** Change de valeur → l'erreur est oubliée (ex. changement d'écran). */ resetKey?: string };
 type State = { error: Error | null };
@@ -18,6 +19,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack);
+    // Conservé sur le poste pour le support (Diagnostic › rapport)
+    useJournalErreurs.getState().journaliser('ecran', error);
   }
 
   componentDidUpdate(prev: Props) {

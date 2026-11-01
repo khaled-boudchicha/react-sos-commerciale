@@ -66,6 +66,7 @@ Priorité : **P0** intégrité des données / sécurité · **P1** fonction atte
 | D43 | agent | Piste d'audit (qui a modifié / supprimé quoi), import Excel. | 08 I21 |
 | D44 | agent | API GraphQL **locale** de l'agent : `annulerMouvement` est un stub (renvoie `false`), `mouvementTresorie` sans résolveur — à corriger avant tout usage (mode LAN). | 08 C11 |
 | D45 | ops | Exécuter une première fois le pipeline GitLab (builds Windows / Linux) ; héberger les mises à jour (`GC_UPDATE_URL`). | 08 B6, 04 |
+| D46 | cloud | *(Option)* Point de collecte des erreurs de l'application, **avec consentement** et sans donnée métier, pour remplacer le copier-coller du rapport de diagnostic. | — (l'app tient un journal local et produit un rapport copiable, Diagnostic › « Copier le rapport ») |
 
 ## 5. Questions à trancher par le propriétaire
 
