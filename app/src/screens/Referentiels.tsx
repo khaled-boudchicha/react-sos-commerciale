@@ -43,6 +43,10 @@ type Ref = {
   /** true si la query renvoie { data, total } au lieu d'un tableau direct. */
   listeDansData?: boolean;
   nomLigne: (l: Ligne) => string;
+  /** Valeurs du formulaire de modification (la lecture et l'écriture n'emploient pas toujours les mêmes noms). */
+  versFormulaire?: (l: Ligne) => Record<string, unknown>;
+  /** Champ du formulaire à proposer en liste, alimentée par une autre liste de REFERENTIELS. */
+  listeDe?: { champ: string; source: string };
 };
 
 const col = (key: string, header: string, opts: Partial<Column<Ligne>> = {}): Column<Ligne> => ({
@@ -70,8 +74,10 @@ const REFS: Ref[] = [
     sections: [{ title: 'Sous-famille', fields: [
       { name: 'code', label: 'Code', span: 4 },
       { name: 'designation', label: 'Désignation', span: 8, required: true },
-      { name: 'famille', label: 'Famille (code)', span: 6 },
+      { name: 'famille', label: 'Famille', span: 6 },
     ] }],
+    // La famille se choisit dans la liste des familles (au lieu d'un code tapé à la main)
+    listeDe: { champ: 'famille', source: 'familles' },
     titres: { creer: 'Nouvelle sous-famille', supprimer: 'Supprimer cette sous-famille ?' },
     nomLigne: (l) => l.designation,
   },
@@ -208,6 +214,8 @@ const REFS: Ref[] = [
       { name: 'description', label: 'Description', type: 'textarea', span: 12 },
     ] }],
     titres: { creer: 'Nouveau type de charge', editer: 'Modifier le type de charge', supprimer: 'Supprimer ce type de charge ?' },
+    // Lecture : `prix_unit` ; écriture : `montant` → la modification reprend le prix actuel
+    versFormulaire: (l) => ({ ...l, montant: l.montant ?? l.prix_unit }),
     nomLigne: (l) => l.designation,
   },
 ];
@@ -261,12 +269,20 @@ function TableRef({ ref_, slotAction }: { ref_: Ref; slotAction: HTMLElement | n
     ? (Array.isArray(brut?.data) ? brut.data : [])
     : (Array.isArray(brut) ? brut : []);
 
+  // Liste de choix alimentée par une autre liste des référentiels (ex. familles d'une sous-famille)
+  const { data: sources } = useQuery(REFERENTIELS, { skip: !ref_.listeDe, fetchPolicy: 'cache-first' });
+  const options = ref_.listeDe ? optionsDe(sources?.[ref_.listeDe.source]) : [];
+  const sections = ref_.listeDe && options.length
+    ? ref_.sections.map((s) => ({ ...s, fields: s.fields.map((f) => (f.name === ref_.listeDe!.champ ? { ...f, type: 'select' as const, options } : f)) }))
+    : ref_.sections;
+
   const crud = useCrud<Ligne>({
     label: ref_.label.toLowerCase(),
     createTitle: ref_.titres?.creer,
     editTitle: ref_.titres?.editer,
     deleteTitle: ref_.titres?.supprimer,
-    sections: ref_.sections,
+    sections,
+    versFormulaire: ref_.versFormulaire,
     createDoc: ref_.create, updateDoc: ref_.update, deleteDoc: ref_.remove,
     onDone: () => { void refetch(); },
     labelOf: ref_.nomLigne,
@@ -296,4 +312,16 @@ function TableRef({ ref_, slotAction }: { ref_: Ref; slotAction: HTMLElement | n
       )}
     </>
   );
+}
+
+/** Options d'une liste de référentiel (chaînes ou objets {code, designation}) : valeur = code, libellé lisible. */
+function optionsDe(liste: unknown): { value: string; label: string }[] {
+  if (!Array.isArray(liste)) return [];
+  return liste.map((x) => {
+    if (typeof x === 'string') return { value: x, label: x };
+    const o = (x ?? {}) as Record<string, unknown>;
+    const code = String(o.code ?? o.Code ?? o.designation ?? o.id ?? '');
+    const lib = String(o.designation ?? o.Designation ?? code);
+    return { value: code, label: code && lib !== code ? `${lib} (${code})` : lib };
+  }).filter((o) => o.value);
 }

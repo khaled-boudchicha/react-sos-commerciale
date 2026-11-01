@@ -9,6 +9,9 @@ import { Card, DescriptionList } from '../components/ui/Card';
 import { Alert, Skeleton } from '../components/ui/States';
 import { D, useDroits } from '../lib/droits';
 import FicheStockPanel from '../components/FicheStockPanel';
+import { NouveauLotDialog, SupprimerLotDialog, type LotGere } from '../components/GestionLots';
+import { Button, IconButton } from '../components/ui/Button';
+import { useState } from 'react';
 
 type Lot = { id: number; n_lot: string; date_fabrication?: string | null; date_peremption?: string | null; qte: number; prix?: unknown[] };
 type Tarif = Record<string, unknown> & { qte_from?: number; qte_to?: number; prix_ht?: number };
@@ -24,7 +27,11 @@ export default function ArticleDetail() {
   // L'agent renvoie { article, lots, tarifs, … } (forme partagée avec l'app mobile)
   const a: Article | undefined = data?.article?.article ?? data?.article ?? undefined;
 
-  const { data: lotsData, loading: lotsLoading, error: lotsErreur } = useQuery(LOTS, { variables: { article_id: articleId } });
+  const { data: lotsData, loading: lotsLoading, error: lotsErreur, refetch: relireLots } = useQuery(LOTS, { variables: { article_id: articleId } });
+  // Gestion des lots : accès aux lots + modification de l'article
+  const peutGererLots = peut('stock', D.stock.lots) && peut('stock', D.stock.modifierArticle);
+  const [nouveauLot, setNouveauLot] = useState(false);
+  const [lotASupprimer, setLotASupprimer] = useState<LotGere | null>(null);
   const { data: tarifsData } = useQuery(TARIFS_ARTICLE, { variables: { code_article: a?.code ?? '' }, skip: !a?.code });
   const { data: bcData } = useQuery(BARCODES_ARTICLE, { variables: { article_id: articleId } });
 
@@ -34,13 +41,17 @@ export default function ArticleDetail() {
 
   const lotCols: Column<Lot>[] = [
     { key: 'lot', header: 'N° lot', sortAccessor: (l) => l.n_lot ?? '', render: (l) => <b className="money">{l.n_lot}</b> },
-    { key: 'per', header: 'Péremption', width: '110px', sortAccessor: (l) => l.date_peremption ?? null, render: (l) => {
+    { key: 'per', header: 'Péremption', width: '160px', sortAccessor: (l) => l.date_peremption ?? null, render: (l) => {
       if (!l.date_peremption) return <span className="text-ink-muted">—</span>;
       const days = Math.round((new Date(l.date_peremption).getTime() - Date.now()) / 86_400_000);
       const tone = days < 0 ? 'bad' : days <= 60 ? 'warn' : 'ok';
       return <span className="flex items-center gap-2">{fmtDate(l.date_peremption)} <StatusPill tone={tone}>{days < 0 ? 'Périmé' : `J-${days}`}</StatusPill></span>;
     } },
     { key: 'qte', header: 'Qté', align: 'right', width: '80px', render: (l) => <span className="money font-semibold">{fmtQte(l.qte)}</span> },
+    // Suppression : lots épuisés seulement (un lot en stock se vide par une sortie, pas par suppression)
+    ...(peutGererLots ? [{ key: 'act', header: '', align: 'right' as const, width: '48px', render: (l: Lot) => (Number(l.qte ?? 0) === 0
+      ? <IconButton icon="trash" size="xs" label={`Supprimer le lot ${l.n_lot ?? ''}`} onClick={() => setLotASupprimer(l as LotGere)} />
+      : null) }] : []),
   ];
 
   const tarifCols: Column<Tarif>[] = [
@@ -92,7 +103,18 @@ export default function ArticleDetail() {
       <div className="grid grid-cols-2 gap-3.5 items-start">
         {peut('stock', D.stock.lots) && (
           <div className="flex flex-col gap-2">
-            <h2 className="font-bold text-md text-ink">Lots & péremption</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-md text-ink">Lots & péremption</h2>
+              {peutGererLots && <Button size="sm" icon="plus" onClick={() => setNouveauLot(true)}>Nouveau lot</Button>}
+            </div>
+            {nouveauLot && (
+              <NouveauLotDialog articleId={articleId} existants={lots as LotGere[]} onClose={() => setNouveauLot(false)}
+                                onDone={() => { setNouveauLot(false); void relireLots(); }} />
+            )}
+            {lotASupprimer && (
+              <SupprimerLotDialog lot={lotASupprimer} onClose={() => setLotASupprimer(null)}
+                                  onDone={() => { setLotASupprimer(null); void relireLots(); }} />
+            )}
             <DataGrid complet columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot."
                       error={lotsErreur && !lotsData ? `Lots indisponibles : ${lotsErreur.message}` : undefined} />
           </div>

@@ -31,7 +31,7 @@ export async function loadTheme() {
 /** Libellés des coordonnées affichées (clés renvoyées par COORDONNEES_SOCIETE). */
 const LIBELLES_COORD: Record<string, string> = {
   raison_sociale: 'Raison sociale', adresse: 'Adresse', wilaya: 'Wilaya', telephone: 'Téléphone', email: 'Email',
-  nif: 'NIF', nis: 'NIS', rc: 'RC', art: 'Art. imposition', rib: 'RIB',
+  nif: 'NIF', nis: 'NIS', rc: 'RC', art: 'Art. imposition', rib: 'RIB', slogan: 'Slogan', fax: 'Fax', site_web: 'Site web',
 };
 
 export default function Parametres() {
@@ -151,7 +151,7 @@ export default function Parametres() {
             Coordonnées indisponibles : {coordErreur.message}
           </Alert>
         )}
-        <DescriptionList items={['raison_sociale', 'adresse', 'wilaya', 'telephone', 'email', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => ({
+        <DescriptionList items={['raison_sociale', 'slogan', 'adresse', 'wilaya', 'telephone', 'fax', 'email', 'site_web', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => ({
           label: LIBELLES_COORD[k] ?? k.replace('_', ' '),
           value: coord[k] == null ? null : String(coord[k]),
           mono: ['nif', 'nis', 'rc', 'art', 'rib'].includes(k),
@@ -169,7 +169,8 @@ export default function Parametres() {
             { title: 'Identité', fields: [
               { name: 'raison_sociale', label: 'Raison sociale', span: 8, required: true },
               { name: 'slogan', label: 'Slogan', span: 4 },
-              { name: 'adresse', label: 'Adresse', span: 12 },
+              { name: 'adresse', label: 'Adresse', span: 8 },
+              { name: 'wilaya', label: 'Wilaya', span: 4 },
             ] },
             { title: 'Contacts', fields: [
               { name: 'telephone', label: 'Téléphone', span: 4 },
@@ -182,6 +183,7 @@ export default function Parametres() {
               { name: 'nif', label: 'NIF', span: 3 },
               { name: 'nis', label: 'NIS', span: 3 },
               { name: 'art', label: 'Art. Imp.', span: 3 },
+              { name: 'rib', label: 'RIB', span: 12 },
             ] },
           ]}
           onCancel={() => setEditCoord(false)}

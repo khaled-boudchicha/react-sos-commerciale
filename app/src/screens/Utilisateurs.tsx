@@ -4,7 +4,7 @@ import {
   DOSSIER_USERS, CREATE_DOSSIER_USER, UPDATE_DOSSIER_USER, DELETE_DOSSIER_USER, SOLDES_COMPTES,
 } from '../api/queries';
 import { useSession } from '../store/session';
-import { CATALOGUE_DROITS, Droits, ModuleDroit, MODULES_DROITS } from '../lib/droits';
+import { CATALOGUE_DROITS, Droits, ModuleDroit, MODULES_DROITS, useDroits } from '../lib/droits';
 import { fmtDate } from '../lib/format';
 import { PageHeader, StatusPill, Tabs } from '../components/ui/atoms';
 import { Button } from '../components/ui/Button';
@@ -74,6 +74,10 @@ export default function Utilisateurs() {
   }, [selection, data]);
 
   const estAdmin = b.typeuser === 'admin';
+  // Seul un administrateur peut donner le profil Administrateur (un compte déjà administrateur le garde affiché)
+  const jeSuisAdmin = useDroits().admin || String(moi?.typeuser ?? '').toLowerCase() === 'admin';
+  const estAdminInitial = selection != null && selection !== 'nouveau'
+    && String(users.find((u) => u.id === selection)?.typeuser ?? '').toLowerCase() === 'admin';
 
   function setModuleDroits(m: ModuleDroit, v: '*' | string[]) {
     setB((x) => ({ ...x, droits: { ...x.droits, [m]: v } }));
@@ -106,6 +110,10 @@ export default function Utilisateurs() {
   async function enregistrer() {
     setErreur(null);
     if (!b.username.trim()) { setErreur('Le nom d’utilisateur est requis.'); return; }
+    // Un nouveau compte sans mot de passe serait ouvert à tous sur le poste
+    if (b.id == null && !b.password) { setErreur('Saisissez un mot de passe pour le nouvel utilisateur.'); return; }
+    // L'agent refuse l'élévation en administrateur par un non-administrateur : on ne la propose pas
+    if (b.typeuser === 'admin' && !jeSuisAdmin && !estAdminInitial) { setErreur('Seul un administrateur peut attribuer le profil Administrateur.'); return; }
     const c = comptes.find((x) => String(x.compte_id) === b.compte_id);
     const input = {
       username: b.username.trim(), prenom: b.prenom || null, nom: b.nom || null,
@@ -198,14 +206,14 @@ export default function Utilisateurs() {
               <Field label="Nom">
                 <TextInput value={b.nom} onChange={(e) => setB({ ...b, nom: e.target.value })} maxLength={50} />
               </Field>
-              <Field label="Mot de passe">
+              <Field label="Mot de passe" required={b.id == null}>
                 <TextInput type="password" value={b.password} onChange={(e) => setB({ ...b, password: e.target.value })}
                            placeholder={b.id == null ? '' : 'inchangé si vide'} maxLength={50} autoComplete="new-password" />
               </Field>
               <Field label="Profil">
                 <Select value={b.typeuser} onChange={(e) => setB({ ...b, typeuser: e.target.value as 'admin' | 'user' })}>
                   <option value="user">Utilisateur (droits ci-dessous)</option>
-                  <option value="admin">Administrateur (tous les droits)</option>
+                  {(jeSuisAdmin || estAdminInitial) && <option value="admin">Administrateur (tous les droits)</option>}
                 </Select>
               </Field>
               <Field label="Caisse par défaut">
