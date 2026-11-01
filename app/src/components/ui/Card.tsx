@@ -94,9 +94,10 @@ export function TotalsPanel({ rows, total, after, className }: {
         ))}
       </div>
       {total && (
-        <div className="px-4 py-3 flex items-baseline justify-between gap-4 text-ink-inverse" style={{ background: 'var(--gradient-hero)' }}>
-          <span className="text-sm font-bold uppercase tracking-wide opacity-90">{total.label}</span>
-          <span className="money text-2xl font-extrabold">{fmtMoney(total.value)}{total.currency !== '' && <span className="text-sm font-bold opacity-80 ml-1">{total.currency ?? 'DA'}</span>}</span>
+        <div className="px-4 py-3 flex items-baseline justify-between gap-4 text-ink-inverse bg-brand-700" style={{ backgroundImage: 'var(--gradient-hero)' }}>
+          {/* Couleur pleine sous le dégradé : contraste calculable (lecteurs, audits) et rendu sûr si le dégradé manque */}
+          <span className="text-sm font-bold uppercase tracking-wide">{total.label}</span>
+          <span className="money text-2xl font-extrabold">{fmtMoney(total.value)}{total.currency !== '' && <span className="text-sm font-bold ml-1">{total.currency ?? 'DA'}</span>}</span>
         </div>
       )}
       {after && <div className="px-4 py-3 border-t border-line-soft">{after}</div>}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { cleBrouillon, useBrouillon } from '../lib/brouillons';
 import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, messageErreur, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
@@ -15,7 +16,7 @@ import { Alert, Skeleton } from '../components/ui/States';
 import ArticleSearch from '../components/ArticleSearch';
 import FournisseurSearch from '../components/FournisseurSearch';
 import LignesTable from '../components/document/LignesTable';
-import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { LigneDoc, ligneDepuisArticle, nouvelleCle, totauxDocument } from '../components/document/lignesDocument';
 import { lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import RemiseGlobale from '../components/document/RemiseGlobale';
@@ -103,7 +104,27 @@ export default function AchatEditor() {
     lignes: lignes.map((l) => [l.code_article, l.qte, l.prix_ht, l.remise, l.n_lot]),
   });
   const modifie = useModifie(empreinte, !sourceId || prefait);
-  const garde = useGardeSaisie(modifie);
+
+  // Brouillon automatique d'une NOUVELLE pièce (pas en modification ni en duplication), repris à la réouverture
+  const dossierCourant = useSession((st) => st.dossier);
+  const utilisateurCourant = useSession((st) => st.dossierUser?.id);
+  const cleB = enEdition || sourceId ? null : cleBrouillon('achat', dossierCourant, utilisateurCourant);
+  const brouillon = useBrouillon(cleB, { type: typeChoisi, tiers: fournisseur, date, mode, remiseGlobale, observation, lignes }, modifie);
+  function reprendreBrouillon() {
+    const d = brouillon.existant?.donnees;
+    if (!d) return;
+    if (d.type) setType(d.type);
+    setFournisseur(d.tiers ?? null);
+    if (d.date) setDate(d.date);
+    if (d.mode) setMode(d.mode);
+    setRemiseGlobale(Number(d.remiseGlobale) || 0);
+    setObservation(d.observation ?? '');
+    setLignes((d.lignes ?? []).map((l) => ({ ...l, key: nouvelleCle() })));
+    brouillon.oublierProposition();
+  }
+  const garde = useGardeSaisie(modifie, undefined, { onAbandon: brouillon.effacer });
+  /** Pièce enregistrée : plus de garde, plus de brouillon. */
+  const terminer = () => { brouillon.effacer(); garde.liberer(); };
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -161,7 +182,7 @@ export default function AchatEditor() {
       if (enEdition) {
         const { data } = await update({ variables: { id: Number(editId), input: commun } });
         toast.success(`Pièce ${data?.updateAchat?.numero ?? src?.numero ?? ''} modifiée.`);
-        garde.liberer();
+        terminer();
         navigate(`/achats/${editId}`);
         return;
       }
@@ -184,13 +205,13 @@ export default function AchatEditor() {
         } catch (e: any) {
           // La pièce existe : on informe sans bloquer
           toast.error(`Pièce ${created.numero} créée, mais paiement échoué : ${e.message ?? e}`);
-          garde.liberer();
+          terminer();
           navigate(`/achats/${created.id}`);
           return;
         }
       }
       toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}${paye > 0 ? ` · payé ${fmtMoney(paye)}` : ''}.`.replace('  ', ' '));
-      garde.liberer();
+      terminer();
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
     } catch (e: unknown) {
@@ -227,6 +248,18 @@ export default function AchatEditor() {
   return (
     <div className="flex flex-col gap-3.5">
       {garde.dialogue}
+      {brouillon.existant && (
+        <Alert tone="info" title="Brouillon non enregistré"
+               action={(
+                 <span className="flex gap-2">
+                   <Button size="sm" variant="primary" icon="history" onClick={reprendreBrouillon}>Reprendre</Button>
+                   <Button size="sm" icon="trash" onClick={brouillon.effacer}>Supprimer le brouillon</Button>
+                 </span>
+               )}>
+          Une pièce commencée le {new Date(brouillon.existant.date).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} n’a pas été enregistrée
+          ({brouillon.existant.donnees.lignes?.length ?? 0} ligne(s){brouillon.existant.donnees.tiers ? ` · fournisseur ${brouillon.existant.donnees.tiers.nom ?? brouillon.existant.donnees.tiers.code}` : ''}).
+        </Alert>
+      )}
       <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={fil}
                   meta={<DocBadge code={type === 'FA' ? 'BR' : type} />} />
 

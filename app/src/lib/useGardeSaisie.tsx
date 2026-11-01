@@ -10,7 +10,10 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
  *   …après un enregistrement réussi : garde.liberer(); navigate(...)
  *   …dans le rendu : {garde.dialogue}
  */
-export function useGardeSaisie(modifie: boolean, message = 'Les modifications de cette pièce n’ont pas été enregistrées.'): {
+export function useGardeSaisie(modifie: boolean, message = 'Les modifications de cette pièce n’ont pas été enregistrées.', options: {
+  /** Appelé quand l'utilisateur confirme « Quitter sans enregistrer » (ex. effacer le brouillon). */
+  onAbandon?: () => void;
+} = {}): {
   dialogue: ReactNode;
   liberer: () => void;
 } {
@@ -26,7 +29,7 @@ export function useGardeSaisie(modifie: boolean, message = 'Les modifications de
     <ConfirmDialog danger title="Quitter sans enregistrer ?"
                    message={<><p>{message}</p><p className="mt-2">Si vous quittez cet écran, elles seront perdues.</p></>}
                    confirmLabel="Quitter sans enregistrer" cancelLabel="Continuer la saisie"
-                   onConfirm={() => blocker.proceed?.()} onCancel={() => blocker.reset?.()} />
+                   onConfirm={() => { options.onAbandon?.(); blocker.proceed?.(); }} onCancel={() => blocker.reset?.()} />
   ) : null;
 
   return { dialogue, liberer: () => { libere.current = true; } };

@@ -2,7 +2,8 @@
 // Lancer : npm run test:ui   (construit dist/ puis exécute ce fichier avec node --test ; nommé *.e2e.mjs pour que vitest l’ignore)
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { demarrerServeur, droitsLimites, lancerNavigateur, ouvrir } from './harnais.mjs';
@@ -55,6 +56,24 @@ describe('navigation', () => {
     assert.deepEqual(page.erreurs, []);
     await page.context().close();
   });
+});
+
+describe('accessibilité (axe-core, WCAG 2 A / AA)', () => {
+  const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
+  for (const [nom, route, session] of [
+    ['tableau de bord', '/', true], ['liste des ventes', '/ventes?type=FA', true], ['comptoir', '/comptoir', true],
+    ['éditeur de facture', '/ventes/nouvelle?type=FA', true], ['diagnostic', '/diagnostic', true], ['connexion', '/', false],
+  ]) {
+    test(`${nom} : aucune violation`, async () => {
+      const page = await ouvrir(navigateur, { route, gql: serveur(), ...(session ? {} : { session: null }) });
+      // Injecté par le protocole du navigateur : la CSP de l'app interdit (à raison) les scripts en ligne
+      await page.evaluate(AXE);
+      const violations = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))
+        .violations.map((v) => `${v.id} (${v.impact}) : ${v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')}`));
+      assert.deepEqual(violations, []);
+      await page.context().close();
+    });
+  }
 });
 
 describe('assistance', () => {
@@ -196,6 +215,25 @@ describe('droits et saisie', () => {
     await champ.fill('L2401');
     await page.waitForTimeout(300);
     assert.ok(await page.locator('input[type="date"][value="2027-03-31"], input[value="2027-03-31"]').count() > 0, 'péremption reprise');
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+
+  test('brouillon : une facture interrompue est proposée à la réouverture et reprise', async () => {
+    const page = await ouvrir(navigateur, { route: '/ventes/nouvelle?type=FA', gql: serveur() });
+    await page.getByLabel('Note').fill('Commande du Dr Benali');
+    await page.waitForTimeout(1200); // enregistrement du brouillon (délai 0,8 s)
+    await page.reload();
+    await page.waitForTimeout(1200);
+    await page.locator('text=Brouillon non enregistré').waitFor({ timeout: 6000 });
+    await page.click('button:has-text("Reprendre")');
+    assert.equal(await page.getByLabel('Note').inputValue(), 'Commande du Dr Benali');
+    // Écarter le brouillon : il ne revient plus
+    await page.getByLabel('Note').fill('');
+    await page.waitForTimeout(1200);
+    await page.reload();
+    await page.waitForTimeout(1200);
+    assert.equal(await page.locator('text=Brouillon non enregistré').count(), 0);
     assert.deepEqual(page.erreurs, []);
     await page.context().close();
   });
