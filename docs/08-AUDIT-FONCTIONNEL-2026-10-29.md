@@ -113,6 +113,27 @@ Les plus utiles à brancher : `etatPaiements*` / `reglements*` (I17), `stocks` /
 
 ---
 
+## Suivi au 01/11/2026 (côté application)
+
+| # | Statut | Correction |
+|---|---|---|
+| I2 | ✅ | PMP, prix d'achat, marges et bénéfices masqués sans le droit « Afficher le bénéfice… » ou « Bénéfice Statistique » : stock (colonnes, export, vue « Marge négative »), fiche et aperçu article, journal des ventes (colonne, total, impression), statistiques (colonnes, exports, indicateurs, valorisation du stock au PMP). |
+| I3 | ✅ partiel | Bordereaux ventes / achats : même restriction « … par utilisateur » que la liste. Statistiques « par vendeur » : un utilisateur restreint (« Statistique par utilisateur », « liste des vente par utilisateur » ou factures / BL / comptoir « par utilisateur ») ne voit que sa ligne. *Reste : journal des ventes (pas de filtre utilisateur côté agent).* Sens exact des deux libellés Delphi : à confirmer. |
+| I4 | ✅ | `?vue=alerte|peremption|marge` ignoré sans le droit ; onglets des mouvements de stock filtrés (entrée / sortie / transferts) ; aucun type de pièce consultable ⇒ message au lieu des factures par défaut. *Tableau de bord : inchangé (CA visible de tous).* |
+| I1 | ⏳ | Non modifié : « refuser par défaut si les droits sont absents » bloquerait les postes reliés à un agent ancien ; décision du propriétaire. |
+| I9 | ✅ | Trésorerie : soldes en erreur ⇒ message et « Réessayer » (plus d'attente infinie). |
+| I12 | ✅ | Messages réseau lisibles partout (lien de traduction, PR #8), « Réessayer » sur les grilles, erreurs affichées dans Paramètres (coordonnées), fiche article (lots), recherche du comptoir. |
+| I13 | ✅ | Une seule instance de l'application (`requestSingleInstanceLock`) ; tickets en attente rangés par dossier **et par caissier** (anciens tickets repris par le premier caissier). |
+| I14 | ✅ partiel | Garde « Quitter sans enregistrer ? » dans les éditeurs de vente et d'achat (routeur migré vers `createHashRouter` pour `useBlocker`). *Client obligatoire pour FA/BL/BR : non modifié (règle métier à confirmer).* |
+| C1 | ✅ | « Grille (démo) » visible en développement seulement. |
+| C2 | ✅ | Préférences de menu et palette de couleurs mémorisées dans electron-store (`navigation`, `palette`). |
+| C3 | ✅ | Palette : Référentiels selon les droits des référentiels ; « Nouvel inventaire » ouvre la création ; Échéances, Modèles d'impression et Diagnostic ajoutés. |
+| C4 | ✅ | Entrées « Journal » du menu soumises aux droits « Journal des ventes » / « Journal d'achat ». |
+| C5 | ✅ | Titres des statistiques « par jour / par mois / par année » selon le regroupement. |
+| C9 | ✅ partiel | Ctrl+Q branché au comptoir (quantité depuis un montant TTC) ; prix de la liste de recherche au tarif du ticket. *Textes « pharmacie » / logo « GC » : inchangés.* |
+| C10 | ✅ partiel | Requête `STAT_VENTES_PAR_FAMILLE` inutilisée supprimée de `api/dashboard.ts`. *Autres doublons (`MODES`, `TRANSFERT_COMPTE`, `REGLER_*`) : à regrouper.* |
+| C12 | ✅ | Jeton jamais en clair (PR #7) ; `http://localhost` refusé en production (PR #7) ; `app:version` / `maj:etat` vérifient l'expéditeur. |
+
 ## À faire en priorité
 
 1. **B1 + B2** — auteur des pièces : envoyer `user_id`/`user_name` dans l'éditeur d'achat, et faire écrire l'auteur depuis le jeton côté agent.

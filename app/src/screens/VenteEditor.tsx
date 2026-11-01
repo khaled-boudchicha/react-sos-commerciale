@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -84,9 +85,11 @@ export default function VenteEditor() {
     : (permis.some((t) => t.code === typeChoisi) ? typeChoisi : permis[0]?.code);
 
   const prefaitRef = useRef(false);
+  const [prefait, setPrefait] = useState(false);
   useEffect(() => {
     if (prefaitRef.current || !src) return;
     prefaitRef.current = true;
+    setPrefait(true);
     setLignes(lignesDepuisPiece(src));
     if (src.code_cli) setClient({ code: src.code_cli, nom: src.raison ?? src.code_cli, raison: src.raison } as unknown as Client);
     if (src.mode_payement) setMode(String(src.mode_payement));
@@ -101,6 +104,14 @@ export default function VenteEditor() {
       toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
     }
   }, [src, enEdition, toast]);
+
+  // Garde « modifications non enregistrées » : état saisi comparé à celui de départ
+  const empreinte = JSON.stringify({
+    tiers: client?.code ?? null, date, mode, remiseGlobale, observation, delai, timbreChoix,
+    lignes: lignes.map((l) => [l.code_article, l.qte, l.prix_ht, l.remise, l.n_lot]),
+  });
+  const modifie = useModifie(empreinte, !sourceId || prefait);
+  const garde = useGardeSaisie(modifie);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -157,7 +168,7 @@ export default function VenteEditor() {
         },
       });
       const created = data?.createVente;
-      if (!created?.id) { navigate('/ventes'); return; }
+      if (!created?.id) { garde.liberer(); navigate('/ventes'); return; }
 
       // Règlement immédiat (encaissement de la pièce créée), plafonné au net à payer
       const recu = Math.min(recuOverride ?? (parseFloat(montantRecu) || 0), Number(created.net_a_payer ?? totaux.net));
@@ -172,11 +183,13 @@ export default function VenteEditor() {
           // La pièce existe : on informe sans bloquer la navigation
           setError(`Pièce ${created.numero} créée, mais règlement échoué : ${e.message ?? e}`);
           toast.error(`Pièce ${created.numero} créée, mais règlement échoué.`);
+          garde.liberer();
           navigate(`/ventes/${created.id}`);
           return;
         }
       }
       toast.success(`Pièce ${created.numero} enregistrée${recu > 0 ? ` · encaissé ${fmtMoney(recu)}` : ''}.`);
+      garde.liberer();
       navigate(`/ventes/${created.id}`);
     } catch (e: unknown) {
       const m = messageEchecCreation(e, 'la liste des ventes');
@@ -206,6 +219,7 @@ export default function VenteEditor() {
         },
       });
       toast.success(`Pièce ${data?.updateVente?.numero ?? src?.numero ?? ''} modifiée.`);
+      garde.liberer();
       navigate(`/ventes/${editId}`);
     } catch (e: any) {
       setError(e.message ?? 'Erreur à l’enregistrement.');
@@ -270,6 +284,7 @@ export default function VenteEditor() {
 
   return (
     <div className="flex flex-col gap-3.5">
+      {garde.dialogue}
       <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={breadcrumb}
                   meta={<DocBadge code={type} />} />
 

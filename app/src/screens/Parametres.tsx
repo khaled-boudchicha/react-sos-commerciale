@@ -38,7 +38,7 @@ export default function Parametres() {
   const { agent, dossier } = useSession();
   const { peut } = useDroits();
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const { data, refetch } = useQuery(COORDONNEES_SOCIETE);
+  const { data, refetch, error: coordErreur } = useQuery(COORDONNEES_SOCIETE);
   const coord = (data?.coordonneesSociete ?? {}) as Record<string, unknown>;
   const [editCoord, setEditCoord] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -146,6 +146,11 @@ export default function Parametres() {
                       <Button size="sm" icon="edit" onClick={() => { setErreur(null); setEditCoord(true); }}>Modifier</Button>
                     )} />
         {erreur && <Alert tone="danger" compact className="mb-3">{erreur}</Alert>}
+        {coordErreur && !data && (
+          <Alert tone="danger" compact className="mb-3" action={<Button size="sm" icon="refresh" onClick={() => void refetch()}>Réessayer</Button>}>
+            Coordonnées indisponibles : {coordErreur.message}
+          </Alert>
+        )}
         <DescriptionList items={['raison_sociale', 'adresse', 'wilaya', 'telephone', 'email', 'nif', 'nis', 'rc', 'art', 'rib'].map((k) => ({
           label: LIBELLES_COORD[k] ?? k.replace('_', ' '),
           value: coord[k] == null ? null : String(coord[k]),

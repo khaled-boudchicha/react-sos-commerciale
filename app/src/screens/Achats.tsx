@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '../components/ui/States';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
@@ -74,7 +75,8 @@ export default function Achats() {
   const typeLabel = TYPES_ACHAT.find((t) => t.code === type)?.label ?? type;
 
   async function imprimerBordereau() {
-    const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, limit: 5000, offset: 0 } });
+    // Même restriction « par utilisateur » que la liste (sinon le bordereau la contournerait)
+    const { data: all } = await fetchAll({ variables: { type_doc: type, date_debut: debut, date_fin: fin, user_id: userId, limit: 5000, offset: 0 } });
     const docs: Achat[] = all?.achats?.data ?? [];
     bordereauDe(docs, `Bordereau des achats — ${typeLabel}`);
   }
@@ -141,6 +143,14 @@ export default function Achats() {
     { header: 'Réglé', value: (r) => r.regler, numeric: true },
     { header: 'Reste', value: (r) => r.reste_a_payer, numeric: true },
   ];
+
+  // Aucun type de pièce consultable : rien à afficher (et surtout pas les factures par défaut)
+  if (typesVisibles.length === 0) {
+    return (
+      <EmptyState icon="lock" title="Aucun type de pièce autorisé"
+                  description="Vos droits ne permettent de consulter aucun type de pièce d’achat. Contactez l’administrateur du dossier." />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3.5">

@@ -14,7 +14,7 @@ type Lot = { id: number; n_lot: string; date_fabrication?: string | null; date_p
 type Tarif = Record<string, unknown> & { qte_from?: number; qte_to?: number; prix_ht?: number };
 
 export default function ArticleDetail() {
-  const { peut, droits } = useDroits();
+  const { peut, droits, voirMarges } = useDroits();
   // « Cacher l'onglet Tarifs » est un droit restrictif : il ne s'applique que s'il est
   // explicitement coché (pas pour un administrateur ni un module « tout »).
   const tarifsCaches = !!droits && !droits.admin && Array.isArray(droits.stock) && droits.stock.includes(D.stock.cacherTarifs);
@@ -24,7 +24,7 @@ export default function ArticleDetail() {
   // L'agent renvoie { article, lots, tarifs, … } (forme partagée avec l'app mobile)
   const a: Article | undefined = data?.article?.article ?? data?.article ?? undefined;
 
-  const { data: lotsData, loading: lotsLoading } = useQuery(LOTS, { variables: { article_id: articleId } });
+  const { data: lotsData, loading: lotsLoading, error: lotsErreur } = useQuery(LOTS, { variables: { article_id: articleId } });
   const { data: tarifsData } = useQuery(TARIFS_ARTICLE, { variables: { code_article: a?.code ?? '' }, skip: !a?.code });
   const { data: bcData } = useQuery(BARCODES_ARTICLE, { variables: { article_id: articleId } });
 
@@ -74,9 +74,9 @@ export default function ArticleDetail() {
           <DescriptionList columns={3} items={[
             { label: 'Code', value: a.code, mono: true },
             { label: 'Famille', value: a.famille },
-            { label: 'PMP', value: <Money value={a.pmp} /> },
+            ...(voirMarges ? [{ label: 'PMP', value: <Money value={a.pmp} /> }] : []),
             { label: 'P.V. TTC', value: <Money value={a.prix_vente_ttc} /> },
-            { label: 'Marge %', value: <Money value={a.margep} digits={1} tone={Number(a.margep) < 0 ? 'danger' : 'success'} /> },
+            ...(voirMarges ? [{ label: 'Marge %', value: <Money value={a.margep} digits={1} tone={Number(a.margep) < 0 ? 'danger' : 'success'} /> }] : []),
             { label: 'Stock réel', value: (
               <span className="inline-flex items-center gap-2">
                 {q <= 0 || q <= min
@@ -93,7 +93,8 @@ export default function ArticleDetail() {
         {peut('stock', D.stock.lots) && (
           <div className="flex flex-col gap-2">
             <h2 className="font-bold text-md text-ink">Lots & péremption</h2>
-            <DataGrid complet columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot." />
+            <DataGrid complet columns={lotCols} rows={lots} rowKey={(l) => l.id} loading={lotsLoading} emptyMessage="Aucun lot."
+                      error={lotsErreur && !lotsData ? `Lots indisponibles : ${lotsErreur.message}` : undefined} />
           </div>
         )}
         <div className="flex flex-col gap-2">

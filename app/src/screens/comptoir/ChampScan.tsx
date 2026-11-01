@@ -5,11 +5,19 @@ import { Article } from '../../api/types';
 import Icon, { Kbd } from '../../components/ui/Icon';
 import { fmtMoney, fmtQte } from '../../lib/format';
 import { useDebouncedValue } from '../../lib/useDebounce';
+import { ligneComptoir, type NiveauPrix } from './comptoirCalc';
 
 const PAR_CODE_BARRE = gql`query ArticleParCodeBarreComptoir($code: String!) { articleParCodeBarre(code: $code) }`;
 const PAR_CODE = gql`query ArticleParCodeComptoir($code: String!) { articleParCode(code: $code) }`;
 
 export type ModeRecherche = 'designation' | 'code';
+
+/** Prix TTC de l'article au tarif du ticket (tarif 1 : prix TTC de la fiche ; autres : prix du tarif + TVA). */
+export function prixAffiche(a: Article, niveau: NiveauPrix): number {
+  if (niveau === 1) return Number(a.prix_vente_ttc) || 0;
+  const l = ligneComptoir(a, niveau);
+  return Math.round(l.prix_ht * (1 + (l.tva || 0) / 100) * 100) / 100;
+}
 
 /**
  * Champ de scan / recherche du comptoir (PanelCodeBarre de ComptoirMixts) — gabarit maquette :
@@ -18,10 +26,12 @@ export type ModeRecherche = 'designation' | 'code';
  * Entrée : code-barres exact d'abord (douchette), puis code article exact en mode « Code »,
  * sinon l'article surligné dans la liste. ↑/↓ naviguent dans la liste, Échap la ferme.
  */
-export default function ChampScan({ id, retour, onArticle }: {
+export default function ChampScan({ id, retour, onArticle, niveauPrix = 1 }: {
   id: string;
   retour: boolean;
   onArticle: (a: Article) => void;
+  /** Tarif appliqué au ticket : le prix affiché dans la liste est celui qui sera facturé. */
+  niveauPrix?: NiveauPrix;
 }) {
   const [term, setTerm] = useState('');
   const [mode, setMode] = useState<ModeRecherche>('designation');
@@ -153,7 +163,7 @@ export default function ChampScan({ id, retour, onArticle }: {
                 <span className={`money text-sm leading-[1.45] font-semibold ${epuise ? '' : 'text-ink-muted'}`} style={epuise ? { color: 'var(--pos-alert)' } : undefined}>
                   stock {fmtQte(a.qte_reale)}
                 </span>
-                <span className="money text-md leading-[1.45] font-extrabold w-[100px] text-right">{fmtMoney(a.prix_vente_ttc)}</span>
+                <span className="money text-md leading-[1.45] font-extrabold w-[100px] text-right">{fmtMoney(prixAffiche(a, niveauPrix))}</span>
               </button>
             );
           })}

@@ -28,7 +28,8 @@ import LineChart from '../components/charts/LineChart';
 import BarChart from '../components/charts/BarChart';
 import DonutChart from '../components/charts/DonutChart';
 import ClientSearch from '../components/ClientSearch';
-import { D, useDroits } from '../lib/droits';
+import { D, statsRestreintesAuxSiennes, useDroits } from '../lib/droits';
+import { useSession } from '../store/session';
 import Etat104Panel from '../components/Etat104Panel';
 
 /** Cartouche graphique réutilisable (titre + corps). */
@@ -56,6 +57,7 @@ const GROUPEMENTS = [
   { code: 'annee', label: 'Par année' },
 ] as const;
 type Groupement = (typeof GROUPEMENTS)[number]['code'];
+const LIBELLE_GROUPEMENT: Record<Groupement, string> = { jour: 'par jour', mois: 'par mois', annee: 'par année' };
 
 export default function Statistiques() {
   const { peut } = useDroits();
@@ -95,7 +97,16 @@ const VUES_VENTES = [
 /** « Mes ventes » : CA et marge par vendeur (les retours sont déduits), totaux = CA de la période. */
 function VueParUtilisateur({ debut, fin }: { debut: string; fin: string }) {
   const { data, loading, error } = useQuery(STAT_VENTES_PAR_UTILISATEUR, { variables: { date_debut: debut, date_fin: fin } });
-  const lignes: any[] = data?.statVentesParUtilisateur?.lignes ?? [];
+  const marges = useMargesStats();
+  const moi = useSession((s) => s.dossierUser);
+  const { droits } = useDroits();
+  // Utilisateur restreint à ses propres ventes : il ne voit que sa ligne
+  const restreint = statsRestreintesAuxSiennes(droits);
+  const toutes: any[] = data?.statVentesParUtilisateur?.lignes ?? [];
+  const lignes = restreint
+    ? toutes.filter((l) => [moi?.username, moi?.name].filter(Boolean).map((x) => String(x).trim().toLowerCase())
+      .includes(String(l.utilisateur ?? '').trim().toLowerCase()))
+    : toutes;
   const cols: Column<any>[] = [
     { key: 'user', header: 'Vendeur', render: (l) => <b>{String(l.utilisateur)}</b> },
     { key: 'pieces', header: 'Pièces', align: 'right', width: '90px', render: (l) => <span className="money">{l.nb_pieces}</span> },
@@ -105,13 +116,14 @@ function VueParUtilisateur({ debut, fin }: { debut: string; fin: string }) {
     { key: 'pct', header: '%', align: 'right', width: '70px', render: (l) => <Pct value={l.pct_marge} />, sortAccessor: (l) => Number(l.pct_marge) },
   ];
   return (
-    <DataGrid titre="Mes ventes — par vendeur" columns={cols} rows={lignes} rowKey={(l) => String(l.utilisateur)}
+    <DataGrid titre={restreint ? 'Mes ventes' : 'Ventes par vendeur'} columns={sansMarges(cols, marges)} rows={lignes} rowKey={(l) => String(l.utilisateur)}
               loading={loading} error={error?.message}
               footer={{ _label: 'Totaux', ttc: <Money value={somme(lignes, 'total_ttc')} /> }} />
   );
 }
 
 function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
+  const marges = useMargesStats();
   const [vue, setVue] = useState<(typeof VUES_VENTES)[number]['code']>('periode');
   const [groupement, setGroupement] = useState<Groupement>('jour');
   // Filtres appliqués CÔTÉ SERVEUR (paramètres des requêtes stat).
@@ -191,10 +203,12 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
       {res && (
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="CA TTC" icon="trend" value={`${fmtMoney(res.total_ttc)} DA`} />
-          <Kpi label="Marge brute" icon="stats" tone="success" value={`${fmtMoney(res.total_marge)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} % du CA HT`} />
+          {marges && <Kpi label="Marge brute" icon="stats" tone="success" value={`${fmtMoney(res.total_marge)} DA`} sub={`${fmtMoney(res.pct_marge_global, 1)} % du CA HT`} />}
           <Kpi label="Charges période" icon="trendDown" tone="warning" value={`${fmtMoney(res.total_charges)} DA`} />
-          <Kpi label="Marge nette" icon="wallet" tone="teal" value={`${fmtMoney(res.marge_nette_total)} DA`}
-               sub={`${fmtMoney(Number(res.total_ht) > 0 ? (Number(res.marge_nette_total) / Number(res.total_ht)) * 100 : 0, 1)} % du CA HT`} />
+          {marges && (
+            <Kpi label="Marge nette" icon="wallet" tone="teal" value={`${fmtMoney(res.marge_nette_total)} DA`}
+                 sub={`${fmtMoney(Number(res.total_ht) > 0 ? (Number(res.marge_nette_total) / Number(res.total_ht)) * 100 : 0, 1)} % du CA HT`} />
+          )}
         </div>
       )}
       <Tabs value={vue} onChange={setVue} options={VUES_VENTES} variant="underline" label="Vues des ventes" />
@@ -222,28 +236,28 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
 
       {vue === 'periode' && (
         <>
-          <Carte titre={`Évolution du CA TTC ${groupement === 'jour' ? '— par jour' : '— par mois'}`} icon="trend"
+          <Carte titre={`Évolution du CA TTC — ${LIBELLE_GROUPEMENT[groupement]}`} icon="trend"
                  actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} size="sm" label="Groupement" />}>
             <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ttc ?? 0) }))}
                        format={(v) => fmtMoney(v, 0)} />
           </Carte>
-          <DataGrid titre={`Ventes ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
-                    exportCsv={{ nom: 'ventes-par-periode', columns: csvPeriode }}
-                    columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
+          <DataGrid titre={`Ventes ${LIBELLE_GROUPEMENT[groupement]}`}
+                    exportCsv={{ nom: 'ventes-par-periode', columns: csvSansMarges(csvPeriode, marges) }}
+                    columns={sansMarges(colPeriode, marges)} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
                     loading={loading} error={error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={res?.total_ht} />, ttc: <Money value={res?.total_ttc} />, marge: <Money value={res?.total_marge} /> }} />
         </>
       )}
 
       {vue === 'article' && (
-        <DataGrid titre={`Ventes par article — ${articles.length} article(s)`} exportCsv={{ nom: 'ventes-par-article', columns: csvArticleVente }} columns={colArticle} rows={articles} rowKey={(a) => a.code_article}
+        <DataGrid titre={`Ventes par article — ${articles.length} article(s)`} exportCsv={{ nom: 'ventes-par-article', columns: csvSansMarges(csvArticleVente, marges) }} columns={sansMarges(colArticle, marges)} rows={articles} rowKey={(a) => a.code_article}
                     loading={art.loading} error={art.error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={somme(articles, 'total_ht')} />, marge: <Money value={somme(articles, 'total_marge')} /> }} />
         
       )}
 
       {vue === 'client' && (
-        <DataGrid titre={`Ventes par client — ${clients.length} client(s)`} exportCsv={{ nom: 'ventes-par-client', columns: csvClient }} columns={colClient} rows={clients} rowKey={(c) => c.code_cli}
+        <DataGrid titre={`Ventes par client — ${clients.length} client(s)`} exportCsv={{ nom: 'ventes-par-client', columns: csvSansMarges(csvClient, marges) }} columns={sansMarges(colClient, marges)} rows={clients} rowKey={(c) => c.code_cli}
                     loading={cli.loading} error={cli.error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={somme(clients, 'total_ht')} />, ttc: <Money value={somme(clients, 'total_ttc')} />, marge: <Money value={somme(clients, 'total_marge')} /> }} />
         
@@ -263,7 +277,7 @@ function SectionVentes({ debut, fin }: { debut: string; fin: string }) {
                           format={(v) => fmtMoney(v, 0)} titreCentre="CA TTC" />
             </Carte>
           </div>
-          <DataGrid titre="Ventes par famille" exportCsv={{ nom: 'ventes-par-famille', columns: csvFamille }} columns={colFamille} rows={familles} rowKey={(f) => f.famille ?? '—'}
+          <DataGrid titre="Ventes par famille" exportCsv={{ nom: 'ventes-par-famille', columns: csvSansMarges(csvFamille, marges) }} columns={sansMarges(colFamille, marges)} rows={familles} rowKey={(f) => f.famille ?? '—'}
                     loading={fam.loading} error={fam.error?.message}
                     footer={{ _label: 'Totaux', ht: <Money value={somme(familles, 'total_ht')} />, ttc: <Money value={somme(familles, 'total_ttc')} /> }} />
         </div>
@@ -351,12 +365,12 @@ function SectionAchats({ debut, fin }: { debut: string; fin: string }) {
 
       {vue === 'periode' && (
         <>
-          <Carte titre={`Évolution des achats HT ${groupement === 'jour' ? '— par jour' : '— par mois'}`} icon="trend"
+          <Carte titre={`Évolution des achats HT — ${LIBELLE_GROUPEMENT[groupement]}`} icon="trend"
                  actions={<Tabs value={groupement} onChange={setGroupement} options={GROUPEMENTS} size="sm" label="Groupement" />}>
             <LineChart data={(res?.lignes ?? []).map((l) => ({ label: l.periode, value: Number(l.total_ht ?? 0) }))}
                        format={(v) => fmtMoney(v, 0)} couleur="var(--chart-2)" />
           </Carte>
-          <DataGrid titre={`Achats ${groupement === 'jour' ? 'par jour' : 'par mois'}`}
+          <DataGrid titre={`Achats ${LIBELLE_GROUPEMENT[groupement]}`}
                     exportCsv={{ nom: 'achats-par-periode', columns: csvAchatPeriode }}
                     columns={colPeriode} rows={res?.lignes ?? []} rowKey={(l) => l.periode}
                     loading={loading} error={error?.message}
@@ -443,6 +457,7 @@ function SectionBenefices({ debut, fin }: { debut: string; fin: string }) {
 /* ─── Valorisation du stock ─────────────────────────────────────────────────── */
 
 function SectionStock() {
+  const marges = useMargesStats();
   const [search, setSearch] = useState('');
   // La frappe met à jour `search` (affichage immédiat) mais la requête n'utilise
   // que la valeur différée : sinon chaque caractère déclenche un scan agrégé
@@ -487,17 +502,19 @@ function SectionStock() {
       {res && (
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="Articles en catalogue" icon="package" tone="neutral" value={String(res.total ?? 0)} />
-          <Kpi label="Valeur du stock (PMP)" icon="inventory" value={`${fmtMoney(totalDistant(res, 'stock_value'))} DA`} />
+          {marges && <Kpi label="Valeur du stock (PMP)" icon="inventory" value={`${fmtMoney(totalDistant(res, 'stock_value'))} DA`} />}
           <Kpi label="Valeur de vente TTC" icon="tag" tone="violet" value={`${fmtMoney(totalDistant(res, 'sales_value'))} DA`} />
-          <Kpi label="Marge potentielle" icon="trend" tone="success" value={`${fmtMoney(totalDistant(res, 'marge_potentielle'))} DA`}
-               sub={`stock initial : ${fmtMoney(totalDistant(res, 'initial_value'))} DA`} />
+          {marges && (
+            <Kpi label="Marge potentielle" icon="trend" tone="success" value={`${fmtMoney(totalDistant(res, 'marge_potentielle'))} DA`}
+                 sub={`stock initial : ${fmtMoney(totalDistant(res, 'initial_value'))} DA`} />
+          )}
         </div>
       )}
       <DataGrid titre="Valorisation article par article"
                   actions={<SearchField value={search} placeholder="Code, désignation…" label="Rechercher un article"
                                         onChange={setSearch} width={256} />}
-                  exportCsv={{ nom: 'valorisation-stock', columns: csvStock }}
-                  columns={columns} rowKey={(a) => a.id}
+                  exportCsv={{ nom: 'valorisation-stock', columns: csvSansMarges(csvStock, marges) }}
+                  columns={sansMarges(columns, marges)} rowKey={(a) => a.id}
                   distant={distant} cleEtat="stat-valorisation-stock"
                   footer={(r) => ({ _label: `${r?.total ?? 0} article(s)`,
                             val: <Money value={totalDistant(r, 'stock_value')} />,
@@ -505,6 +522,20 @@ function SectionStock() {
                             marge: <Money value={totalDistant(r, 'marge_potentielle')} /> })} />
     </>
   );
+}
+
+/* ─── Coûts et marges (droit « Bénéfice Statistique ») ──────────────────────────── */
+
+/** Marges, bénéfices et valorisation au coût (PMP) : réservés au droit « Bénéfice Statistique ». */
+function useMargesStats(): boolean {
+  return useDroits().peut('autre', D.autre.beneficeStat);
+}
+const CLES_COUT = new Set(['marge', 'pct', 'pmp', 'val']);
+function sansMarges<T>(cols: Column<T>[], marges: boolean): Column<T>[] {
+  return marges ? cols : cols.filter((c) => !CLES_COUT.has(c.key));
+}
+function csvSansMarges<T>(cols: ExportColumn<T>[], marges: boolean): ExportColumn<T>[] {
+  return marges ? cols : cols.filter((c) => !/marge|bénéfice|pmp|valeur stock/i.test(c.header));
 }
 
 /* ─── Colonnes CSV ──────────────────────────────────────────────────────────── */

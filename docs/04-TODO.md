@@ -85,7 +85,7 @@ Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sau
 - ☑ **Bibliothèque complète des documents (25/08/2026)** : 9 modèles — pièce de vente A4 (facture/BL/devis…), **ticket 80 mm** (comptoir), pièce d'achat A4, relevé client, **relevé fournisseur** (+ nouvelle fiche fournisseur `/tiers/fournisseur/:code`), situation des impayés client, **état des créances** (liste complète re-requêtée, validé 4 pages), **état de trésorerie** (période/compte), **état du stock** (valeur PMP). Tous branchés dans l'UI (cf. tableau dans `app/src/print/README.md`), validés E2E données réelles.
 - ☑ Modèles restants livrés : **bordereau** (ventes/achats, validé 892 BL/27 pages), **journaux ventes/achats** (ligne à ligne), **feuille d'inventaire** (2 boutons : « Feuille de comptage » vierge à remplir + « Imprimer l'état » chiffré avec écarts/valorisation). Bibliothèque d'impression complète.
 - ◐ **Exports CSV (Excel FR, BOM UTF-8)** : ventes, achats, stock, 8 vues Statistiques (page/ordre affiché) + **clients, fournisseurs, débiteurs, états clients/fournisseurs, trésorerie** (28/08/2026 — export de la **liste complète** via re-requête `limit 5000`, pas seulement la page ; états respectent « masquer les soldés » ; dates formatées `JJ/MM/AAAA`). Validé E2E : clients = 279 lignes / trésorerie = 977 lignes (vs 50 affichées). ☐ référentiels, XLSX natif
-- ☐ Sélection d'imprimante + impression directe (silencieuse) pour tickets
+- ☑ Sélection d'imprimante + impression directe (silencieuse) pour tickets (Paramètres › imprimante ticket ; comptoir : impression silencieuse, aperçu en cas d'échec)
 
 ## Phase 6 — Serveurs P2 (nouvelles capacités, agent+bridge+cloud)
 - ☑ **Mouvements de stock** (create/delete vente & achat) via `recalcArticlesStock` → proc native `UpdateSingleArticleStock` + synchro `Qte_reale`=`SUM(lots.Qte)` — validé E2E (25/08/2026)
@@ -105,7 +105,7 @@ Chaque item = case bridge agent + champ proxy cloud (pattern §5 du doc 03), sau
 - ⚠️ **Lancement de la fenêtre non vérifiable ici** : la session d'automatisation n'a pas de session graphique macOS (Electron démarre mais `whenReady` n'aboutit pas). À lancer manuellement : `open "release/mac-arm64/Gestion Commerciale.app"`.
 - ◐ Builds Windows (NSIS) et Linux (AppImage/deb) : pipeline `.gitlab-ci.yml` (check à chaque push ; builds + publication dans le registre générique GitLab sur tag `vX.Y.Z` ; macOS sur runner `macos`, manuel) — ☐ à exécuter une première fois sur GitLab (non testé ici)
 - ☑ Auto-update (electron-updater, fournisseur generic) : actif si le build est publié avec `GC_UPDATE_URL` ; téléchargement en fond, installation à la fermeture, état + bouton dans Paramètres. Cible mac `zip` ajoutée (requise), artefacts sans espace. Vérifié : `app-update.yml` / `latest-mac.yml` générés
-- ☐ Télémétrie d'erreurs (optionnel) + page diagnostic connexion
+- ◐ Télémétrie d'erreurs (optionnel, ☐) + ☑ page diagnostic connexion (`/diagnostic` : Internet / serveur / agent, protection de la session, journal des incidents réseau, cache hors ligne)
 
 ## Phase 8 — Qualité
 - ◐ **Tests de parité chiffrée vs Delphi** (26/08/2026 — rapport : [06-PARITE-DELPHI.md](06-PARITE-DELPHI.md)) : ✅ soldes clients (5), CA TTC annuel, créances, solde fournisseur, valeur du stock, solde de trésorerie — **tous au centime**. 2 bugs graves corrigés au passage (signes de règlements inversés en trésorerie ; noms des tiers lus dans `nom` vide au lieu de `raison`). ☐ relevés ligne à ligne, stats par article/client/famille, bénéfices, Stat 104

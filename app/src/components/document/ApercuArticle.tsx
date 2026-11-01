@@ -30,7 +30,7 @@ export default function ApercuArticle({ article, onOuvrir, onFermer }: {
   onOuvrir: () => void;
   onFermer: () => void;
 }) {
-  const { peut } = useDroits();
+  const { peut, voirMarges } = useDroits();
   const enveloppe = (entete: ReactNode, contenu: ReactNode) => (
     <ApercuCadre entete={entete} onFermer={onFermer} cle={article?.id}>{contenu}</ApercuCadre>
   );
@@ -71,12 +71,14 @@ export default function ApercuArticle({ article, onOuvrir, onFermer }: {
 
       <section aria-label="Prix">
         <SectionTitle icon="tag">Prix</SectionTitle>
-        <div className="grid grid-cols-3 gap-2">
-          <Chiffre label="PMP"><Money value={a.pmp} /></Chiffre>
+        <div className={voirMarges ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-1 gap-2'}>
+          {voirMarges && <Chiffre label="PMP"><Money value={a.pmp} /></Chiffre>}
           <Chiffre label="P.V. TTC"><Money value={a.prix_vente_ttc} /></Chiffre>
-          <Chiffre label="Marge %">
-            <Money value={a.margep} digits={1} colorNeg={false} tone={Number(a.margep) < 0 ? 'danger' : 'success'} />
-          </Chiffre>
+          {voirMarges && (
+            <Chiffre label="Marge %">
+              <Money value={a.margep} digits={1} colorNeg={false} tone={Number(a.margep) < 0 ? 'danger' : 'success'} />
+            </Chiffre>
+          )}
         </div>
       </section>
 

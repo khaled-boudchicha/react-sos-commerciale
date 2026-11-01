@@ -194,6 +194,23 @@ export function comptesAutorises<T>(droits: Droits | null | undefined, comptes: 
 }
 
 /**
+ * « Statistique par utilisateur » / « liste des vente par utilisateur » cochés (sans être administrateur
+ * ni avoir le module « tout ») : comme les droits « <pièce> par utilisateur », l'utilisateur ne voit que
+ * ses propres chiffres. Un utilisateur restreint sur ses factures l'est aussi dans les statistiques.
+ */
+export function statsRestreintesAuxSiennes(droits: Droits | null | undefined): boolean {
+  if (!droits || droits.admin) return false;
+  const autre = droits.autre;
+  if (Array.isArray(autre) && (autre.includes('Statistique par utilisateur') || autre.includes('liste des vente par utilisateur'))) return true;
+  return ['FA', 'BL', 'BCT'].some((code) => restreintAuxSiennes(droits, 'vente', code));
+}
+
+/** Coûts et marges visibles : « Afficher le bénéfice… » (pièces) ou « Bénéfice Statistique ». */
+export function voitMarges(droits: Droits | null | undefined): boolean {
+  return aDroit(droits, 'vente', D.vente.benefice) || aDroit(droits, 'autre', D.autre.beneficeStat);
+}
+
+/**
  * Hook d'accès aux droits de l'utilisateur dossier connecté.
  *   const { peut, peutDoc } = useDroits();
  *   peut('stock', D.stock.creerArticle)
@@ -209,6 +226,8 @@ export function useDroits() {
     aModule: (module: ModuleDroit) => aModule(droits, module),
     restreintAuxSiennes: (sens: 'vente' | 'achat', code: string) => restreintAuxSiennes(droits, sens, code),
     comptesAutorises: <T,>(comptes: T[], nom: (c: T) => string | null | undefined) => comptesAutorises(droits, comptes, nom),
+    /** Coûts et marges (PMP, prix d'achat, marge, bénéfice) : droit « bénéfice » des pièces ou des statistiques. */
+    voirMarges: voitMarges(droits),
     /** Droit sur un type de pièce (code FA/BL/… de l'app). Type inconnu → autorisé. */
     peutDoc: (sens: 'vente' | 'achat', code: string, action: ActionDoc) => {
       const l = (sens === 'vente' ? DROITS_DOC_VENTE : DROITS_DOC_ACHAT)[code];

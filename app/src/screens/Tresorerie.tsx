@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Alert } from '../components/ui/States';
 import { useApolloClient, useQuery, useLazyQuery, useMutation } from '@apollo/client';
 import { TRESORIE_COMPLETE, SOLDES_COMPTES, COORDONNEES_SOCIETE, ANNULER_MOUVEMENT } from '../api/queries';
 import ImprimerDocument from '../impression/ImprimerDocument';
@@ -53,7 +54,7 @@ export default function Tresorerie() {
   const peutAnnuler = peut('autre', D.autre.suppressionTresorerie);
   const peutArreter = peutUn('autre', [D.autre.arreterCaisse, D.autre.arreterCaisseAlt]);
   const [annuler, { loading: annulant }] = useMutation(ANNULER_MOUVEMENT);
-  const { data: soldesData, refetch: refetchSoldes } = useQuery(SOLDES_COMPTES);
+  const { data: soldesData, refetch: refetchSoldes, error: soldesErreur } = useQuery(SOLDES_COMPTES);
   const tousSoldes: SoldeCompte[] = Array.isArray(soldesData?.soldesComptes) ? soldesData.soldesComptes : [];
   // Droit Delphi PrevilegeBank : l'utilisateur ne voit que ses comptes autorisés
   const soldes = useMemo(() => comptesAutorises(tousSoldes, (c) => c.compte), [tousSoldes, comptesAutorises]);
@@ -65,7 +66,8 @@ export default function Tresorerie() {
   // Utilisateur limité à certains comptes : aucune requête « tous comptes » tant qu'un compte autorisé n'est pas choisi
   const enAttenteCompte = restreint && compteId === null;
 
-  const enAttente = enAttenteCompte || !soldesData;
+  // Soldes en erreur : on n'attend pas indéfiniment (message + « Réessayer » plus bas)
+  const enAttente = enAttenteCompte || (!soldesData && !soldesErreur);
 
   // Tri, filtres, recherche, pagination et groupes faits par le serveur ;
   // `version` est incrémenté après un mouvement / une annulation pour recharger la liste.
@@ -166,6 +168,12 @@ export default function Tresorerie() {
           <Button variant="primary" icon="plus" onClick={() => setMouvement('encaissement')}>Encaissement</Button>
         )}
       </PageHeader>
+
+      {soldesErreur && !soldesData && (
+        <Alert tone="danger" action={<Button size="sm" icon="refresh" onClick={() => void refetchSoldes()}>Réessayer</Button>}>
+          Soldes des comptes indisponibles : {soldesErreur.message}
+        </Alert>
+      )}
       <Toolbar>
         <DateRangeField from={debut} to={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
         <Button icon="layers" onClick={() => setGroupe((g) => !g)} pressed={groupe}

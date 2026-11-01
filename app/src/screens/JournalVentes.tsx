@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useDroits } from '../lib/droits';
 import { useApolloClient, useQuery, useLazyQuery } from '@apollo/client';
 import { JOURNAL_VENTES, JOURNAL_ACHATS, COORDONNEES_SOCIETE } from '../api/queries';
 import { fmtDate, fmtMoney, fmtQte, isoFirstOfMonth, isoToday } from '../lib/format';
@@ -22,12 +23,15 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   const [article, setArticle] = useState('');
 
   const vente = sens === 'vente';
+  // Marge : seulement avec le droit « bénéfice » (colonne, total, impression)
+  const { voirMarges } = useDroits();
+  const avecMarge = vente && voirMarges;
   const client = useApolloClient();
   const codeArticle = article || undefined;
   // Tri, filtres, recherche, pagination et groupes faits par le serveur
   const distant = useMemo<DataGridDistant<LigneJournal>>(() => ({
     cle: JSON.stringify([sens, debut, fin, codeArticle]),
-    totaux: vente
+    totaux: avecMarge
       ? [{ field: 'total_ttc', type: 'sum' }, { field: 'total_marge', type: 'sum' }]
       : [{ field: 'total_ttc', type: 'sum' }],
     taillePage: 100,
@@ -39,7 +43,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
       return (vente ? data.journalVentes : data.journalAchats) as
         { data: LigneJournal[]; total: number; resumes?: Record<string, number | null> };
     },
-  }), [client, sens, vente, debut, fin, codeArticle]);
+  }), [client, sens, vente, avecMarge, debut, fin, codeArticle]);
 
   const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
@@ -48,8 +52,9 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
   async function imprimerJournal() {
     const { data: all } = await fetchAll({ variables: { date_debut: debut, date_fin: fin, code_article: article || undefined, limit: 5000, offset: 0 } });
     const full = (vente ? all?.journalVentes : all?.journalAchats) as { lignes: LigneJournal[] } | undefined;
+    const lignes = (full?.lignes ?? []).map((l) => (avecMarge ? l : { ...l, total_marge: undefined }));
     setPrintDoc(demandeJournal(
-      { sens, lignes: full?.lignes ?? [], debut, fin },
+      { sens, lignes, debut, fin },
       (socData?.coordonneesSociete ?? {}) as Record<string, unknown>,
     ));
   }
@@ -66,7 +71,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
     { key: 'prix_ht', header: 'P.U. HT', align: 'right', width: '100px', field: 'prix_ht', render: (l) => <span className="money">{fmtMoney(l.prix_ht)}</span> },
     { key: 'total_ttc', header: 'Total TTC', align: 'right', width: '115px', field: 'total_ttc',
       render: (l) => <span className="money font-semibold">{fmtMoney(l.total_ttc)}</span> },
-    ...(vente ? [{
+    ...(avecMarge ? [{
       key: 'total_marge', header: 'Marge', align: 'right' as const, width: '110px', field: 'total_marge',
       render: (l: LigneJournal) => (
         <span className="money" style={{ color: Number(l.total_marge) < 0 ? 'var(--danger-text)' : 'var(--success-text)' }}>
@@ -92,7 +97,7 @@ export default function Journal({ sens }: { sens: 'vente' | 'achat' }) {
                 footer={(r) => ({
                   _label: `${r?.total ?? 0} ligne(s)`,
                   total_ttc: <span className="money">{fmtMoney(totalDistant(r, 'total_ttc'))}</span>,
-                  ...(vente ? { total_marge: <span className="money">{fmtMoney(totalDistant(r, 'total_marge'))}</span> } : {}),
+                  ...(avecMarge ? { total_marge: <span className="money">{fmtMoney(totalDistant(r, 'total_marge'))}</span> } : {}),
                 })} />
     </div>
   );
