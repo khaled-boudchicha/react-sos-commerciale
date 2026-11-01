@@ -25,7 +25,8 @@ type EtatComptoir = {
   tickets: TicketComptoir[];
   actif: number;
   options: OptionsComptoir;
-  charger: (dossier: string) => void;
+  /** Charge les tickets en attente du caissier `utilisateur` dans `dossier`. */
+  charger: (dossier: string, utilisateur?: string | number | null) => void;
   setActif: (i: number) => void;
   majTicket: (f: (t: TicketComptoir) => TicketComptoir) => void;
   /** Modifie un ticket désigné (réponse asynchrone arrivée après un changement d'onglet). */
@@ -36,7 +37,10 @@ type EtatComptoir = {
   setOptions: (o: Partial<OptionsComptoir>) => void;
 };
 
-const cleTickets = (dossier: string) => `gc.comptoir.tickets.${dossier}`;
+/** Clé de stockage : tickets propres au dossier ET au caissier (un caissier ne reprend pas ceux d'un autre). */
+const cleTickets = (portee: string) => `gc.comptoir.tickets.${portee}`;
+const portee = (dossier: string, utilisateur?: string | number | null) =>
+  utilisateur != null && String(utilisateur) !== '' ? `${dossier}.u${utilisateur}` : dossier;
 const CLE_OPTIONS = 'gc.comptoir.options';
 
 function lire<T>(cle: string): T | null {
@@ -46,8 +50,19 @@ function ecrire(cle: string, v: unknown) {
   try { localStorage.setItem(cle, JSON.stringify(v)); } catch { /* stockage indisponible */ }
 }
 
-function ticketsInitiaux(dossier: string): TicketComptoir[] {
-  const lus = lire<TicketComptoir[]>(cleTickets(dossier));
+function ticketsInitiaux(dossier: string, utilisateur?: string | number | null): TicketComptoir[] {
+  const cle = cleTickets(portee(dossier, utilisateur));
+  let lus = lire<TicketComptoir[]>(cle);
+  // Migration : tickets enregistrés avant le rangement par caissier (clé du seul dossier) → au premier
+  // caissier qui ouvre la caisse, puis l'ancienne clé est supprimée.
+  if (!Array.isArray(lus) && cle !== cleTickets(dossier)) {
+    const anciens = lire<TicketComptoir[]>(cleTickets(dossier));
+    if (Array.isArray(anciens)) {
+      lus = anciens;
+      ecrire(cle, anciens);
+      try { localStorage.removeItem(cleTickets(dossier)); } catch { /* stockage indisponible */ }
+    }
+  }
   const base = Array.from({ length: NB_TICKETS }, ticketVide);
   if (!Array.isArray(lus)) return base;
   // Les clés de ligne sont réattribuées : le compteur en mémoire repart de 1 à chaque lancement
@@ -62,9 +77,11 @@ export const useComptoir = create<EtatComptoir>((set, get) => ({
   actif: 0,
   options: { ...OPTIONS_DEFAUT, ...(lire<Partial<OptionsComptoir>>(CLE_OPTIONS) ?? {}) },
 
-  charger: (dossier) => {
-    if (get().dossier === dossier) return;
-    set({ dossier, tickets: ticketsInitiaux(dossier), actif: 0 });
+  // `dossier` (état) = portée de stockage : dossier + caissier
+  charger: (dossier, utilisateur) => {
+    const p = portee(dossier, utilisateur);
+    if (get().dossier === p) return;
+    set({ dossier: p, tickets: ticketsInitiaux(dossier, utilisateur), actif: 0 });
   },
   setActif: (i) => set({ actif: Math.max(0, Math.min(NB_TICKETS - 1, i)) }),
   majTicket: (f) => get().majTicketA(get().actif, f),

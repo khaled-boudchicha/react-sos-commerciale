@@ -6,6 +6,7 @@ import { Client, Article, Fournisseur } from '../api/types';
 import { fmtMoney, fmtQte } from '../lib/format';
 import { useDebouncedValue } from '../lib/useDebounce';
 import { D, useDroits } from '../lib/droits';
+import { LIBELLES_REFERENTIELS } from '../navigation/commandes';
 import { Icon, IconBadge, Kbd, type IconName, type Tone } from './ui/Icon';
 import { Spinner } from './ui/Button';
 import { useRecents, ilYA } from '../navigation/recents';
@@ -46,7 +47,10 @@ const STATIQUES: { groupe: string; titre: string; sous?: string; to: string; si?
   { groupe: 'Aller à', titre: 'Tiers', sous: 'Clients, fournisseurs, débiteurs', to: '/tiers', si: (d) => d.peutUn('tiers', [D.tiers.clients, D.tiers.fournisseurs]) },
   { groupe: 'Aller à', titre: 'Trésorerie', to: '/tresorerie', si: (d) => d.peut('autre', D.autre.tresorerie) },
   { groupe: 'Aller à', titre: 'Statistiques', to: '/statistiques', si: (d) => d.peut('autre', D.autre.statistiques) },
-  { groupe: 'Aller à', titre: 'Référentiels', to: '/referentiels', si: (d) => d.aModule('tiers') },
+  { groupe: 'Aller à', titre: 'Échéances', sous: 'Factures à encaisser', to: '/echeances', si: (d) => d.aModule('vente') },
+  { groupe: 'Aller à', titre: 'Référentiels', to: '/referentiels', si: (d) => d.peutUn('tiers', LIBELLES_REFERENTIELS) },
+  { groupe: 'Aller à', titre: 'Modèles d’impression', to: '/modeles', si: (d) => d.peut('autre', D.autre.parametres) },
+  { groupe: 'Aller à', titre: 'Diagnostic de connexion', sous: 'Internet, serveur, agent, cache hors ligne', to: '/diagnostic' },
   { groupe: 'Aller à', titre: 'Paramètres', to: '/parametres', si: (d) => d.peut('autre', D.autre.parametres) },
   { groupe: 'Aller à', titre: 'Utilisateurs & droits', to: '/parametres/utilisateurs', si: (d) => d.peut('autre', D.autre.droitsAcces) },
   { groupe: 'Créer', titre: 'Nouvelle facture', sous: 'Vente FA', to: '/ventes/nouvelle?type=FA', si: (d) => d.peutDoc('vente', 'FA', 'creer') },
@@ -54,7 +58,7 @@ const STATIQUES: { groupe: string; titre: string; sous?: string; to: string; si?
   { groupe: 'Créer', titre: 'Nouveau devis', sous: 'Proforma FP', to: '/ventes/nouvelle?type=FP', si: (d) => d.peutDoc('vente', 'FP', 'creer') },
   { groupe: 'Créer', titre: 'Nouveau bon de réception', sous: 'Achat BR', to: '/achats/nouvelle?type=BR', si: (d) => d.peutDoc('achat', 'BR', 'creer') },
   { groupe: 'Créer', titre: "Nouvelle facture d'achat", sous: 'Achat FA', to: '/achats/nouvelle?type=FA', si: (d) => d.peutDoc('achat', 'FA', 'creer') },
-  { groupe: 'Créer', titre: 'Nouvel inventaire', to: '/stock/inventaires', si: (d) => d.peut('stock', D.stock.inventaire) },
+  { groupe: 'Créer', titre: 'Nouvel inventaire', to: '/stock/inventaires?nouveau=1', si: (d) => d.peut('stock', D.stock.inventaire) },
 ];
 
 function norm(s: string) {

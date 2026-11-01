@@ -33,8 +33,8 @@ function diffuser(win: BrowserWindow | null, e: EtatMaj) {
 }
 
 export function initialiserMisesAJour(getWin: () => BrowserWindow | null, estExpediteurValide: (e: Electron.IpcMainInvokeEvent) => boolean) {
-  ipcMain.handle('app:version', () => app.getVersion());
-  ipcMain.handle('maj:etat', () => etat);
+  ipcMain.handle('app:version', (e) => (estExpediteurValide(e) ? app.getVersion() : null));
+  ipcMain.handle('maj:etat', (e) => (estExpediteurValide(e) ? etat : null));
   ipcMain.handle('maj:verifier', async (e) => {
     if (!estExpediteurValide(e) || !configure()) return etat;
     try { await autoUpdater.checkForUpdates(); } catch (err) { diffuser(getWin(), { etat: 'erreur', message: (err as Error).message }); }

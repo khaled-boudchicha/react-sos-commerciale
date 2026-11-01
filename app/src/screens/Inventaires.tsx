@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useApolloClient, useQuery, useMutation } from '@apollo/client';
 import { INVENTAIRES, CREATE_INVENTAIRE, DELETE_INVENTAIRE, REFERENTIELS } from '../api/queries';
 import { fmtDate, isoToday } from '../lib/format';
@@ -19,7 +19,9 @@ type Inventaire = {
 
 export default function Inventaires() {
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(false);
+  // ?nouveau=1 (palette de commandes, ruban) : ouvre directement la création
+  const [params] = useSearchParams();
+  const [creating, setCreating] = useState(params.get('nouveau') === '1');
   const [motif, setMotif] = useState('');
   const [depot, setDepot] = useState('');
   const [date, setDate] = useState(isoToday());

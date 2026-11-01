@@ -27,6 +27,7 @@ import ChampScan from './ChampScan';
 import LignesComptoir from './LignesComptoir';
 import PaiementDialog, { ResultatPaiement } from './PaiementDialog';
 import RemiseDialog from './RemiseDialog';
+import MontantDialog from './MontantDialog';
 import TuilesArticles from './TuilesArticles';
 import VentesJourDialog from './VentesJourDialog';
 import { ventesSuspectes, type TentativeIncertaine } from './reprise';
@@ -34,7 +35,7 @@ import { ventesSuspectes, type TentativeIncertaine } from './reprise';
 const CREATE_VENTE = gql`mutation CreateVenteComptoir($input: JSON!) { createVente(input: $input) }`;
 const ID_SCAN = 'comptoir-scan';
 
-type Dialogue = 'paiement' | 'remise' | 'ventes' | 'caisse' | 'annuler' | 'retour' | null;
+type Dialogue = 'paiement' | 'remise' | 'ventes' | 'caisse' | 'annuler' | 'retour' | 'montant' | null;
 
 /**
  * Vente au comptoir (portage de ComptoirMixts.pas) — implémentation de la maquette
@@ -42,7 +43,7 @@ type Dialogue = 'paiement' | 'remise' | 'ventes' | 'caisse' | 'annuler' | 'retou
  *
  *  F2 encaisser · F12 exact + ticket · F11 exact sans ticket · F4 annuler · F6 / Échap scan
  *  F7 remise · F8 client · F9 réimprimer · F10 ventes du jour · ↑/↓ ligne · +/− quantité
- *  Suppr retirer la ligne · Ctrl+1…5 tickets en attente
+ *  Suppr retirer la ligne · Ctrl+Q quantité depuis un montant · Ctrl+1…5 tickets en attente
  *
  * Validation = createVente BCT (BRT en mode retour) + règlement espèces sur la caisse de
  * l'utilisateur. Le lot le mieux fourni est affecté à chaque nouvelle ligne (règle Delphi).
@@ -54,7 +55,9 @@ export default function Comptoir() {
   const { peut, peutDoc, restreintAuxSiennes } = useDroits();
   const { tickets, actif, options, charger, setActif, majTicket, majTicketA, viderTicket, patchLigne, setOptions } = useComptoir();
 
-  useEffect(() => { if (dossier) charger(dossier); }, [dossier, charger]);
+  // Tickets en attente propres au caissier connecté (un autre caissier du poste ne les reprend pas)
+  const caissierId = dossierUser?.id ?? dossierUser?.username ?? null;
+  useEffect(() => { if (dossier) charger(dossier, caissierId); }, [dossier, caissierId, charger]);
 
   const ticket = tickets[actif];
   const retour = ticket.retour;
@@ -294,6 +297,8 @@ export default function Comptoir() {
     F8: focusClient,
     F9: reimprimerDernier,
     F10: () => setDialogue('ventes'),
+    // Ctrl+Q : quantité de la ligne sélectionnée calculée depuis un montant TTC (Delphi)
+    'Ctrl+Q': () => { if (ticket.lignes.some((l) => l.key === selection)) setDialogue('montant'); },
     NumpadAdd: () => qteSelection(1),
     NumpadSubtract: () => qteSelection(-1),
     ArrowDown: (e) => { if (horsSaisie(e)) deplacerSelection(1); },
@@ -407,7 +412,7 @@ export default function Comptoir() {
             </div>
           )}
 
-          <ChampScan id={ID_SCAN} retour={retour} onArticle={ajouter} />
+          <ChampScan id={ID_SCAN} retour={retour} onArticle={ajouter} niveauPrix={options.niveauPrix} />
 
           <LignesComptoir lignes={ticket.lignes} selection={selection} onSelect={setSelection}
                           patch={patch} remove={supprimer} retour={retour}
@@ -534,6 +539,13 @@ export default function Comptoir() {
                        onConfirm={() => void enregistrer({ recu: 0, regle: 0, rendu: 0, credit: false, imprimer: options.ticketAuto && peutImprimer })}
                        onCancel={() => setDialogue(null)} />
       )}
+      {dialogue === 'montant' && (() => {
+        const l = ticket.lignes.find((x) => x.key === selection);
+        return l ? (
+          <MontantDialog ligne={l} onClose={() => setDialogue(null)}
+                         onValider={(q) => { patch(l.key, { qte: q }); setDialogue(null); setTimeout(focusScan, 0); }} />
+        ) : null;
+      })()}
       {dialogue === 'remise' && (
         <RemiseDialog pct={ticket.remisePct} baseTtc={tot.net + tot.remGlob}
                       onValider={(pct) => { majTicket((t) => ({ ...t, remisePct: pct })); setDialogue(null); }}

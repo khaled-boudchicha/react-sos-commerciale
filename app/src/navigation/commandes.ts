@@ -60,7 +60,7 @@ export const C = {
   ventesFP: { id: 'ventesFP', libelle: 'Proforma', icone: 'devis', ton: 'ventes', to: '/ventes?type=FP', si: doc('vente', 'FP', 'voir') },
   ventesFAV: { id: 'ventesFAV', libelle: 'Avoirs', icone: 'avoir', ton: 'ventes', to: '/ventes?type=FAV', si: doc('vente', 'FAV', 'voir') },
   ventesBRT: { id: 'ventesBRT', libelle: 'Retours', icone: 'retour', ton: 'ventes', to: '/ventes?type=BRT', si: doc('vente', 'BRT', 'voir') },
-  ventesJournal: { id: 'ventesJournal', libelle: 'Journal des ventes', court: 'Journal', icone: 'journal', ton: 'ventes', to: '/ventes?vue=journal', si: (d) => d.aModule('vente'), aide: 'Toutes les lignes vendues sur la période, avec la marge.' },
+  ventesJournal: { id: 'ventesJournal', libelle: 'Journal des ventes', court: 'Journal', icone: 'journal', ton: 'ventes', to: '/ventes?vue=journal', si: (d) => d.peut('vente', D.vente.journal), aide: 'Toutes les lignes vendues sur la période, avec la marge.' },
   nouvelleFA: { id: 'nouvelleFA', libelle: 'Nouvelle facture', court: 'Nouvelle facture', icone: 'nouveau', ton: 'ventes', to: '/ventes/nouvelle?type=FA', si: doc('vente', 'FA', 'creer'), aide: 'Créer une facture de vente.' },
   nouveauBL: { id: 'nouveauBL', libelle: 'Bon de livraison', icone: 'livraison', ton: 'ventes', to: '/ventes/nouvelle?type=BL', si: doc('vente', 'BL', 'creer'), aide: 'Créer un bon de livraison.' },
   nouveauBC: { id: 'nouveauBC', libelle: 'Bon de commande', icone: 'commande', ton: 'ventes', to: '/ventes/nouvelle?type=BC', si: doc('vente', 'BC', 'creer') },
@@ -75,7 +75,7 @@ export const C = {
   achatsDO: { id: 'achatsDO', libelle: 'Demandes d’offre', icone: 'devis', ton: 'achats', to: '/achats?type=DO', si: doc('achat', 'DO', 'voir') },
   achatsFAV: { id: 'achatsFAV', libelle: 'Avoirs fournisseurs', icone: 'avoir', ton: 'achats', to: '/achats?type=FAV', si: doc('achat', 'FAV', 'voir') },
   achatsBRT: { id: 'achatsBRT', libelle: 'Retours fournisseurs', icone: 'retour', ton: 'achats', to: '/achats?type=BRT', si: doc('achat', 'BRT', 'voir') },
-  achatsJournal: { id: 'achatsJournal', libelle: 'Journal des achats', court: 'Journal', icone: 'journal', ton: 'achats', to: '/achats?vue=journal', si: (d) => d.aModule('achat') },
+  achatsJournal: { id: 'achatsJournal', libelle: 'Journal des achats', court: 'Journal', icone: 'journal', ton: 'achats', to: '/achats?vue=journal', si: (d) => d.peut('achat', D.achat.journal) },
   nouveauBR: { id: 'nouveauBR', libelle: 'Bon de réception', court: 'Bon de réception', icone: 'reception', ton: 'achats', to: '/achats/nouvelle?type=BR', si: doc('achat', 'BR', 'creer'), aide: 'Réceptionner une livraison fournisseur (entrée en stock).' },
   nouvelleFAachat: { id: 'nouvelleFAachat', libelle: 'Facture d’achat', icone: 'nouveau', ton: 'achats', to: '/achats/nouvelle?type=FA', si: doc('achat', 'FA', 'creer') },
   nouveauBCachat: { id: 'nouveauBCachat', libelle: 'Commande fournisseur', icone: 'commande', ton: 'achats', to: '/achats/nouvelle?type=BC', si: doc('achat', 'BC', 'creer') },
@@ -107,7 +107,8 @@ export const C = {
   modeles: { id: 'modeles', libelle: 'Modèles d’impression', court: 'Modèles d’impression', icone: 'modeles', ton: 'config', to: '/modeles', si: parametres, aide: 'Factures, tickets, relevés, étiquettes : bibliothèque et designer.' },
   utilisateurs: { id: 'utilisateurs', libelle: 'Utilisateurs & droits', court: 'Utilisateurs & droits', icone: 'droits', ton: 'config', to: '/parametres/utilisateurs', si: (d) => d.peut('autre', D.autre.droitsAcces) },
   diagnostic: { id: 'diagnostic', libelle: 'Diagnostic', icone: 'diagnostic', ton: 'config', to: '/diagnostic' },
-  grille: { id: 'grille', libelle: 'Grille (démo)', icone: 'grille', ton: 'config', to: '/outils/grille', si: (d) => d.peut('stock', D.stock.article) },
+  // Écran de démonstration (5 000 articles, données factices) : en développement seulement
+  grille: { id: 'grille', libelle: 'Grille (démo)', icone: 'grille', ton: 'config', to: '/outils/grille', si: (d) => import.meta.env.DEV && d.peut('stock', D.stock.article) },
   ui: { id: 'ui', libelle: 'Charte & composants', court: 'Charte graphique', icone: 'layers', ton: 'config', to: '/outils/ui', aide: 'Vitrine de la charte graphique : couleurs, typographie, boutons, champs, états et modales.' },
 
   // Session et affichage

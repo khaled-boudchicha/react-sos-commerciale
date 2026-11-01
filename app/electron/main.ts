@@ -8,7 +8,8 @@ import { enregistrerModeles } from './modeles';
 const store = new Store({ name: 'gestion-commerciale' });
 
 // Seules ces clés sont accessibles depuis le renderer (pas d'accès arbitraire au store).
-const STORE_KEYS = new Set(['session', 'deviceId', 'theme', 'gc.imprimanteTicket', 'gc.cachet']);
+// Préférences du poste : session, appareil, thème, palette, disposition des menus, impression
+const STORE_KEYS = new Set(['session', 'deviceId', 'theme', 'palette', 'navigation', 'gc.imprimanteTicket', 'gc.cachet']);
 // Clés sensibles (jeton JWT) chiffrées au repos via le trousseau de l'OS (safeStorage).
 const SECRET_KEYS = new Set(['session']);
 type Chiffre = { __enc: string };
@@ -153,6 +154,19 @@ ipcMain.handle('print:silent', async (e, html: string, opts: { deviceName?: stri
     if (!w.isDestroyed()) w.close();
   }
 });
+
+// Une seule instance : deux fenêtres sur le même poste se partageraient la session et les tickets
+// en attente (écritures concurrentes dans le même stockage). La seconde ouverture ramène la première.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
 
 app.whenReady().then(() => {
   createWindow();

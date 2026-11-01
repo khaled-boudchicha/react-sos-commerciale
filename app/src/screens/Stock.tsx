@@ -34,10 +34,15 @@ const VUES = [
 export default function Stock() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(
-    (VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous');
-  // Liens directs (ruban) : ?vue=alerte, ?vue=peremption…
-  useEffect(() => { setVue((VUES.find((v) => v.code === params.get('vue'))?.code) ?? 'tous'); }, [params]);
+  const { peut, peutUn, voirMarges } = useDroits();
+  // Vues autorisées : alerte, lots (péremption) et marges suivent les droits, y compris par lien direct
+  const vuesAutorisees = VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte))
+    && (v.code !== 'peremption' || peut('stock', D.stock.lots)) && (v.code !== 'marge' || voirMarges));
+  const vueDemandee = (code: string | null) => vuesAutorisees.find((v) => v.code === code)?.code ?? 'tous';
+  const [vue, setVue] = useState<(typeof VUES)[number]['code']>(() => vueDemandee(params.get('vue')));
+  // Liens directs (ruban) : ?vue=alerte, ?vue=peremption… — ignorés sans le droit correspondant
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setVue(vueDemandee(params.get('vue'))); }, [params, vuesAutorisees.length]);
   const [search, setSearch] = useState('');
   // Incrémenté après création / modification / suppression : relit la liste
   const [version, setVersion] = useState(0);
@@ -73,7 +78,6 @@ export default function Stock() {
     unites:   names(refData?.unitesMesure, ['nom', 'designation', 'unite', 'name']),
     tva:      names(refData?.tauxTVA,  ['taux', 'valeur', 'tva', 'nom']),
   });
-  const { peut, peutUn } = useDroits();
   const crud = useCrud<Article & { id: number }>({
     label: 'article', createTitle: 'Nouvel article', editTitle: "Modifier l'article", deleteTitle: 'Supprimer cet article ?', sections: articleSections, width: 820,
     createDoc: CREATE_ARTICLE, updateDoc: UPDATE_ARTICLE, deleteDoc: DELETE_ARTICLE,
@@ -110,11 +114,12 @@ export default function Stock() {
     { key: 'code', header: 'Code', width: '110px', field: 'code', render: (a) => <span className="money">{a.code}</span> },
     { key: 'designation', header: 'Désignation', field: 'designation', render: (a) => <b>{a.designation}</b> },
     { key: 'famille', header: 'Famille', width: '120px', field: 'famille', render: (a) => <span className="text-ink-muted">{a.famille ?? '—'}</span> },
-    { key: 'pmp', header: 'PMP', align: 'right', width: '95px', field: 'pmp', render: (a) => <Money value={a.pmp} /> },
+    // Coûts et marges : seulement avec le droit « bénéfice »
+    ...(voirMarges ? [{ key: 'pmp', header: 'PMP', align: 'right' as const, width: '95px', field: 'pmp', render: (a: Article) => <Money value={a.pmp} /> }] : []),
     { key: 'pv', header: 'P.V. TTC', align: 'right', width: '95px', field: 'prix_vente_ttc', render: (a) => <Money value={a.prix_vente_ttc} /> },
-    { key: 'margep', header: 'Marge %', align: 'right', width: '80px', field: 'margep', render: (a) => (
+    ...(voirMarges ? [{ key: 'margep', header: 'Marge %', align: 'right' as const, width: '80px', field: 'margep', render: (a: Article) => (
       <Money value={a.margep} digits={1} />
-    ) },
+    ) }] : []),
     { key: 'qte', header: 'Stock', align: 'right', width: '85px', field: 'qte_reale', type: 'number', render: (a) => {
       const q = Number(a.qte_reale ?? 0), min = Number(a.stock_min ?? 0);
       if (q <= 0 || q <= min) {
@@ -135,9 +140,9 @@ export default function Stock() {
     { header: 'Code', value: (a) => a.code },
     { header: 'Désignation', value: (a) => (a.designation ?? '').replace(/\s+/g, ' ').trim() },
     { header: 'Famille', value: (a) => a.famille ?? '' },
-    { header: 'PMP', value: (a) => a.pmp, numeric: true },
+    ...(voirMarges ? [{ header: 'PMP', value: (a: Article) => a.pmp, numeric: true }] : []),
     { header: 'P.V. TTC', value: (a) => a.prix_vente_ttc, numeric: true },
-    { header: 'Marge %', value: (a) => a.margep, numeric: true },
+    ...(voirMarges ? [{ header: 'Marge %', value: (a: Article) => a.margep, numeric: true }] : []),
     { header: 'Stock', value: (a) => a.qte_reale, numeric: true },
     { header: 'Stock min', value: (a) => a.stock_min, numeric: true },
   ];
@@ -162,7 +167,7 @@ export default function Stock() {
       {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <Toolbar>
         <Tabs value={vue} onChange={setVue} label="Vue"
-              options={VUES.filter((v) => (v.code !== 'alerte' || peut('stock', D.stock.alerte)) && (v.code !== 'peremption' || peut('stock', D.stock.lots)))} />
+              options={vuesAutorisees} />
         <SearchField value={search} onChange={setSearch} placeholder="Code, désignation, code-barres…"
                      label="Rechercher un article" className="ml-auto" />
       </Toolbar>

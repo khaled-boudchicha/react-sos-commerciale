@@ -10,9 +10,3 @@ export const DASHBOARD = gql`
     alertesStock
   }
 `;
-
-export const STAT_VENTES_PAR_FAMILLE = gql`
-  query StatVentesParFamille($date_debut: String, $date_fin: String) {
-    statVentesParFamille(date_debut: $date_debut, date_fin: $date_fin)
-  }
-`;

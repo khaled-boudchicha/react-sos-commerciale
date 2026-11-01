@@ -45,7 +45,13 @@ type Ouvert = { sens: SensBon; id: number; transfert?: Transfert };
  * création et suppression (selon droits).
  */
 export default function MouvementsStock() {
-  const [onglet, setOnglet] = useState<Onglet>('entree');
+  const { peut } = useDroits();
+  const droitEntree = peut('stock', D.stock.bonEntree);
+  const droitSortie = peut('stock', D.stock.bonSortie);
+  const droitTransfert = droitEntree && droitSortie;
+  // Onglets limités aux mouvements que l'utilisateur peut consulter
+  const onglets = ONGLETS.filter((o) => (o.code === 'entree' ? droitEntree : o.code === 'sortie' ? droitSortie : droitTransfert));
+  const [onglet, setOnglet] = useState<Onglet>(onglets[0]?.code ?? 'entree');
   const [debut, setDebut] = useState(isoFirstOfMonth());
   const [fin, setFin] = useState(isoToday());
   const [search, setSearch] = useState('');
@@ -56,10 +62,6 @@ export default function MouvementsStock() {
   const [suppression, setSuppression] = useState<Ouvert & { libelle: string } | null>(null);
   const toast = useToast();
 
-  const { peut } = useDroits();
-  const droitEntree = peut('stock', D.stock.bonEntree);
-  const droitSortie = peut('stock', D.stock.bonSortie);
-  const droitTransfert = droitEntree && droitSortie;
 
   const estBon = onglet !== 'transferts';
   const client = useApolloClient();
@@ -171,7 +173,7 @@ export default function MouvementsStock() {
       </PageHeader>
 
       <Toolbar>
-        <Tabs value={onglet} onChange={setOnglet} options={ONGLETS} label="Type de mouvement" />
+        <Tabs value={onglet} onChange={setOnglet} options={onglets} label="Type de mouvement" />
         <PeriodPicker debut={debut} fin={fin} onChange={(d, f) => { setDebut(d); setFin(f); }} />
         {estBon && <SearchField value={search} onChange={setSearch} placeholder="N°, motif, observation…" label="Rechercher un bon" />}
       </Toolbar>

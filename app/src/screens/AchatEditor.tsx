@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, messageErreur, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -80,9 +81,11 @@ export default function AchatEditor() {
   const payable = !enEdition && !!type && TYPES_AVEC_REGLEMENT.includes(type);
 
   const prefaitRef = useRef(false);
+  const [prefait, setPrefait] = useState(false);
   useEffect(() => {
     if (prefaitRef.current || !src) return;
     prefaitRef.current = true;
+    setPrefait(true);
     setLignes(lignesDepuisPiece(src));
     const nom = src.fournisseur ?? src.raison ?? src.code_four;
     if (src.code_four) setFournisseur({ code: src.code_four, nom, raison: nom } as unknown as Fournisseur);
@@ -96,6 +99,14 @@ export default function AchatEditor() {
       toast.info(`Pièce ${src.numero ?? ''} dupliquée — vérifiez puis enregistrez.`);
     }
   }, [src, enEdition, toast]);
+
+  // Garde « modifications non enregistrées » : état saisi comparé à celui de départ
+  const empreinte = JSON.stringify({
+    tiers: fournisseur?.code ?? null, date, mode, remiseGlobale, observation,
+    lignes: lignes.map((l) => [l.code_article, l.qte, l.prix_ht, l.remise, l.n_lot]),
+  });
+  const modifie = useModifie(empreinte, !sourceId || prefait);
+  const garde = useGardeSaisie(modifie);
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -153,6 +164,7 @@ export default function AchatEditor() {
       if (enEdition) {
         const { data } = await update({ variables: { id: Number(editId), input: commun } });
         toast.success(`Pièce ${data?.updateAchat?.numero ?? src?.numero ?? ''} modifiée.`);
+        garde.liberer();
         navigate(`/achats/${editId}`);
         return;
       }
@@ -175,11 +187,13 @@ export default function AchatEditor() {
         } catch (e: any) {
           // La pièce existe : on informe sans bloquer
           toast.error(`Pièce ${created.numero} créée, mais paiement échoué : ${e.message ?? e}`);
+          garde.liberer();
           navigate(`/achats/${created.id}`);
           return;
         }
       }
       toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}${paye > 0 ? ` · payé ${fmtMoney(paye)}` : ''}.`.replace('  ', ' '));
+      garde.liberer();
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
     } catch (e: unknown) {
@@ -215,6 +229,7 @@ export default function AchatEditor() {
   const paye = parseFloat(montantPaye) || 0;
   return (
     <div className="flex flex-col gap-3.5">
+      {garde.dialogue}
       <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={fil}
                   meta={<DocBadge code={type === 'FA' ? 'BR' : type} />} />
 
