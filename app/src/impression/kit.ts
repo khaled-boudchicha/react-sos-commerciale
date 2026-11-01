@@ -1,7 +1,7 @@
 import {
   creerBande, creerEtat, creerObjet, creerPage,
   type BandDef, type FontDef, type FormatDef, type HighlightRule, type ObjDef, type ReportDef, type TextObj,
-} from '@softly/report';
+} from '@softly/report/core';
 
 /**
  * Kit de design des modèles livrés : thèmes, blocs (en-tête, cartes de synthèse, tiers, totaux, signatures),

@@ -194,6 +194,30 @@ describe('comptoir', () => {
   });
 });
 
+describe('impression', () => {
+  test('aperçu chargé à la demande : état du stock rendu avec ses lignes, puis fermé', async () => {
+    const page = await ouvrir(navigateur, { route: '/stock', gql: serveur({ Articles: { articles: { data: ARTICLES, total: 2 } } }) });
+    await page.click('button:has-text("Imprimer l\'état du stock")');
+    const apercu = page.locator('[role="dialog"][aria-label^="Aperçu"]');
+    await apercu.waitFor({ timeout: 8000 });
+    await apercu.locator('text=/2 lignes?/').waitFor({ timeout: 4000 });
+    await apercu.locator('button[aria-label="Fermer"]').click();
+    await apercu.waitFor({ state: 'detached', timeout: 4000 });
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+
+  test('modèles d’impression : la bibliothèque s’ouvre et prévisualise un modèle livré', async () => {
+    const page = await ouvrir(navigateur, { route: '/modeles', gql: serveur() });
+    const vignette = page.locator('button[aria-label^="Aperçu de "]').first();
+    await vignette.waitFor({ timeout: 8000 });
+    await vignette.click();
+    await page.locator('[role="dialog"][aria-label^="Aperçu"]').waitFor({ timeout: 8000 });
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+});
+
 describe('droits et saisie', () => {
   test('profil vendeur : ni PMP ni marge dans le stock', async () => {
     const page = await ouvrir(navigateur, {

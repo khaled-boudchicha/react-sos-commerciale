@@ -7,7 +7,7 @@ import { cn } from '../ui/cn';
 import { PrintDocument } from '../../print/engine/types';
 import { getCachet } from '../../print/engine/cachet';
 import { buildVenteModelePrint, modelesPour, ModeleVenteId, Societe } from '../../print/templates';
-import { type ModeleInfo, listerModeles, modeleParDefaut } from '@softly/report';
+import { type ModeleInfo, listerModeles, modeleParDefaut } from '@softly/report/core';
 
 /** Modèle professionnel proposé par défaut selon le type de pièce (premier modèle livré sinon). */
 const PRO_PAR_TYPE: Record<string, string> = { BL: 'integre-bl-a4', BCT: 'integre-bon-comptoir-a5' };
