@@ -170,9 +170,12 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
   Linux avec electron-builder 24 et démarrage du paquet. ☐ à vérifier sur Windows : installeur NSIS, impression silencieuse
   des tickets, coffre de chiffrement de la session.
 - ☑ `npm audit fix` : failles « hautes » de production corrigées (brace-expansion, fast-uri, js-yaml).
-- ☐ **react-router v6 → v7** : deux avis modérés (redirection par antislash, désérialisation) corrigés seulement en v7.
-  Exposition faible (aucune navigation vers une URL saisie par l'utilisateur, pas de rendu serveur) ; migration à planifier
-  (le routeur est déjà en mode « data », proche de l'API v7).
+- ☑ **react-router v6 → v7.18.5** : les deux avis modérés (redirection par antislash, désérialisation) sont fermés.
+  Migration sans changement de code : le routeur était déjà en mode « data » (`createHashRouter`), aucune route « splat »
+  n'utilise de lien relatif (comportement modifié en v7), pas de loaders / actions. Les mises à jour de navigation passent
+  désormais par `startTransition` (défaut v7). Vérifié : types, 264 tests unitaires, 49 parcours d'interface (dont la garde
+  « quitter sans enregistrer », `useBlocker`), 9 tests Electron. Bundle principal +37 kB (1 245 → 1 282 kB).
+  `npm audit --omit=dev` ne remonte plus que la chaîne d'exceljs.
 - ☐ **exceljs** : chaîne `archiver` / `uuid` / `minimatch` (avis modérés) ; le correctif proposé est un retour à exceljs 3
   (inacceptable). Usage limité à l'écriture des exports ; suivre une version corrigée d'exceljs.
 - ☐ Passer à Electron 45 après quelques correctifs de cette branche (sortie fin octobre 2026) ; electron-builder 26.
