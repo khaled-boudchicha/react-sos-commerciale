@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { gql, useApolloClient, useMutation, useQuery } from '@apollo/client';
 import { Link } from 'react-router-dom';
 import { ADD_REGLEMENT_CLIENT, COORDONNEES_SOCIETE, LOTS, VENTE, VENTES } from '../../api/queries';
@@ -52,7 +52,7 @@ export default function Comptoir() {
   const apollo = useApolloClient();
   const { dossier, dossierUser } = useSession();
   const { peut, peutDoc, restreintAuxSiennes } = useDroits();
-  const { tickets, actif, options, charger, setActif, majTicket, viderTicket, patchLigne, setOptions } = useComptoir();
+  const { tickets, actif, options, charger, setActif, majTicket, majTicketA, viderTicket, patchLigne, setOptions } = useComptoir();
 
   useEffect(() => { if (dossier) charger(dossier); }, [dossier, charger]);
 
@@ -78,8 +78,6 @@ export default function Comptoir() {
   // État de la connexion (Internet / serveur / agent) : même source que l'en-tête de l'application
   const connexion = useConnexion();
   const enLigne = connexion.ok;
-  // Encaissements restés sans réponse, par ticket en attente (voir reprise.ts)
-  const incertains = useRef<Record<number, TentativeIncertaine>>({});
   const [verification, setVerification] = useState(false);
   const [doublon, setDoublon] = useState<{ vente: Vente; paiement: ResultatPaiement } | null>(null);
 
@@ -170,14 +168,14 @@ export default function Comptoir() {
    * depuis dans les ventes du jour ? Renvoie false si l'encaissement doit être suspendu.
    */
   async function verifierTentativePrecedente(p: ResultatPaiement): Promise<boolean> {
-    const tentative = incertains.current[actif];
+    const tentative = ticket.incertain;
     if (!tentative || retour) return true;
     setVerification(true);
     try {
       const r = await refetchJour();
       const suspecte = ventesSuspectes(tentative, (r.data?.ventes?.data ?? []) as Vente[])[0];
       if (suspecte) { setDoublon({ vente: suspecte, paiement: p }); return false; }
-      delete incertains.current[actif];
+      majTicketA(actif, (t) => ({ ...t, incertain: undefined }));
       return true;
     } catch (e) {
       toast.error(`Vérification impossible (${messageErreur(e)}). Le ticket précédent a peut-être été enregistré : réessayez quand la connexion sera rétablie.`);
@@ -213,7 +211,6 @@ export default function Comptoir() {
       });
       const cree = data?.createVente as Vente | undefined;
       if (!cree?.id) throw new Error('réponse du serveur incomplète');
-      delete incertains.current[slot];
 
       if (!retour && p.regle > 0) {
         try {
@@ -242,7 +239,8 @@ export default function Comptoir() {
     } catch (e: unknown) {
       if (resultatIncertain(e)) {
         if (!retour) {
-          incertains.current[slot] = { net: tot.net, connus, utilisateur: String(dossierUser.username ?? ''), moment: Date.now() };
+          const tentative: TentativeIncertaine = { net: tot.net, connus, utilisateur: String(dossierUser.username ?? ''), moment: Date.now() };
+          majTicketA(slot, (t) => ({ ...t, incertain: tentative }));
         }
         toast.error(retour
           ? 'Pas de réponse du serveur : le retour a peut-être été enregistré. Vérifiez la liste des ventes avant de recommencer.'
@@ -402,6 +400,12 @@ export default function Comptoir() {
               </button>
             </div>
           )}
+          {ticket.incertain && (
+            <div role="status" className="flex-none flex items-center gap-2.5 px-3.5 py-2.5 rounded-md text-sm leading-[1.45] font-semibold bg-warning-soft text-warning-text border border-warning-line">
+              <Icon name="alert" size={18} />
+              Le dernier encaissement de ce ticket ({fmtMoney(ticket.incertain.net)} DA) n’a pas reçu de réponse : les ventes du jour seront vérifiées avant de réencaisser.
+            </div>
+          )}
 
           <ChampScan id={ID_SCAN} retour={retour} onArticle={ajouter} />
 
@@ -538,7 +542,7 @@ export default function Comptoir() {
       {dialogue === 'annuler' && (
         <ConfirmDialog title="Annuler le ticket" danger confirmLabel="Annuler le ticket"
                        message={`Supprimer les ${ticket.lignes.length} ligne(s) du ticket ${actif + 1} ? Rien n’a encore été enregistré.`}
-                       onConfirm={() => { delete incertains.current[actif]; viderTicket(); setDialogue(null); setTimeout(focusScan, 0); }}
+                       onConfirm={() => { viderTicket(); setDialogue(null); setTimeout(focusScan, 0); }}
                        onCancel={() => setDialogue(null)} />
       )}
       {dialogue === 'ventes' && (
@@ -565,7 +569,7 @@ export default function Comptoir() {
                        onCancel={() => setDoublon(null)}
                        onConfirm={() => {
                          const p = doublon.paiement;
-                         delete incertains.current[actif];
+                         majTicketA(actif, (t) => ({ ...t, incertain: undefined }));
                          setDoublon(null);
                          void enregistrer(p, true);
                        }} />

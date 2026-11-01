@@ -534,6 +534,13 @@ local des connexions LAN (poste, utilisateur, heure) remonté au cloud par le he
   - invalidation : toute écriture réussie sur un article, un tarif, un code-barres ou un référentiel vide le cache du dossier ; la déconnexion vide tout le cache du poste ; bouton « Vider » dans `/diagnostic` (compteurs et date de l'article le plus ancien) ;
   - usage : continuer à **préparer** des tickets et à consulter pendant une coupure ; l'encaissement reste suspendu.
   - *Limite connue* : un prix modifié depuis un autre poste (ou le Delphi) n'est connu qu'à la prochaine lecture en ligne ; le cache est donc limité à 24 h et clairement signalé.
+- ✅ **Messages d'erreur lisibles partout** (`traductionLink`, `api/erreurs.ts › traduireErreurTransport`) : « Failed to fetch », « Received status code 503 », « Unexpected token < » deviennent des phrases utiles à la source, pour la soixantaine d'écrans qui affichent `e.message` ; le message d'origine reste dans `messageOriginal`.
+- ✅ **Listes** : bouton « Réessayer » sur les erreurs de chargement des grilles distantes.
+- ✅ **Session expirée** : `UNAUTHENTICATED` ⇒ retour à la connexion **avec une explication** (au lieu d'un retour muet à l'écran de connexion).
+- ✅ **Appairage robuste** (`lib/appairage.ts`) : code abîmé par une messagerie réparé (guillemets typographiques, espaces insécables, texte autour, clés sans guillemets, base64) ; import d'un fichier `.druxamed-pairing` / `.json` / `.txt` (bouton ou glisser-déposer).
+- ✅ **Conflit de session** : le message et la confirmation expliquent qu'un compte se partage mal entre deux caisses (« créez un compte par personne »).
+- ✅ **Anti-doublon persistant** : la tentative incertaine est enregistrée avec le ticket (stockage du comptoir) et survit à un redémarrage ; bandeau sur le ticket concerné.
+- ✅ **Éditeurs de pièces** (vente, achat) : une création restée sans réponse affiche « la pièce a peut-être été enregistrée — vérifiez la liste avant de réenregistrer ».
 
 ### Lot 2 — Mode LAN / hybride (effort L, 6–10 semaines, agent + cloud + app)
 | Action | Effort | Risque | Recette |

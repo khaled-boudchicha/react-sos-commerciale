@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { messageEchecCreation, messageErreur, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ACHAT, UPDATE_ACHAT, ADD_REGLEMENT_FOURNISSEUR } from '../api/queries';
@@ -181,9 +182,10 @@ export default function AchatEditor() {
       toast.success(`Pièce ${created?.numero ?? ''} enregistrée${affecteStock ? ' · stock mis à jour' : ''}${paye > 0 ? ` · payé ${fmtMoney(paye)}` : ''}.`.replace('  ', ' '));
       if (created?.id) navigate(`/achats/${created.id}`);
       else navigate('/achats');
-    } catch (e: any) {
-      setError(e.message ?? 'Erreur à l’enregistrement.');
-      toast.error(`${enEdition ? 'Modification' : 'Enregistrement'} échoué${enEdition ? 'e' : ''} : ${e.message ?? 'erreur'}`);
+    } catch (e: unknown) {
+      const m = enEdition ? messageErreur(e, 'Erreur à l’enregistrement.') : messageEchecCreation(e, 'la liste des achats');
+      setError(m);
+      toast.error(!enEdition && resultatIncertain(e) ? m : `${enEdition ? 'Modification' : 'Enregistrement'} échoué${enEdition ? 'e' : ''} : ${m}`);
     }
   }
 

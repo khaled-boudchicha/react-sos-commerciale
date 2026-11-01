@@ -74,3 +74,59 @@ export function resultatIncertain(e: unknown): boolean {
   if (/failed to fetch|networkerror|load failed/i.test((e as { message?: string } | null)?.message ?? '')) return true;
   return messagesGraphQL(e).some((g) => DELAI_SERVEUR.test(g.code ?? '') || DELAI_SERVEUR.test(g.message ?? ''));
 }
+
+type ErreurHttp = Error & { statusCode?: number; result?: unknown; messageOriginal?: string };
+
+/**
+ * Message lisible d'une erreur de transport brute (TypeError « Failed to fetch », ServerError HTTP,
+ * ServerParseError d'une page HTML d'erreur…). null si l'erreur n'est pas une erreur de transport connue.
+ */
+export function messageTransport(e: ErreurHttp, enLigne = !horsLigne()): string | null {
+  if (e instanceof DelaiDepasseError) return null; // déjà lisible
+  const statut = e.statusCode;
+  if (statut == null) {
+    if (e.name === 'ServerParseError') return 'Réponse inattendue du serveur (service en maintenance ?). Réessayez dans un instant.';
+    // fetch() rejeté (réseau, DNS, CORS, certificat) : TypeError ; tout autre objet n'est pas « réseau »
+    if (e.name !== 'TypeError') return null;
+    return enLigne ? 'Serveur injoignable : vérifiez la connexion Internet.' : 'Pas de connexion Internet sur ce poste.';
+  }
+  if (statut === 502 || statut === 503 || statut === 504) return `Serveur momentanément indisponible (HTTP ${statut}). Réessayez dans un instant.`;
+  if (statut >= 500) return `Erreur du serveur (HTTP ${statut}). Si elle persiste, contactez SOFTLY.`;
+  // 4xx : le serveur a répondu ; son propre message (erreur GraphQL) est plus utile qu'un code
+  const premier = (e.result as { errors?: { message?: string }[] } | undefined)?.errors?.[0]?.message;
+  if (premier) return premier;
+  if (statut === 401) return 'Session expirée : reconnectez-vous.';
+  if (statut === 403) return 'Accès refusé par le serveur.';
+  if (statut === 413) return 'Requête trop volumineuse pour le serveur.';
+  if (statut === 429) return 'Trop de requêtes : patientez quelques secondes.';
+  return `Requête refusée par le serveur (HTTP ${statut}).`;
+}
+
+/**
+ * Remplace, en place, le message technique d'une erreur de transport par un message lisible.
+ * L'objet est conservé (statusCode, result, response… restent utilisables par les liens Apollo) ;
+ * le message d'origine reste dans `messageOriginal` (journal, support).
+ */
+export function traduireErreurTransport<T>(e: T): T {
+  if (!(e instanceof Error)) return e;
+  const err = e as ErreurHttp;
+  if (err.messageOriginal !== undefined) return e;
+  const lisible = messageTransport(err);
+  if (!lisible) return e;
+  try {
+    err.messageOriginal = err.message;
+    Object.defineProperty(err, 'message', { value: lisible, configurable: true, writable: true });
+  } catch { /* objet gelé : message d'origine conservé */ }
+  return e;
+}
+
+/**
+ * Message d'échec d'une CRÉATION de pièce : si la réponse s'est perdue, la pièce existe peut-être déjà ;
+ * le dire évite qu'un utilisateur réenregistre aussitôt et crée un doublon.
+ */
+export function messageEchecCreation(e: unknown, liste: string): string {
+  if (resultatIncertain(e)) {
+    return `Pas de réponse du serveur : la pièce a peut-être été enregistrée. Vérifiez ${liste} avant de réenregistrer, pour éviter un doublon.`;
+  }
+  return messageErreur(e, 'Erreur à l’enregistrement.');
+}

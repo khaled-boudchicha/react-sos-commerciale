@@ -5,7 +5,7 @@ import { RetryLink } from '@apollo/client/link/retry';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { useSession } from '../store/session';
 import { useReseau } from '../store/reseau';
-import { DelaiDepasseError, estPanneTransport, messageErreur } from './erreurs';
+import { DelaiDepasseError, estPanneTransport, messageErreur, traduireErreurTransport } from './erreurs';
 import { horsLigneLink } from './cacheHorsLigne';
 
 // Codes poussés par le cloud dans extensions.code (pattern errorLink du mobile)
@@ -96,6 +96,19 @@ const retryLink = new RetryLink({
   attempts: { max: 3, retryIf: (erreur, op) => doitRelancer(erreur, op) },
 });
 
+/**
+ * Messages lisibles à la source : « Failed to fetch », « Response not successful: Received status code
+ * 503 », « Unexpected token < » deviennent des phrases utiles partout où l'interface affiche `e.message`.
+ */
+const traductionLink = new ApolloLink((operation, forward) => new Observable((observer) => {
+  const sub = forward(operation).subscribe({
+    next: (v) => observer.next(v),
+    error: (e) => observer.error(traduireErreurTransport(e)),
+    complete: () => observer.complete(),
+  });
+  return () => sub.unsubscribe();
+}));
+
 /** Toute réponse du serveur (même une erreur GraphQL) prouve que le cloud est joignable. */
 const sondeLink = new ApolloLink((operation, forward) => forward(operation).map((r) => {
   useReseau.getState().signalerSucces();
@@ -113,15 +126,15 @@ const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
       useSession.getState().setAccessError(code);
     }
     if (code === 'UNAUTHENTICATED') {
-      useSession.getState().logout();
+      useSession.getState().expirerSession();
     }
   }
 });
 
 export const apollo = new ApolloClient({
   // Ordre : cache hors ligne (secours en dernier recours) → erreurs (vue finale, panne comptée) → relance
-  // → sonde de succès → délai par tentative → en-têtes → HTTP
-  link: from([horsLigneLink, errorLink, retryLink, sondeLink, delaiLink, authLink, httpLink]),
+  // → sonde de succès → délai par tentative → en-têtes → messages lisibles → HTTP
+  link: from([horsLigneLink, errorLink, retryLink, sondeLink, delaiLink, authLink, traductionLink, httpLink]),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: { fetchPolicy: 'cache-and-network' },

@@ -1,4 +1,5 @@
 import { Article, Client } from '../../api/types';
+import type { TentativeIncertaine } from './reprise';
 import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../../components/document/lignesDocument';
 
 /**
@@ -16,6 +17,11 @@ export type TicketComptoir = {
   remisePct: number;
   /** Mode retour (bouton « Retour ») : la validation crée un bon de retour BRT. */
   retour: boolean;
+  /**
+   * Encaissement resté sans réponse (voir reprise.ts) : conservé avec le ticket, donc après un
+   * redémarrage, pour vérifier les ventes du jour avant de réencaisser.
+   */
+  incertain?: TentativeIncertaine;
 };
 
 export const ticketVide = (): TicketComptoir => ({ lignes: [], client: null, remisePct: 0, retour: false });
