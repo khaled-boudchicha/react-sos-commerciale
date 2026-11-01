@@ -1,4 +1,4 @@
-import type { ReportDef } from '@softly/report';
+import type { ReportDef } from '@softly/report/core';
 import {
   THEMES, bandePied, bandeSuite, bandeTotauxListe, bandeDe, blocEntete, blocInfos, blocNote, blocSignatures, blocTiers, empiler, nouvelEtat, tableau, T,
   type Col, type Info, type ThemeId,

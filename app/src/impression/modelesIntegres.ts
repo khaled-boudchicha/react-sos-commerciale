@@ -1,4 +1,4 @@
-import { declarerModeleIntegre, type ReportDef } from '@softly/report';
+import { declarerModeleIntegre, type ReportDef } from '@softly/report/core';
 import { MODELES_PIECES } from './modelesPieces';
 import { MODELES_ETATS } from './modelesEtats';
 import { MODELES_TICKETS } from './modelesTickets';

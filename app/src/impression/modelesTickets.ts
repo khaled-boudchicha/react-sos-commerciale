@@ -1,4 +1,4 @@
-import { creerBande, creerObjet, type BandDef, type ObjDef, type ReportDef } from '@softly/report';
+import { creerBande, creerObjet, type BandDef, type ObjDef, type ReportDef } from '@softly/report/core';
 import { FMT, THEMES, T, bandeDe, nouvelEtat, type Ctx } from './kit';
 
 /**

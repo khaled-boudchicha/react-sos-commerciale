@@ -1,4 +1,4 @@
-import { chargerModele, configurerReport, enregistrerFonction, listerModeles, modeleParDefaut, rendreEtat, versDocumentImprimable, type StockageModeles } from '@softly/report';
+import { chargerModele, configurerReport, enregistrerFonction, listerModeles, modeleParDefaut, rendreEtat, versDocumentImprimable, type StockageModeles } from '@softly/report/core';
 import type { PrintDocument } from '../print/engine/types';
 import type { DemandeImpression } from './demandes';
 import { arreteLaSomme } from '../lib/enLettres';

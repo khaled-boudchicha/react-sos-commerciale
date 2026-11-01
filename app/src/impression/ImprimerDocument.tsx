@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ImpressionModele, listerModeles, modeleParDefaut } from '@softly/report';
+import { listerModeles, modeleParDefaut } from '@softly/report/core';
+import ImpressionModele from './ImpressionModeleDiffere';
 import type { DemandeImpression } from './demandes';
 
 /**

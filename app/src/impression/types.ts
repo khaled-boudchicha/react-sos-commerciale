@@ -1,4 +1,4 @@
-import { declarerType, type DatasetDef, type FieldDef, type KindDef, type ReportData } from '@softly/report';
+import { declarerType, type DatasetDef, type FieldDef, type KindDef, type ReportData } from '@softly/report/core';
 import { arreteLaSomme } from '../lib/enLettres';
 import type { Achat, Article, LigneVente, Vente } from '../api/types';
 import type { Societe } from '../print/templates/partials';

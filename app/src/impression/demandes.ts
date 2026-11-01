@@ -1,4 +1,4 @@
-import type { ReportData } from '@softly/report';
+import type { ReportData } from '@softly/report/core';
 import type { Societe } from '../print/templates/partials';
 import type { TicketExtras } from './types';
 import type { Vente } from '../api/types';

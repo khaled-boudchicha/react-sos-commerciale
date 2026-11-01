@@ -1,4 +1,4 @@
-import type { BandDef, HighlightRule, ObjDef, ReportDef } from '@softly/report';
+import type { BandDef, HighlightRule, ObjDef, ReportDef } from '@softly/report/core';
 import {
   THEMES, bandePied, bandeSuite, bandeDe, blocCartes, blocEntete, blocNote, blocSignatures, blocTiers, blocTotaux, empiler, nouvelEtat, tableau, T,
   type Carte, type Col, type LigneTotal, type ThemeId,

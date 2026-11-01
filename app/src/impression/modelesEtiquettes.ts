@@ -1,4 +1,4 @@
-import { creerBande, creerEtat, creerObjet, creerPage, type ObjDef, type ReportDef } from '@softly/report';
+import { creerBande, creerEtat, creerObjet, creerPage, type ObjDef, type ReportDef } from '@softly/report/core';
 import { THEMES, T, type Ctx } from './kit';
 
 /** Étiquettes de rayon (prix + code-barres) sur planche A4 : cellules répétées en colonnes. */

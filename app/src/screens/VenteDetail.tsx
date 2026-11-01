@@ -20,7 +20,7 @@ import LiensPiece from '../components/document/LiensPiece';
 import PrintPreview from '../print/engine/PrintPreview';
 import { PrintDocument } from '../print/engine/types';
 import ImprimerPieceDialog from '../components/document/ImprimerPieceDialog';
-import { ImpressionModele } from '@softly/report';
+import ImpressionModele from '../impression/ImpressionModeleDiffere';
 import { donneesVente } from '../impression';
 import { demandeTicket } from '../impression/demandes';
 import ImprimerDocument from '../impression/ImprimerDocument';
