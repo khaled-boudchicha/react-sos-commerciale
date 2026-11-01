@@ -163,3 +163,16 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
 - ☑ Tests agent : intégration 109 (cycle des pièces) + **`lectures.itest.js`** (91 commandes Get*, 0 erreur SQL) + **`schema.itest.js`** (tables et colonnes écrites contre la base Delphi).
 - Reste (inchangé) : déploiement, commit du mobile, mode strict, push — en attente de votre accord.
 
+## Dépendances et sécurité (01/11/2026)
+- ☑ **Electron 31 → 44.10.1** (31 n'était plus maintenu : Chromium sans correctifs de sécurité). Adaptations : marges du
+  PDF (`margins` à 0 au lieu de `marginType: 'none'`), imprimante par défaut (`isDefault` retiré de PrinterInfo, déduit des
+  options système quand elles existent). Vérifié : tests Electron 9/9 (dont export PDF à la taille de page), empaquetage
+  Linux avec electron-builder 24 et démarrage du paquet. ☐ à vérifier sur Windows : installeur NSIS, impression silencieuse
+  des tickets, coffre de chiffrement de la session.
+- ☑ `npm audit fix` : failles « hautes » de production corrigées (brace-expansion, fast-uri, js-yaml).
+- ☐ **react-router v6 → v7** : deux avis modérés (redirection par antislash, désérialisation) corrigés seulement en v7.
+  Exposition faible (aucune navigation vers une URL saisie par l'utilisateur, pas de rendu serveur) ; migration à planifier
+  (le routeur est déjà en mode « data », proche de l'API v7).
+- ☐ **exceljs** : chaîne `archiver` / `uuid` / `minimatch` (avis modérés) ; le correctif proposé est un retour à exceljs 3
+  (inacceptable). Usage limité à l'écriture des exports ; suivre une version corrigée d'exceljs.
+- ☐ Passer à Electron 45 après quelques correctifs de cette branche (sortie fin octobre 2026) ; electron-builder 26.

@@ -183,7 +183,14 @@ ipcMain.handle('securite:etat', (e) => {
 ipcMain.handle('printers:list', async (e) => {
   if (!win || !expediteurValide(e)) return [];
   const list = await win.webContents.getPrintersAsync();
-  return list.map((p) => ({ name: p.name, displayName: p.displayName, isDefault: p.isDefault }));
+  // `isDefault` a été retiré de PrinterInfo : l'indication vient, quand le système la fournit, des options
+  // de l'imprimante (CUPS : printer-is-default). Sert uniquement à la mention « (défaut) » dans Paramètres.
+  return list.map((p) => {
+    const o = (p.options ?? {}) as Record<string, unknown>;
+    const isDefault = o['printer-is-default'] === 'true' || o['printer-is-default'] === true
+      || (p as unknown as { isDefault?: boolean }).isDefault === true;
+    return { name: p.name, displayName: p.displayName, isDefault };
+  });
 });
 
 // Impression silencieuse d'un HTML complet vers une imprimante donnée (tickets).

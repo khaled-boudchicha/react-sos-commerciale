@@ -83,6 +83,24 @@ describe('application de bureau', () => {
     assert.deepEqual(await app.evaluate(() => globalThis.__ouvertures), ['https://example.invalid/']);
   });
 
+  test('impression : liste des imprimantes et export PDF à la taille de la page (sans marge)', async () => {
+    const imprimantes = await page.evaluate(() => window.gc.printers());
+    assert.ok(Array.isArray(imprimantes));
+    // Fenêtre « Enregistrer sous » remplacée par un chemin du profil de test
+    const cible = join(profil, 'etat-test.pdf');
+    await app.evaluate(({ dialog }, chemin) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: chemin }); }, cible);
+    const html = '<!doctype html><html><body style="margin:0"><div style="width:80mm;height:120mm;background:#eee">Ticket</div></body></html>';
+    const chemin = await page.evaluate((h) => window.gc.modeles.pdf(h, 80, 120, 'ticket.pdf'), html);
+    assert.equal(chemin, cible);
+    const pdf = readFileSync(cible);
+    assert.equal(pdf.subarray(0, 5).toString(), '%PDF-');
+    // Taille de page = 80 × 120 mm (en points PDF : mm / 25,4 × 72)
+    const boite = /\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/.exec(pdf.toString('latin1'));
+    assert.ok(boite, 'MediaBox absente');
+    assert.ok(Math.abs(Number(boite[1]) - (80 / 25.4) * 72) < 2, `largeur ${boite[1]}`);
+    assert.ok(Math.abs(Number(boite[2]) - (120 / 25.4) * 72) < 2, `hauteur ${boite[2]}`);
+  });
+
   test('écran planté : rechargement automatique', async () => {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.forcefullyCrashRenderer());
     // Le processus principal recharge l'écran : la fenêtre redevient utilisable
@@ -101,13 +119,13 @@ describe('application de bureau', () => {
 describe('fenêtre', () => {
   test('taille et position retrouvées au lancement suivant', async () => {
     const premier = await lancer();
-    await premier.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ x: 40, y: 30, width: 1300, height: 820 }));
+    await premier.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setBounds({ x: 40, y: 30, width: 1200, height: 760 }) /* tient dans l'écran virtuel (1280 px) */);
     await premier.page.waitForTimeout(300);
     await premier.app.close();
     const second = await lancer();
     const b = await second.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getNormalBounds());
     await second.app.close();
-    assert.equal(b.width, 1300);
-    assert.equal(b.height, 820);
+    assert.equal(b.width, 1200);
+    assert.equal(b.height, 760);
   });
 });
