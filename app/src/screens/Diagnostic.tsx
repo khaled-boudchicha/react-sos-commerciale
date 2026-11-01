@@ -7,6 +7,9 @@ import { Button } from '../components/ui/Button';
 import { Card, DescriptionList } from '../components/ui/Card';
 import { IconBadge, type IconName, type Tone } from '../components/ui/Icon';
 import { useToast } from '../components/ui/Toast';
+import { EmptyState } from '../components/ui/States';
+import { useReseau } from '../store/reseau';
+import { useConnexion } from '../api/useSurveillanceReseau';
 
 const PING = gql`query DiagPing { __typename }`;
 const SESSION_STATUS = gql`query DiagSession { sessionStatus }`;
@@ -31,6 +34,10 @@ export default function Diagnostic() {
   const dossierUser = useSession((s) => s.dossierUser);
   const [checks, setChecks] = useState<Check[]>([]);
   const [running, setRunning] = useState(false);
+  const connexion = useConnexion();
+  const journal = useReseau((s) => s.journal);
+  const viderJournal = useReseau((s) => s.viderJournal);
+  const derniereReponse = useReseau((s) => s.derniereReponse);
   // Protection de la session sur ce poste (application de bureau uniquement)
   const [protection, setProtection] = useState<string>('—');
 
@@ -156,12 +163,43 @@ export default function Diagnostic() {
       </Card>
 
       <Card>
-        <DescriptionList columns={4} items={[
+        <DescriptionList columns={3} items={[
+          { label: 'État de la connexion', value: connexion.libelle },
+          { label: 'Dernière réponse du serveur', value: derniereReponse ? new Date(derniereReponse).toLocaleTimeString('fr-FR') : '—' },
           { label: 'Agent associé', value: agent?.label ?? agent?.agentId ?? '—' },
           { label: 'Dossier', value: dossier ?? '—' },
           { label: 'Utilisateur du dossier', value: dossierUser?.username ?? '—' },
           { label: 'Session sur ce poste', value: protection },
         ]} />
+      </Card>
+
+      <Card padding="none">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line-soft">
+          <div className="flex-1">
+            <div className="font-bold text-base text-ink">Journal des incidents réseau</div>
+            <div className="text-xs text-ink-muted">Pannes de transport enregistrées sur ce poste (50 dernières, répétitions regroupées).</div>
+          </div>
+          <Button size="sm" icon="trash" onClick={viderJournal} disabled={journal.length === 0}>Vider</Button>
+        </div>
+        {journal.length === 0 ? (
+          <EmptyState size="sm" icon="check" title="Aucun incident" description="Aucune panne de connexion n’a été relevée sur ce poste." />
+        ) : (
+          <ul className="divide-y divide-line-soft max-h-[320px] overflow-auto">
+            {journal.map((j) => (
+              <li key={`${j.debut}-${j.operation}`} className="flex items-start gap-3 px-4 py-2.5">
+                <span className="money text-xs text-ink-muted w-[150px] flex-none pt-0.5">
+                  {new Date(j.debut).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-ink">{j.message}</span>
+                  <span className="block text-xs text-ink-muted truncate">
+                    {j.operation}{j.n > 1 ? ` · ${j.n} échecs jusqu’à ${new Date(j.fin).toLocaleTimeString('fr-FR')}` : ''}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
   );

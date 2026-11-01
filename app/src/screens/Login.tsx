@@ -8,6 +8,7 @@ import { Alert } from '../components/ui/States';
 import { Badge } from '../components/ui/atoms';
 import { Icon, IconBadge } from '../components/ui/Icon';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { messageErreur } from '../api/erreurs';
 
 type Step = 'credentials' | 'agent' | 'dossier';
 
@@ -80,7 +81,7 @@ export default function Login() {
       void loadDossiers();
       void loadDossierUsers();
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
     }
   }
 
@@ -99,7 +100,7 @@ export default function Login() {
       if ((res.agents ?? []).length === 1) setSelectedAgent(res.agents[0]);
       setStep('agent');
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
     }
   }
 
@@ -136,7 +137,7 @@ export default function Login() {
     void loadDossiers();
     void loadDossierUsers();
     } catch (err: any) {
-      setError(err.message ?? 'Serveur injoignable.');
+      setError(messageErreur(err, 'Serveur injoignable.'));
     }
   }
 
@@ -155,7 +156,7 @@ export default function Login() {
       }
       session.setDossierUser(dossierUserDepuisLogin(res));
     } catch (err: any) {
-      setError(err.message ?? 'Erreur de connexion.');
+      setError(messageErreur(err, 'Erreur de connexion.'));
     }
   }
 
