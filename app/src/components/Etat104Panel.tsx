@@ -11,7 +11,7 @@ import { Alert } from './ui/States';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeEtat104 } from '../impression/demandes';
-import type { Etat104Ligne } from '../print/templates';
+import type { Etat104Ligne } from '../impression/donnees';
 
 const CSV: ExportColumn<Etat104Ligne>[] = [
   { header: 'Code', value: (r) => r.code_cli },

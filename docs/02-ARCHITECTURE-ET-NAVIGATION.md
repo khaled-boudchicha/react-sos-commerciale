@@ -64,7 +64,7 @@ Sidebar à groupes repliables + topbar (recherche ⌘K, sélecteur dossier/exerc
 3. **Fiche tiers 360°** : header solde + onglets Relevé / Factures non réglées / Règlements / Avances / Infos — boutons Régler (lettrage), Crédit initial.
 4. **Trésorerie** : sélecteur de compte (cards), grille transactions filtrée par période (jour/semaine/mois/année/dates), nouveau mouvement, transfert, arrêté de caisse.
 5. **Inventaire** : préparation par dépôt → grille de comptage (qté théorique/physique/écart) → clôture.
-6. **Impression** : templates HTML React (facture A4, ticket, relevé tiers, bordereau) rendus dans une fenêtre cachée → print/PDF. S'inspirer de `app_mobile_client/lib/facturePdf.ts`.
+6. **Impression** : moteur d'états `@softly/report` (modèles `.gcr`, designer, aperçu, PDF, impression directe des tickets) — voir `05-IMPRESSION.md`.
 
 ## 5. Données & types
 
@@ -72,6 +72,19 @@ Sidebar à groupes repliables + topbar (recherche ⌘K, sélecteur dossier/exerc
 - Constantes types de documents partagées : vente `FA=1, BL=2, FP=3, BCT=4, BRT=6, FAV=7, BC=0` ; achat `BC=0, FA=1, BR=2, DO=3, BRT=4, FAV=5` (source `ventes.service.ts` / `achats.service.ts` de l'agent).
 - Pièges DB à respecter (cf. `sos-agent/docs/SQL-GESTION-COMMERCIALE.md`) : `reglemntfournisseur`=paiements CLIENTS (inversé), types 6/7 = retours à netter, `RemiseP` doc-level, pas de colonne `actif` sur `clients`.
 
-## 6. Droits utilisateurs (cible)
+## 6. Droits utilisateurs (mis en œuvre)
 
-S'appuyer sur le **nouveau** modèle du Delphi (`DroitsConstants.pas` : IDs par catégorie Tiers 1001+, Achat 2001+, Vente 3001+, Stock 4001+, Dossier 5001+, Autres 6001+, Banques 7001+ ; actions READ/CREATE/UPDATE/DELETE/PRINT/EXPORT…) — tables `user_rights`/`rights_definition` de `commercecommun`. Nécessite le chantier serveur P2 (exposition des droits via l'agent). En v1 : rôle admin/utilisateur simple (masquer suppression/paramètres aux non-admins).
+> Le modèle « numérique » envisagé au départ (`DroitsConstants.pas`, IDs 1001+…) a été **abandonné** : les bases réelles
+> n'utilisent pas `user_rights` / `rights_definition`.
+
+- **Modèle réel** : libellés séparés par `|` dans les colonnes `Previlege*` de `commercecommun.users` (Tiers, Achat, Vente,
+  Stock, Autre, Bank…), comme le Delphi. Renvoyés par l'agent au `loginDossierUser`, rafraîchis toutes les 5 minutes.
+- **Côté app** : `app/src/lib/droits.ts` (constantes `D.<module>.<droit>` = libellés exacts du Delphi, `useDroits()` :
+  `peut(module, libelle)`, `voitMarges`, `statsRestreintesAuxSiennes`, `comptesAutorises` pour `PrevilegeBank`).
+  Menus, ruban, palette, routes (`<G si={…}>`), actions et colonnes (PMP, marges) sont masqués selon les droits ;
+  les listes « … par utilisateur » ne montrent que les pièces de l'utilisateur.
+- **Côté agent** : les écritures sont contrôlées par l'agent ; en **mode strict** (`exiger_jeton_utilisateur`), toute
+  écriture sans jeton utilisateur valide est refusée (voir `07-DEPLOIEMENT.md` § 6).
+- Écran **Paramètres › Utilisateurs & droits** : comptes du dossier et matrice des droits.
+- Droits absents au login : tout est autorisé côté interface (comportement historique) — décision en attente
+  (`12-DEMANDES-AGENT-CLOUD.md`, D8 / Q4).

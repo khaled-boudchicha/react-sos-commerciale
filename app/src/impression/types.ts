@@ -3,10 +3,9 @@ import { arreteLaSomme } from '../lib/enLettres';
 import type { Achat, Article, LigneVente, Vente } from '../api/types';
 import type { Societe } from '../print/templates/partials';
 import type {
-  ArreteCaisseData, BonStock, BordereauLigne, Etat104Ligne, Etat104Totaux, JournalLigne,
+  ArreteCaisseData, BonStock, BordereauLigne, Etat104Ligne, Etat104Totaux, InventaireEntete, InventaireLigne, JournalLigne,
   RecouvrementLigne, RecouvrementTotaux, TicketVentesLigne,
-} from '../print/templates';
-import type { InventaireEntete, InventaireLigne } from '../print/templates/inventaire';
+} from './donnees';
 
 /**
  * Types de documents imprimables par les états personnalisés (métier Gestion Commerciale). Pour chaque type :

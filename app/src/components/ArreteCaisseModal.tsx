@@ -9,7 +9,7 @@ import ConfirmDialog from './ui/ConfirmDialog';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeArreteCaisse, demandeRecuTransfert } from '../impression/demandes';
-import type { ArreteCaisseData } from '../print/templates';
+import type { ArreteCaisseData } from '../impression/donnees';
 import { D, useDroits } from '../lib/droits';
 import Dialog from './ui/Dialog';
 import { Button } from './ui/Button';

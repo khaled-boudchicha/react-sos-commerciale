@@ -141,6 +141,7 @@ Les plus utiles à brancher : `etatPaiements*` / `reglements*` (I17), `stocks` /
 | C8 | ✅ partiel | Écrans secondaires chargés à la demande (`React.lazy`) : script principal 1 456 → 1 245 ko. |
 | C10 | ✅ | Doublons GraphQL regroupés (`MODES_PAYEMENT`, `TRANSFERT_COMPTE`, `REGLER_*`) ; les modes de paiement sont aussi servis par le cache hors ligne. |
 | I21 | ✅ partiel | Achat : les lots existants de l'article sont proposés dans la colonne « Lot » (liste), la péremption d'un lot choisi est reprise. *Import Excel, piste d'audit : agent (12, D43).* |
+| C13 | ✅ | Documentation remise à jour (01/11) : `04-TODO` (cases périmées), `05-IMPRESSION` (moteur `@softly/report`, 33 modèles, PDF, impression directe), `07-DEPLOIEMENT` (nouveautés 0.3.x et recette), `02` (modèle de droits réel), `03` (état des manques serveur). |
 | Qualité | ✅ | Parcours d'interface automatisés (`npm run test:ui`, 11 scénarios, build de production + GraphQL simulé), ajoutés à la CI GitLab (job `ui`, non bloquant au départ). |
 
 > Les points qui dépendent de l'agent, du cloud ou de l'exploitation sont suivis dans [12-DEMANDES-AGENT-CLOUD.md](12-DEMANDES-AGENT-CLOUD.md).

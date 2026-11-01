@@ -47,6 +47,15 @@ sos-agent (PC pharmacie)  →  MariaDB (dossiers commercecommun / multi-lots)
 
 ## 3. Manques — travail serveur à faire
 
+> **État au 01/11/2026** — la plupart des manques ci-dessous ont été comblés et sont utilisés par l'app : CRUD articles,
+> lots (`lots`, `addLot`, `deleteLot`), `tarifsArticle`, `barcodesArticle`, `alertesStock`, `recalculerStock`,
+> `tresorie`, `createInventaire`, `updateVente` / `updateAchat`, transformation de pièces et `grouperBL`,
+> `annulerMouvement`, `transfertStock`, recouvrement, État 104, utilisateurs et droits du dossier, `facturesNonReglees`.
+> **Restent ouverts** (ou non branchés faute de signature documentée) : `prixPourQte` / `promotions` / `calculerPrix`,
+> `mouvementTresorie` (détail), stock par dépôt, paiements détaillés, module production. Le suivi à jour des demandes
+> aux équipes agent / cloud est dans [12-DEMANDES-AGENT-CLOUD.md](12-DEMANDES-AGENT-CLOUD.md) ; ce chapitre est conservé
+> pour l'historique et le pattern d'ajout (§ 5).
+
 ### P1 — Routage simple (le code agent existe, il manque 1 `case` bridge + 1 champ proxy chacun)
 | Commande à router | Service agent existant | Champ cloud à créer |
 |---|---|---|
@@ -78,9 +87,10 @@ sos-agent (PC pharmacie)  →  MariaDB (dossiers commercecommun / multi-lots)
 - `AGENT-GRPC.md` partiellement obsolète (mentionne des commandes disparues) — à remettre à jour au fil des ajouts.
 
 ## 4. Côté app desktop (pas serveur, mais à prévoir)
-- **Types TS** : retours JSON opaques → générer/écrire les types depuis les `.gql` typés de l'agent (`sos-agent/src/modules/*/*.schema.gql`).
-- **Impression/PDF** : rien côté serveur — imprimer côté Electron (facture A4 + ticket), en s'inspirant de `app_mobile_client/lib/facturePdf.ts` / `etatTiersPdf.ts`.
-- **Statut agent temps réel** : polling `myAgents` + gestion des erreurs de timeout par commande (pattern errorLink du mobile).
+- ☐ **Types TS** (attend la publication du schéma cloud, `12` D0) : retours JSON opaques → générer/écrire les types depuis les `.gql` typés de l'agent (`sos-agent/src/modules/*/*.schema.gql`).
+- ☑ **Impression/PDF** : faite côté Electron avec le moteur `@softly/report` (voir `05-IMPRESSION.md`).
+- ☑ **Statut agent temps réel** : sonde unique (20 s, 6 s en mode dégradé), états Internet / serveur / agent, délais par
+  type de requête, relance des lectures seulement (`api/client.ts`, `store/reseau.ts`, voir `10-ANALYSE-CONNEXION.md`).
 
 ## 5. Pattern d'ajout d'une opération bout-en-bout (référence)
 1. Méthode dans `sos-agent/src/modules/<module>/<module>.service.ts` (+ module si neuf).

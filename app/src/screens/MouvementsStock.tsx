@@ -21,7 +21,7 @@ import TransfertStockModal from '../components/TransfertStockModal';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeBonStock } from '../impression/demandes';
-import type { BonStock, BonStockLigne } from '../print/templates';
+import type { BonStock, BonStockLigne } from '../impression/donnees';
 
 type Transfert = {
   code: string; date: string; depot_source?: string | null; depot_destination?: string | null;

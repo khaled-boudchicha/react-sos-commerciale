@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { useQuery } from '@apollo/client';
 import { ETAT_FOURNISSEUR, FACTURES_NON_REGLEES } from '../../api/queries';
 import type { Client, Fournisseur } from '../../api/types';
-import type { EtatFournisseurLigne, EtatFournisseurSolde } from '../../print/templates/etatFournisseur';
+import type { EtatFournisseurLigne, EtatFournisseurSolde } from '../../impression/donnees';
 import { fmtDate } from '../../lib/format';
 import { Badge, Money, StatusPill } from '../ui/atoms';
 import { Button } from '../ui/Button';

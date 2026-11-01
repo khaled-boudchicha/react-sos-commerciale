@@ -1,4 +1,7 @@
-# Déploiement — version 0.2.0 (septembre 2026)
+# Déploiement — guide (0.2.0, mis à jour pour 0.3.x en novembre 2026)
+
+> **Version 0.3.x** : voir l'encadré « Ce qui change avec 0.3.x » ci-dessous avant de déployer. Le reste du guide
+> (mise en service, ordre de déploiement, recette, mode strict) reste valable.
 
 Première mise en production de l'app desktop. Elle regroupe : cycle des pièces, droits, caisse,
 stock, timbre (25/09) ; grille de données avec tri / filtres / groupes **côté serveur**, fiche de
@@ -21,6 +24,25 @@ Procédure pas à pas pour mettre en production les évolutions des dépôts :
 **Aucune migration de schéma** : ni la base d'administration du cloud ni les bases des dossiers
 (MariaDB des pharmacies) ne changent de structure. Les nouvelles fonctions utilisent des colonnes
 déjà présentes (Delphi). Un retour arrière ne demande donc aucune opération sur les données.
+
+## Ce qui change avec 0.3.x (app desktop, novembre 2026)
+
+Aucune modification du cloud ni de l'agent n'est **requise** : 0.3.x fonctionne avec les versions déployées en 0.2.0.
+Les demandes aux équipes agent / cloud sont suivies dans [12-DEMANDES-AGENT-CLOUD.md](12-DEMANDES-AGENT-CLOUD.md).
+
+| Sujet | Conséquence pour le déploiement |
+|---|---|
+| **Electron 44** (au lieu de 31) | Chromium à jour des correctifs de sécurité. Windows 7 / 8 / 8.1 ne sont plus pris en charge (déjà le cas depuis Electron 23). |
+| **Session chiffrée sur le poste** (DPAPI sous Windows, Trousseau sous macOS, trousseau du bureau sous Linux) | Jamais de repli en clair. Sous **Linux sans trousseau** (pas de gnome-keyring / KWallet), la session n'est pas mémorisée : l'utilisateur se reconnecte à chaque lancement. Diagnostic › « Session sur ce poste » l’indique. |
+| **URL du cloud en `https://` uniquement** | Une URL `http://` est refusée en production (seul `http://localhost` est admis en développement). La politique de sécurité du contenu (CSP) bloque aussi toute requête `http:`. |
+| **Une seule instance** de l'application par poste | Un second lancement ramène la fenêtre existante au premier plan. |
+| **Cache hors ligne** (IndexedDB du poste) | Référentiels 7 jours, articles consultés 24 heures ; vidé à la déconnexion. Hors ligne, l'encaissement du comptoir est suspendu (pas de vente sans serveur). |
+| **Brouillons** des factures et achats en cours (7 jours, par dossier et par utilisateur) | Repris après une fermeture ou une coupure ; effacés à l'enregistrement. |
+| **Journal local des erreurs** + Diagnostic › « Copier le rapport » | Le support demande ce rapport (il ne contient aucun jeton ni mot de passe). |
+| **Tests automatisés** : `npm run test:ui` (parcours d'interface), `npm run test:electron` (application de bureau réelle, `xvfb-run -a` sous Linux) | Jobs GitLab `ui` et `electron`, **non bloquants** au départ : les rendre bloquants après un premier passage vert sur GitLab. |
+
+À vérifier **sur Windows** avant la diffusion (non testable dans l'environnement de développement) : installeur NSIS,
+impression silencieuse des tickets sur l'imprimante thermique, mémorisation chiffrée de la session (DPAPI).
 
 ## Mettre en service un nouveau client (procédure courante)
 
@@ -165,7 +187,8 @@ Retour arrière : réinstaller l'installeur précédent du tray.
 
 ```bash
 cd gestion-commerciale-desktop
-git tag v0.2.0 && git push origin v0.2.0
+# vX.Y.Z = champ "version" de app/package.json (0.3.0 aujourd'hui) : l'incrémenter avant de taguer
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
 La CI construit Windows (NSIS) et Linux (AppImage, deb) ; macOS via le job manuel `build:macos`
@@ -203,6 +226,16 @@ Sur un **dossier de test** de préférence (copie de base) :
 - [ ] Fiche client → Crédit initial : un montant inférieur au déjà payé est refusé ; les paiements
       du crédit restent dans le relevé.
 - [ ] Référentiels : créer / supprimer un centre de coût et un commercial.
+
+Ajouts 0.3.x :
+
+- [ ] Diagnostic : Internet / serveur / agent au vert, « Session sur ce poste » = chiffrée.
+- [ ] Comptoir : couper le réseau → bandeau immédiat, encaissement suspendu ; rétablir → reprise sans doublon.
+- [ ] Facture en cours : fermer l'application puis la rouvrir → le brouillon est proposé et repris.
+- [ ] Quitter une facture modifiée par le menu → « Quitter sans enregistrer ? ».
+- [ ] Ticket : impression directe sur l'imprimante thermique (Paramètres › imprimante ticket).
+- [ ] Facture : aperçu, puis PDF à la taille de la page.
+- [ ] Profil vendeur (sans le droit « Afficher le bénéfice ») : ni PMP ni marge dans le stock, la fiche article et les statistiques.
 
 Automatisé (sur une copie de dossier uniquement) :
 

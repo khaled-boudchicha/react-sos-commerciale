@@ -14,7 +14,7 @@ import type { Tone } from './ui/Icon';
 import ImprimerDocument from '../impression/ImprimerDocument';
 import type { DemandeImpression } from '../impression/demandes';
 import { demandeRecouvrement } from '../impression/demandes';
-import type { RecouvrementLigne } from '../print/templates';
+import type { RecouvrementLigne } from '../impression/donnees';
 
 const CSV: ExportColumn<RecouvrementLigne>[] = [
   { header: 'Code', value: (r) => r.code_cli },
