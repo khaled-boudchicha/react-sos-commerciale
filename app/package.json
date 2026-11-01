@@ -16,7 +16,8 @@
     "test": "vitest run",
     "lint:ui": "node scripts/ui-lint.mjs --strict",
     "test:e2e": "node e2e/flux-critiques.mjs",
-    "test:ui": "vite build && node --test --test-concurrency=1 e2e/ui/parcours.e2e.mjs"
+    "test:ui": "vite build && node --test --test-concurrency=1 e2e/ui/parcours.e2e.mjs",
+    "test:electron": "tsc -p tsconfig.electron.json && vite build && node --test --test-concurrency=1 e2e/electron/electron.e2e.mjs"
   },
   "author": "SOFTLY",
   "license": "MIT",
