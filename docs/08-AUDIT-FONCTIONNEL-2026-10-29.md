@@ -140,6 +140,8 @@ Les plus utiles à brancher : `etatPaiements*` / `reglements*` (I17), `stocks` /
 | I8 | ✅ partiel | Échéances : « Régler… » ouvre le règlement détaillé (montant partiel, mode, caisse, date) ; « Tout payé » garde le solde rapide. *Échéances fournisseurs : agent (voir 12, D25).* |
 | C8 | ✅ partiel | Écrans secondaires chargés à la demande (`React.lazy`) : script principal 1 456 → 1 245 ko. |
 | C10 | ✅ | Doublons GraphQL regroupés (`MODES_PAYEMENT`, `TRANSFERT_COMPTE`, `REGLER_*`) ; les modes de paiement sont aussi servis par le cache hors ligne. |
+| I21 | ✅ partiel | Achat : les lots existants de l'article sont proposés dans la colonne « Lot » (liste), la péremption d'un lot choisi est reprise. *Import Excel, piste d'audit : agent (12, D43).* |
+| Qualité | ✅ | Parcours d'interface automatisés (`npm run test:ui`, 11 scénarios, build de production + GraphQL simulé), ajoutés à la CI GitLab (job `ui`, non bloquant au départ). |
 
 > Les points qui dépendent de l'agent, du cloud ou de l'exploitation sont suivis dans [12-DEMANDES-AGENT-CLOUD.md](12-DEMANDES-AGENT-CLOUD.md).
 | §6 | ✅ partiel | Lots depuis la fiche article : « Nouveau lot » (n° + péremption, créé **vide** : la quantité entre par un bon) et suppression des lots épuisés (`addLot` / `deleteLot`), avec les droits « accés Lot » + « Modifier un Article ». *I17 / I15 / I11 : signatures cloud de `etatPaiements*`, `reglements*`, `stocks`, `stockArticle` non documentées dans ce dépôt — à confirmer avant de les brancher ; tables tarifs par quantité / promotions absentes de la base de test.* |
