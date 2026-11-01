@@ -392,3 +392,12 @@ export const MARQUER_ECHEANCE_PAYEE = gql`
     marquerEcheancePayee(input: $input)
   }
 `;
+
+// ─── Lots (création d'un lot vide, suppression d'un lot épuisé) ──────────────────
+// Signatures du proxy cloud : docs/plans/2026-08-25-phase1-routage-serveur.md (routées bout-en-bout, docs/04 phase 1).
+export const ADD_LOT = gql`
+  mutation AddLot($article_id: Int!, $n_lot: String!, $date_peremption: String) {
+    addLot(article_id: $article_id, n_lot: $n_lot, date_peremption: $date_peremption)
+  }
+`;
+export const DELETE_LOT = gql`mutation DeleteLot($lot_id: Int!) { deleteLot(lot_id: $lot_id) }`;

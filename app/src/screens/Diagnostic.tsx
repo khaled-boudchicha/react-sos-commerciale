@@ -83,13 +83,13 @@ export default function Diagnostic() {
       const a = list.find((x) => x.agentId === agent?.agentId) ?? list[0];
       const enLigne = !!a?.isOnline;
       res.push({
-        cle: 'agent', libelle: 'Agent PC (pharmacie)',
+        cle: 'agent', libelle: 'Agent (PC de l’établissement)',
         etat: enLigne ? 'ok' : 'warn',
         detail: a ? (enLigne ? `en ligne — ${a.label ?? a.agentId}` : 'hors ligne') : 'aucun agent associé',
         ms: Math.round(performance.now() - t0),
       });
     } catch (e: any) {
-      res.push({ cle: 'agent', libelle: 'Agent PC (pharmacie)', etat: 'ko', detail: e?.message ?? 'échec', ms: Math.round(performance.now() - t0) });
+      res.push({ cle: 'agent', libelle: 'Agent (PC de l’établissement)', etat: 'ko', detail: e?.message ?? 'échec', ms: Math.round(performance.now() - t0) });
     }
     setChecks([...res]);
 

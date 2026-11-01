@@ -133,6 +133,11 @@ Les plus utiles à brancher : `etatPaiements*` / `reglements*` (I17), `stocks` /
 | C9 | ✅ partiel | Ctrl+Q branché au comptoir (quantité depuis un montant TTC) ; prix de la liste de recherche au tarif du ticket. *Textes « pharmacie » / logo « GC » : inchangés.* |
 | C10 | ✅ partiel | Requête `STAT_VENTES_PAR_FAMILLE` inutilisée supprimée de `api/dashboard.ts`. *Autres doublons (`MODES`, `TRANSFERT_COMPTE`, `REGLER_*`) : à regrouper.* |
 | C12 | ✅ | Jeton jamais en clair (PR #7) ; `http://localhost` refusé en production (PR #7) ; `app:version` / `maj:etat` vérifient l'expéditeur. |
+| I10 | ✅ | Coordonnées de la société : wilaya et RIB modifiables ; slogan, fax et site web affichés. |
+| C6 | ✅ partiel | Types de charges : le prix unitaire est repris en modification (lecture `prix_unit`, écriture `montant`) ; famille d'une sous-famille choisie dans la liste des familles. *Référentiels sans mutation de modification : limite de l'agent.* |
+| C7 | ✅ | Mot de passe obligatoire pour un nouvel utilisateur ; profil Administrateur proposé seulement par un administrateur (l'agent refusait déjà l'élévation). |
+| C9 | ✅ | Textes « pharmacie » en dur remplacés par « établissement » (connexion, diagnostic). |
+| §6 | ✅ partiel | Lots depuis la fiche article : « Nouveau lot » (n° + péremption, créé **vide** : la quantité entre par un bon) et suppression des lots épuisés (`addLot` / `deleteLot`), avec les droits « accés Lot » + « Modifier un Article ». *I17 / I15 / I11 : signatures cloud de `etatPaiements*`, `reglements*`, `stocks`, `stockArticle` non documentées dans ce dépôt — à confirmer avant de les brancher ; tables tarifs par quantité / promotions absentes de la base de test.* |
 
 ## À faire en priorité
 

@@ -20,7 +20,7 @@ type Entity = { id: number } & Record<string, unknown>;
  */
 export function useCrud<T extends Entity>({
   label, createTitle, editTitle, deleteTitle, sections, createDoc, updateDoc, deleteDoc, onDone, labelOf, width, formExtra,
-  peutModifier = true, peutSupprimer = true,
+  peutModifier = true, peutSupprimer = true, versFormulaire,
 }: {
   label: string;
   /** Titres si l'élision française diffère (ex. « Nouvel article », « Modifier l'article »). */
@@ -41,6 +41,8 @@ export function useCrud<T extends Entity>({
   /** Droits de l'utilisateur dossier : masquent les actions Modifier / Supprimer correspondantes. */
   peutModifier?: boolean;
   peutSupprimer?: boolean;
+  /** Valeurs du formulaire de modification à partir de la ligne lue (noms de champs différents en lecture / écriture). */
+  versFormulaire?: (row: T) => Record<string, unknown>;
 }) {
   const [editing, setEditing] = useState<T | null | 'new'>(null);
   const [deleting, setDeleting] = useState<T | null>(null);
@@ -96,7 +98,7 @@ export function useCrud<T extends Entity>({
         <FormModal
           title={editing === 'new' ? (createTitle ?? `Nouveau ${label}`) : (editTitle ?? `Modifier le ${label}`)}
           sections={sections}
-          initial={editing === 'new' ? undefined : editing}
+          initial={editing === 'new' ? undefined : (versFormulaire ? versFormulaire(editing as T) : editing)}
           loading={creating || updating}
           error={error}
           width={width}

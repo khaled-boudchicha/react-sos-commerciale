@@ -18,7 +18,7 @@ const STATUT_MESSAGES: Record<string, string> = {
   expire: 'Abonnement expiré — contactez SOFTLY.',
   suspendu: 'Abonnement suspendu — contactez SOFTLY.',
   bloque: 'Compte bloqué — contactez SOFTLY.',
-  agent_offline: "Cet agent est hors ligne. Démarrez l'agent sur le PC de la pharmacie.",
+  agent_offline: "Cet agent est hors ligne. Démarrez l'agent sur le PC de l'établissement.",
   agent_invalide: "Code d'appairage invalide ou révoqué — recopiez-le depuis l'agent.",
   max_appareils_atteint: "Nombre maximum d'appareils atteint pour ce compte.",
 };
