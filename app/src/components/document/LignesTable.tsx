@@ -208,8 +208,10 @@ export default function LignesTable({ sens, lignes, patch, remove }: {
       </div>
 
       {/* ── Grille : défilement horizontal maîtrisé, en-tête collant, colonnes figées ── */}
+      {/* Zone défilante atteignable au clavier (flèches / défilement) même sans ligne */}
       <div ref={defil.ref} onScroll={defil.onScroll} onFocusCapture={defil.onFocusCapture}
-           className="relative isolate overflow-auto max-h-[62vh] overscroll-x-contain">
+           tabIndex={0} role="region" aria-label="Lignes de la pièce"
+           className="relative isolate overflow-auto max-h-[62vh] overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-300)]">
         <table className="w-full table-fixed border-separate border-spacing-0 text-sm" style={{ minWidth: largeurMin }}>
           <colgroup>
             {colonnes.map((c) => <col key={c.id} style={c.largeur ? { width: c.largeur } : undefined} />)}
