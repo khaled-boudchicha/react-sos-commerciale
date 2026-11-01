@@ -44,6 +44,9 @@ const GROUPES: { titre: string; items: [string[], string][] }[] = [
       [['F10'], 'Ventes du jour'],
       [['↑', '↓'], 'Changer de ligne'],
       [['+', '−'], 'Modifier la quantité'],
+      [['Ctrl', 'Q'], 'Quantité calculée depuis un montant TTC'],
+      [['Suppr'], 'Retirer la ligne sélectionnée'],
+      [['Ctrl', '1…5'], 'Passer d’un ticket en attente à l’autre'],
     ],
   },
   {

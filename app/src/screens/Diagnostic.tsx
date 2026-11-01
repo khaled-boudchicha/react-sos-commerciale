@@ -7,6 +7,8 @@ import { Button } from '../components/ui/Button';
 import { Card, DescriptionList } from '../components/ui/Card';
 import { IconBadge, type IconName, type Tone } from '../components/ui/Icon';
 import { useToast } from '../components/ui/Toast';
+import { useJournalErreurs } from '../lib/journalErreurs';
+import { rapportDiagnostic } from '../lib/rapportDiagnostic';
 import { EmptyState } from '../components/ui/States';
 import { useReseau } from '../store/reseau';
 import { useConnexion } from '../api/useSurveillanceReseau';
@@ -41,6 +43,28 @@ export default function Diagnostic() {
   const derniereReponse = useReseau((s) => s.derniereReponse);
   // Cache hors ligne du dossier courant (articles consultés, référentiels)
   const [cache, setCache] = useState<Awaited<ReturnType<typeof etatCacheHorsLigne>>>(null);
+  const erreursApp = useJournalErreurs((s) => s.erreurs);
+  const viderErreurs = useJournalErreurs((s) => s.vider);
+
+  /** Rapport texte pour le support (aucun jeton ni mot de passe), copié dans le presse-papiers. */
+  async function copierRapport() {
+    let version: string | null = null;
+    try { version = (await window.gc?.version?.()) ?? null; } catch { /* hors Electron */ }
+    const texte = rapportDiagnostic({
+      version, plateforme: window.gc?.platform ?? null, date: new Date(),
+      agent: String(agent?.label ?? agent?.agentId ?? ''), dossier, utilisateur: dossierUser?.username ?? null,
+      connexion: connexion.libelle, protectionSession: protection, derniereReponse,
+      cache: cache ? { articles: cache.articles, reponses: cache.reponses } : null,
+      controles: checks.map((c) => ({ libelle: c.libelle, etat: c.etat, detail: c.detail, ms: c.ms })),
+      incidents: journal, erreurs: erreursApp,
+    });
+    try {
+      await navigator.clipboard.writeText(texte);
+      toast.success('Rapport de diagnostic copié : collez-le dans votre message au support.');
+    } catch {
+      toast.error('Copie impossible : le presse-papiers est indisponible.');
+    }
+  }
   const lireCache = useCallback(() => { void etatCacheHorsLigne().then(setCache); }, []);
   useEffect(lireCache, [lireCache]);
   // Protection de la session sur ce poste (application de bureau uniquement)
@@ -134,6 +158,7 @@ export default function Diagnostic() {
     <div className="flex flex-col gap-3.5">
       <PageHeader title="Diagnostic de connexion" icon="activity" backTo="/parametres" backLabel="Retour aux paramètres"
                   breadcrumb={[{ label: 'Paramètres', to: '/parametres' }, { label: 'Diagnostic de connexion' }]}>
+        <Button icon="copy" onClick={() => void copierRapport()} title="Rapport texte pour le support (sans jeton ni mot de passe)">Copier le rapport</Button>
         <Button icon="refresh" onClick={() => void rafraichirJeton()}>Renouveler le jeton</Button>
         <Button variant="primary" icon="activity" onClick={() => void lancer()} disabled={running} loading={running}>
           {running ? 'Test…' : 'Retester'}
@@ -220,6 +245,34 @@ export default function Diagnostic() {
                   <span className="block text-sm text-ink">{j.message}</span>
                   <span className="block text-xs text-ink-muted truncate">
                     {j.operation}{j.n > 1 ? ` · ${j.n} échecs jusqu’à ${new Date(j.fin).toLocaleTimeString('fr-FR')}` : ''}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <Card padding="none">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-line-soft">
+          <div className="flex-1">
+            <div className="font-bold text-base text-ink">Erreurs de l’application</div>
+            <div className="text-xs text-ink-muted">Erreurs d’écran ou de script relevées sur ce poste (30 dernières). Elles figurent dans le rapport de diagnostic.</div>
+          </div>
+          <Button size="sm" icon="trash" onClick={viderErreurs} disabled={erreursApp.length === 0}>Vider</Button>
+        </div>
+        {erreursApp.length === 0 ? (
+          <EmptyState size="sm" icon="check" title="Aucune erreur" description="Aucune erreur de l’application n’a été relevée sur ce poste." />
+        ) : (
+          <ul className="divide-y divide-line-soft max-h-[320px] overflow-auto">
+            {erreursApp.map((e) => (
+              <li key={`${e.debut}-${e.message}`} className="flex items-start gap-3 px-4 py-2.5">
+                <span className="money text-xs text-ink-muted w-[150px] flex-none pt-0.5">
+                  {new Date(e.debut).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-ink break-words">{e.message}</span>
+                  <span className="block text-xs text-ink-muted truncate">
+                    {{ ecran: 'Écran', script: 'Script', promesse: 'Traitement' }[e.origine]} · {e.ecran}{e.n > 1 ? ` · ${e.n} fois` : ''}
                   </span>
                 </span>
               </li>

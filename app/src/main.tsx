@@ -23,7 +23,10 @@ import './styles/report-theme.css';
 import { initialiserImpression } from './impression';
 import { usePreferencesNavigation } from './navigation/preferences';
 import PontNotifications from './impression/PontNotifications';
+import { surveillerErreursGlobales } from './lib/journalErreurs';
 
+// Erreurs de script et promesses non gérées : journal local (Diagnostic), avant tout le reste
+surveillerErreursGlobales();
 initialiserImpression();
 void useSession.getState().hydrate();
 void loadTheme();
