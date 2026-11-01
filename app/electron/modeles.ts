@@ -125,7 +125,8 @@ export function enregistrerModeles(getWin: () => BrowserWindow | null, expediteu
         printBackground: true, preferCSSPageSize: false,
         // pouces (et non microns : ceux-ci sont réservés à webContents.print ; ici ils produisaient un PDF tronqué à ≈349 mm de haut)
         pageSize: { width: lMm / 25.4, height: hMm / 25.4 },
-        margins: { marginType: 'none' },
+        // Sans marge (l'ancienne forme `{ marginType: 'none' }` n'existe plus depuis Electron 3x)
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
       fs.writeFileSync(r.filePath, pdf);
       return r.filePath;
