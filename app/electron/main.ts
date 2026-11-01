@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, shell, IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, screen, shell, IpcMainInvokeEvent } from 'electron';
 import * as path from 'path';
 import Store from 'electron-store';
 import { initialiserMisesAJour } from './updater';
@@ -63,10 +63,29 @@ function expediteurValide(e: IpcMainInvokeEvent): boolean {
 
 let win: BrowserWindow | null = null;
 
+/** Taille et position de la fenêtre au dernier arrêt (clé interne au processus principal). */
+type Fenetre = { x: number; y: number; width: number; height: number; maximisee: boolean };
+const CLE_FENETRE = 'fenetre';
+
+/** Dernière position, si elle est encore sur un écran branché (sinon : taille par défaut, centrée). */
+function fenetreMemorisee(): Partial<Fenetre> {
+  const f = store.get(CLE_FENETRE) as Fenetre | undefined;
+  if (!f || ![f.x, f.y, f.width, f.height].every(Number.isFinite)) return {};
+  const ecran = screen.getDisplayMatching({ x: f.x, y: f.y, width: f.width, height: f.height }).workArea;
+  const visible = f.x < ecran.x + ecran.width - 100 && f.x + f.width > ecran.x + 100
+    && f.y >= ecran.y - 10 && f.y < ecran.y + ecran.height - 100;
+  return visible ? f : { width: f.width, height: f.height, maximisee: f.maximisee };
+}
+
+/** Rechargements automatiques après un plantage de l'écran (garde-fou contre une boucle). */
+const plantages: number[] = [];
+
 function createWindow() {
+  const memo = fenetreMemorisee();
   win = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: memo.width ?? 1440,
+    height: memo.height ?? 900,
+    ...(memo.x != null && memo.y != null ? { x: memo.x, y: memo.y } : {}),
     minWidth: 1180,
     minHeight: 720,
     title: 'Gestion Commerciale',
@@ -78,6 +97,40 @@ function createWindow() {
       sandbox: true,
       webSecurity: true,
     },
+  });
+
+  if (memo.maximisee) win.maximize();
+
+  // Mémorise taille / position à la fermeture (taille « normale » même si la fenêtre est agrandie)
+  win.on('close', () => {
+    if (!win || win.isDestroyed()) return;
+    const b = win.getNormalBounds();
+    store.set(CLE_FENETRE, { ...b, maximisee: win.isMaximized() } satisfies Fenetre);
+  });
+
+  // L'écran a planté (mémoire, pilote graphique…) : rechargement automatique, au plus 3 fois par minute ;
+  // au-delà, on prévient au lieu de boucler. Les tickets et brouillons sont conservés sur le poste.
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit' || !win || win.isDestroyed()) return;
+    const maintenant = Date.now();
+    while (plantages.length && maintenant - plantages[0] > 60_000) plantages.shift();
+    plantages.push(maintenant);
+    if (plantages.length <= 3) { win.reload(); return; }
+    void dialog.showMessageBox(win, {
+      type: 'error', title: 'Gestion Commerciale',
+      message: 'L’application a rencontré plusieurs erreurs graves.',
+      detail: `Motif : ${details.reason}. Fermez puis rouvrez l’application ; si le problème persiste, contactez le support (Diagnostic › Copier le rapport).`,
+    });
+  });
+
+  // L'écran ne répond plus (traitement long, poste saturé) : proposer d'attendre ou de recharger
+  win.on('unresponsive', () => {
+    if (!win || win.isDestroyed()) return;
+    void dialog.showMessageBox(win, {
+      type: 'warning', title: 'Gestion Commerciale', buttons: ['Attendre', 'Recharger'], defaultId: 0, cancelId: 0,
+      message: 'L’application ne répond pas.',
+      detail: 'Un traitement est peut-être en cours. Vous pouvez attendre, ou recharger l’écran (les tickets en attente sont conservés).',
+    }).then((r) => { if (r.response === 1 && win && !win.isDestroyed()) win.reload(); });
   });
 
   // Barre de menus native masquée (Windows / Linux) : l'application a sa propre navigation (barre latérale ou ruban).

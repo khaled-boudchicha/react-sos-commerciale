@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { cleBrouillon, useBrouillon } from '../lib/brouillons';
 import { useGardeSaisie, useModifie } from '../lib/useGardeSaisie';
 import { messageEchecCreation, resultatIncertain } from '../api/erreurs';
 import { gql, useMutation, useQuery } from '@apollo/client';
@@ -16,7 +17,7 @@ import { Alert, Loading } from '../components/ui/States';
 import ArticleSearch from '../components/ArticleSearch';
 import ClientSearch from '../components/ClientSearch';
 import LignesTable from '../components/document/LignesTable';
-import { LigneDoc, ligneDepuisArticle, totauxDocument } from '../components/document/lignesDocument';
+import { LigneDoc, ligneDepuisArticle, nouvelleCle, totauxDocument } from '../components/document/lignesDocument';
 import { lignesDepuisPiece, lignesPourServeur } from '../components/document/prefillPiece';
 import { useToast } from '../components/ui/Toast';
 import { calculerTimbre, estEspeces, TYPES_TIMBRE } from '../lib/timbre';
@@ -108,7 +109,29 @@ export default function VenteEditor() {
     lignes: lignes.map((l) => [l.code_article, l.qte, l.prix_ht, l.remise, l.n_lot]),
   });
   const modifie = useModifie(empreinte, !sourceId || prefait);
-  const garde = useGardeSaisie(modifie);
+
+  // Brouillon automatique d'une NOUVELLE pièce (pas en modification ni en duplication), repris à la réouverture
+  const dossierCourant = useSession((st) => st.dossier);
+  const utilisateurCourant = useSession((st) => st.dossierUser?.id);
+  const cleB = enEdition || sourceId ? null : cleBrouillon('vente', dossierCourant, utilisateurCourant);
+  const brouillon = useBrouillon(cleB, { type: typeChoisi, tiers: client, date, mode, remiseGlobale, observation, delai, timbreChoix, lignes }, modifie);
+  function reprendreBrouillon() {
+    const d = brouillon.existant?.donnees;
+    if (!d) return;
+    if (d.type) setType(d.type);
+    setClient(d.tiers ?? null);
+    if (d.date) setDate(d.date);
+    if (d.mode) setMode(d.mode);
+    setRemiseGlobale(Number(d.remiseGlobale) || 0);
+    setObservation(d.observation ?? '');
+    setDelai(d.delai ?? '');
+    setTimbreChoix(d.timbreChoix ?? null);
+    setLignes((d.lignes ?? []).map((l) => ({ ...l, key: nouvelleCle() })));
+    brouillon.oublierProposition();
+  }
+  const garde = useGardeSaisie(modifie, undefined, { onAbandon: brouillon.effacer });
+  /** Pièce enregistrée : plus de garde, plus de brouillon. */
+  const terminer = () => { brouillon.effacer(); garde.liberer(); };
 
   function addArticle(a: Article) {
     setLignes((ls) => {
@@ -165,7 +188,7 @@ export default function VenteEditor() {
         },
       });
       const created = data?.createVente;
-      if (!created?.id) { garde.liberer(); navigate('/ventes'); return; }
+      if (!created?.id) { terminer(); navigate('/ventes'); return; }
 
       // Règlement immédiat (encaissement de la pièce créée), plafonné au net à payer
       const recu = Math.min(recuOverride ?? (parseFloat(montantRecu) || 0), Number(created.net_a_payer ?? totaux.net));
@@ -180,13 +203,13 @@ export default function VenteEditor() {
           // La pièce existe : on informe sans bloquer la navigation
           setError(`Pièce ${created.numero} créée, mais règlement échoué : ${e.message ?? e}`);
           toast.error(`Pièce ${created.numero} créée, mais règlement échoué.`);
-          garde.liberer();
+          terminer();
           navigate(`/ventes/${created.id}`);
           return;
         }
       }
       toast.success(`Pièce ${created.numero} enregistrée${recu > 0 ? ` · encaissé ${fmtMoney(recu)}` : ''}.`);
-      garde.liberer();
+      terminer();
       navigate(`/ventes/${created.id}`);
     } catch (e: unknown) {
       const m = messageEchecCreation(e, 'la liste des ventes');
@@ -216,7 +239,7 @@ export default function VenteEditor() {
         },
       });
       toast.success(`Pièce ${data?.updateVente?.numero ?? src?.numero ?? ''} modifiée.`);
-      garde.liberer();
+      terminer();
       navigate(`/ventes/${editId}`);
     } catch (e: any) {
       setError(e.message ?? 'Erreur à l’enregistrement.');
@@ -282,6 +305,18 @@ export default function VenteEditor() {
   return (
     <div className="flex flex-col gap-3.5">
       {garde.dialogue}
+      {brouillon.existant && (
+        <Alert tone="info" title="Brouillon non enregistré"
+               action={(
+                 <span className="flex gap-2">
+                   <Button size="sm" variant="primary" icon="history" onClick={reprendreBrouillon}>Reprendre</Button>
+                   <Button size="sm" icon="trash" onClick={brouillon.effacer}>Supprimer le brouillon</Button>
+                 </span>
+               )}>
+          Une pièce commencée le {new Date(brouillon.existant.date).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} n’a pas été enregistrée
+          ({brouillon.existant.donnees.lignes?.length ?? 0} ligne(s){brouillon.existant.donnees.tiers ? ` · client ${brouillon.existant.donnees.tiers.nom ?? brouillon.existant.donnees.tiers.code}` : ''}).
+        </Alert>
+      )}
       <PageHeader title={titre} backTo={retour} backLabel="Annuler" breadcrumb={breadcrumb}
                   meta={<DocBadge code={type} />} />
 

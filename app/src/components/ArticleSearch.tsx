@@ -89,7 +89,7 @@ export default function ArticleSearch({ onSelect, autoFocus }: {
       <TextInput ref={inputRef} value={term} autoFocus={autoFocus} leading="search" autoComplete="off"
                  onChange={(e) => setTerm(e.target.value)} onKeyDown={onKey}
                  placeholder="Article : code, désignation ou code-barres… (F2)"
-                 aria-expanded={open} aria-autocomplete="list" invalid={!!scanErreur}
+                 role="combobox" aria-expanded={open} aria-autocomplete="list" invalid={!!scanErreur}
                  trailing={scanning ? <Spinner size={14} className="text-brand-text" /> : undefined} />
       {scanErreur && (
         <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-danger-text" role="alert">

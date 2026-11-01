@@ -43,7 +43,7 @@ export default function FournisseurSearch({ value, onSelect }: {
     <div className="relative">
       <TextInput value={term} onChange={(e) => setTerm(e.target.value)} leading="search" autoComplete="off"
                  placeholder="Fournisseur : nom ou code…"
-                 aria-expanded={open} aria-autocomplete="list" />
+                 role="combobox" aria-expanded={open} aria-autocomplete="list" />
       {open && (
         <div className="absolute z-dropdown left-0 right-0 mt-1 bg-raised border border-line-soft rounded-md shadow-lifted max-h-[260px] overflow-auto py-1 animate-pop-in">
           {loading && <div className="px-3 py-2.5 flex items-center gap-2 text-sm text-ink-muted" role="status"><Spinner size={14} className="text-brand-text" />Recherche…</div>}
