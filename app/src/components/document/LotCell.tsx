@@ -10,7 +10,9 @@ const champSelect = 'w-full bg-transparent text-xs px-1 py-1.5 border border-tra
  * Cellule « N° de lot ».
  *  - Vente : liste les lots EXISTANTS en stock de l'article, triés par péremption
  *    croissante (FEFO). Choisir un lot renseigne aussi la date de péremption.
- *  - Achat (réception) ou article sans lot en stock : saisie libre (nouveau lot).
+ *  - Achat (réception) : saisie libre (nouveau lot), avec les lots EXISTANTS de l'article proposés
+ *    (réception dans un lot déjà connu) ; choisir un lot existant reprend sa date de péremption.
+ *  - Vente d'un article sans lot en stock : saisie libre.
  */
 export default function LotCell({ sens, line, patch }: {
   sens: Sens;
@@ -20,19 +22,40 @@ export default function LotCell({ sens, line, patch }: {
   const estVente = sens === 'vente';
   const { data } = useQuery(LOTS, {
     variables: { article_id: line.id_article },
-    skip: !estVente || !line.id_article,
+    skip: !line.id_article,
   });
 
-  const lots = (Array.isArray(data?.lots) ? data.lots : [])
-    .filter((l: any) => Number(l.qte) > 0)
+  const tous = (Array.isArray(data?.lots) ? data.lots : [])
+    .filter((l: any) => String(l.n_lot ?? '').trim() !== '')
     .sort((a: any, b: any) => String(a.date_peremption ?? '').localeCompare(String(b.date_peremption ?? '')));
+  const lots = tous.filter((l: any) => Number(l.qte) > 0);
 
   // Pas de sélection de lot possible → saisie libre (achat, ou vente sans stock lot)
   if (!estVente || lots.length === 0) {
+    const listeId = !estVente && tous.length ? `lots-${line.key}` : undefined;
     return (
-      <input value={line.n_lot ?? ''} placeholder="—"
-             onChange={(e) => patch(line.key, { n_lot: e.target.value })}
-             className={champTexte} />
+      <>
+        <input value={line.n_lot ?? ''} placeholder="—" list={listeId}
+               title={listeId ? 'Nouveau lot, ou lot existant de l’article (liste)' : undefined}
+               onChange={(e) => {
+                 const v = e.target.value;
+                 // Lot existant choisi dans la liste : sa péremption est reprise
+                 const existant = listeId ? tous.find((l: any) => String(l.n_lot) === v) : undefined;
+                 patch(line.key, existant?.date_peremption
+                   ? { n_lot: v, date_peremption: isoDate(existant.date_peremption) }
+                   : { n_lot: v });
+               }}
+               className={champTexte} />
+        {listeId && (
+          <datalist id={listeId}>
+            {tous.map((l: any) => (
+              <option key={l.id} value={l.n_lot}>
+                {`stock ${fmtQte(l.qte)} · ${l.date_peremption ? fmtDate(l.date_peremption) : 'sans péremption'}`}
+              </option>
+            ))}
+          </datalist>
+        )}
+      </>
     );
   }
 

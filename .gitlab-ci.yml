@@ -1,6 +1,6 @@
 # Gestion Commerciale Desktop — intégration continue & builds multi-plateformes.
 #
-# - Chaque push / MR : typecheck (renderer + Electron) et tests unitaires.
+# - Chaque push / MR : typecheck (renderer + Electron), tests unitaires et parcours d'interface (e2e/ui).
 # - Tag vX.Y.Z : builds Windows (NSIS) + Linux (AppImage, deb) sur les images
 #   officielles electron-builder, macOS (dmg + zip) sur un runner macOS (tag
 #   `macos`, job manuel), puis dépôt des installateurs et des manifestes
@@ -41,6 +41,17 @@ check:
     - npm run typecheck
     - npx tsc -p tsconfig.electron.json --noEmit
     - TZ=Africa/Algiers npm test
+
+# Parcours d'interface (build de production + GraphQL simulé, aucun agent) : connexion, comptoir,
+# anti-doublon, cache hors ligne, droits, garde de saisie. Image Playwright de la même version que la
+# dépendance `playwright` (navigateurs fournis). Non bloquant tant qu'il n'a pas tourné sur GitLab.
+ui:
+  stage: check
+  image: mcr.microsoft.com/playwright:v1.63.0-noble
+  <<: *npm
+  allow_failure: true
+  script:
+    - npm run test:ui
 
 # Aligne la version de l'app sur le tag puis construit ; l'URL de mise à jour
 # n'est injectée que si GC_UPDATE_URL est défini.
