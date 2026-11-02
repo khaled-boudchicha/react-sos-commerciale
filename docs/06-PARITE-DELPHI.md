@@ -79,8 +79,10 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
 3. **Achats par fournisseur** (`2fe51ac`) : TTC calculé sur le total d'en-tête (timbre inclus, parfois ≠ somme des
    lignes) au lieu des lignes × (1 − remise %) comme `StatAchats.pas` (−196 DA sur `bon 2026`, −553 DA sur `bon 2025`).
 4. **Recouvrement** (`cc592de`) : nouveau mode `mode: 'delphi'` (résumé par client, détail par pièce) qui reproduit
-   le formulaire. Non exposé par le cloud : le schéma `recouvrement(...)` de `sos-cloud-server` n'a pas les arguments
-   `mode`, `annee`, `code_cli`, `detail`.
+   le formulaire. Exposé de bout en bout : arguments `mode`, `annee`, `code_cli`, `detail` ajoutés au schéma
+   `recouvrement(...)` de `sos-cloud-server`, copie de l'agent régénérée, et l'écran Tiers › Recouvrement de l'app
+   propose « Solde client » ou « Comme le logiciel de bureau » (par client / par pièce, export CSV ; pas d'impression
+   dans ce mode).
 
 ### Choix assumés (écarts volontaires avec le Delphi)
 
@@ -97,7 +99,8 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
 
 ### Reste à faire / à surveiller
 
-- Exposer `mode: 'delphi'` dans le schéma GraphQL du cloud et ajouter un sélecteur à l'écran Recouvrement.
+- Imprimer le recouvrement « comme le logiciel de bureau » (le modèle d'impression attend les tranches d'ancienneté
+  du mode par défaut).
 - `getSoldeClient` ne lit qu'une fiche quand un code client est en double (`facture 2025`, client 060 :
   14 442 080,43 contre 15 331 336,88 pour le relevé et le recouvrement).
 - Jointures encore sensibles aux codes en double : journal des achats et listes d'avances (aucun cas réel pour

@@ -363,6 +363,12 @@ export const RECOUVREMENT = gql`
     recouvrement(nbrjour: $nbrjour, search: $search, inactifs: $inactifs, limit: $limit, offset: $offset, grille: $grille)
   }
 `;
+/** Recouvrement « Delphi » (RecouverementForm.pas) : résumé par client, ou détail par pièce avec `detail`. */
+export const RECOUVREMENT_DELPHI = gql`
+  query RecouvrementDelphi($nbrjour: Int, $annee: Int, $detail: Boolean, $code_cli: String) {
+    recouvrement(mode: "delphi", nbrjour: $nbrjour, annee: $annee, detail: $detail, code_cli: $code_cli)
+  }
+`;
 export const ETAT_104 = gql`
   query Etat104($annee: Int, $date_debut: String, $date_fin: String, $inclure_bl: Boolean) {
     etat104(annee: $annee, date_debut: $date_debut, date_fin: $date_fin, inclure_bl: $inclure_bl)

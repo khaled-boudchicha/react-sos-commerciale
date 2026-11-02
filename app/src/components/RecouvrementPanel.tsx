@@ -8,7 +8,8 @@ import DataGrid, { Column, DataGridDistant, totalDistant } from './ui/DataGrid';
 import { ReponseDistante } from './grille/types';
 import { ExportBtn, Money, Toolbar } from './ui/atoms';
 import { Button } from './ui/Button';
-import { Checkbox, Field, TextInput } from './ui/Field';
+import { Checkbox, Field, SegmentedControl, TextInput } from './ui/Field';
+import RecouvrementDelphi from './RecouvrementDelphi';
 import { KpiTile } from './ui/Kpi';
 import type { Tone } from './ui/Icon';
 import ImprimerDocument from '../impression/ImprimerDocument';
@@ -37,7 +38,7 @@ const CSV: ExportColumn<RecouvrementLigne>[] = [
  * plus de N jours, ventilées par ancienneté — ou, mode desktop, clients sans
  * pièce depuis N jours (« inactifs »).
  */
-export default function RecouvrementPanel({ search }: { search: string }) {
+function RecouvrementSolde({ search }: { search: string }) {
   const navigate = useNavigate();
   const [nbrjour, setNbrjour] = useState(30);
   const [inactifs, setInactifs] = useState(false);
@@ -134,6 +135,23 @@ export default function RecouvrementPanel({ search }: { search: string }) {
                 })}
                 emptyMessage="Aucun client en retard pour ce critère."
                 onRowClick={(r) => navigate(`/tiers/client/${encodeURIComponent(r.code_cli)}`)} />
+    </>
+  );
+}
+
+/**
+ * Deux façons de lire le recouvrement : le solde de chaque client (crédit initial, avoirs et pièces trop
+ * payées compris) ou la liste du logiciel de bureau (factures et BL impayés seulement). Les montants diffèrent.
+ */
+export default function RecouvrementPanel({ search }: { search: string }) {
+  const [calcul, setCalcul] = useState<'solde' | 'delphi'>('solde');
+  return (
+    <>
+      <Toolbar>
+        <SegmentedControl label="Calcul du recouvrement" value={calcul} onChange={setCalcul}
+                          options={[{ value: 'solde', label: 'Solde client' }, { value: 'delphi', label: 'Comme le logiciel de bureau' }]} />
+      </Toolbar>
+      {calcul === 'solde' ? <RecouvrementSolde search={search} /> : <RecouvrementDelphi search={search} />}
     </>
   );
 }

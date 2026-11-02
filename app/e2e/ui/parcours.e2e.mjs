@@ -416,4 +416,31 @@ describe('droits et saisie', () => {
     await page.locator('text=FA-0001').first().waitFor({ timeout: 8000 });
     await page.context().close();
   });
+
+  test('recouvrement « comme le logiciel de bureau » : par client puis par pièce, totaux du Delphi', async () => {
+    const resume = { mode: 'delphi', detail: false, nbrjour: 30, annee: 2026, total: 2, totaux: { net_a_payer: 700000, reste_a_payer: 450000.5, regler: 249999.5 }, data: [
+      { code_cli: '102', raison: 'LABO BEN SALEM', nb_pieces: 3, net_a_payer: 500000, reste_a_payer: 300000, regler: 200000, plus_ancienne: '2026-03-02', derniere: '2026-08-30' },
+      { code_cli: '049', raison: 'PHARMACIE ZEROUAL', nb_pieces: 1, net_a_payer: 200000, reste_a_payer: 150000.5, regler: 49999.5, plus_ancienne: '2026-07-07', derniere: '2026-07-07' },
+    ] };
+    const detail = { mode: 'delphi', detail: true, nbrjour: 30, annee: 2026, total: 1, totaux: { net_a_payer: 200000, reste_a_payer: 150000.5, regler: 49999.5 }, data: [
+      { code: 'BL N° 1261/2026', operation: 'Bon de Livraison', date_piece: '2026-07-07', code_cli: '049', raison: 'PHARMACIE ZEROUAL', net_a_payer: 200000, reste_a_payer: 150000.5, regler: 49999.5 },
+    ] };
+    const page = await ouvrir(navigateur, { route: '/tiers?vue=recouvrement', gql: serveur({
+      Recouvrement: { recouvrement: { data: [], total: 0, totaux: {}, resumes: {} } },
+      RecouvrementDelphi: (v) => ({ recouvrement: v.detail ? detail : resume }),
+    }) });
+    await page.click('button[role="radio"]:has-text("Comme le logiciel de bureau")');
+    await page.locator('text=LABO BEN SALEM').first().waitFor({ timeout: 8000 });
+    // Les indicateurs reprennent exactement les sommes des lignes (ni solde client ni avoirs)
+    assert.ok(await page.locator('text=PHARMACIE ZEROUAL').count() > 0);
+    const requete = page.appels.filter((a) => a.operationName === 'RecouvrementDelphi').at(-1);
+    assert.equal(requete.variables.detail, false);
+    assert.equal(requete.variables.nbrjour, 30);
+    assert.equal(requete.variables.annee, new Date().getFullYear());
+    await page.click('button[role="radio"]:has-text("Par pièce")');
+    await page.locator('text=BL N° 1261/2026').first().waitFor({ timeout: 8000 });
+    assert.equal(page.appels.filter((a) => a.operationName === 'RecouvrementDelphi').at(-1).variables.detail, true);
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
 });
