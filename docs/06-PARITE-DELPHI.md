@@ -44,9 +44,65 @@ clients, la fiche (`nom_client`), les règlements, la caisse, les achats et les 
 Conséquences : listes sans nom, **recherche par nom inopérante**, fiches et documents imprimés
 sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''), nom)`.
 
-## Ce qui reste à couvrir
+## Campagne du 02/11/2026 — états ligne à ligne
 
-- Relevés détaillés ligne à ligne (client / fournisseur) vs le PDF Delphi
-- Statistiques par article / client / famille, bénéfices, achats
-- États de paiement, avances, Stat 104
-- Recalcul complet du stock après clôture d'inventaire
+> Méthode : pour chaque état, le **SQL exact du Delphi** (extrait de `ConstSql.pas`, `servermodule.dfm` et des
+> unités `StatVentes.pas`, `StatAchats.pas`, `Statistique104.pas`, `Benefices.pas`, `EtatPaiements.pas`,
+> `RecouverementForm.pas`, `JournalVentes.pas`, `journalAchats.pas`) est exécuté sur la base, puis comparé à la
+> commande de l'agent **sur la même base**, clé par clé (client, article, mois, ligne…). Lecture seule.
+> Scripts rejouables : `sos-agent/test/parite/` (voir son README). Dossiers : `bon 2026` (référence), `bon 2025`,
+> `bon 2024`, et — pour les factures, absentes de `bon *` — `overlab 2025`, `overlab2024`, `facture 2024/2025`.
+
+| État | Source Delphi | Résultat |
+|---|---|---|
+| Relevé client (ligne à ligne) | `servermodule.dfm` › `EtatClients` | ✅ 201 clients, 3 284 lignes de chaque côté, même solde (5 dossiers) |
+| Relevé fournisseur | `servermodule.dfm` › `EtatFournisseurs` | ✅ soldes identiques (5 dossiers) |
+| Ventes par article / client / famille | `StatVentes.pas` | ✅ 1 110 / 172 / 10 lignes, 0 écart (6 dossiers) |
+| Achats par période / article | `StatAchats.pas` | ✅ 0 écart |
+| Achats par fournisseur | `StatAchats.pas` | ✅ après correctif (TTC par les lignes) |
+| Bénéfices | `StatVentes.pas` | ✅ écart 0,00 sur 11 mois — voir « Choix » pour `Benefices.pas` |
+| États de paiement | `EtatPaiements.pas` | ✅ 168 clients, 285 296 465,12 (1 centime d'arrondi) |
+| Stat 104 | `Statistique104.pas` | ✅ après correctif (4 dossiers avec factures) |
+| Recouvrement | `RecouverementForm.pas` | ✅ en mode `delphi` (8 cas) — le mode par défaut est volontairement différent |
+| Journal des ventes | `JournalVentes.pas` | ✅ 8 309 lignes, aucune absente ni en trop (6 dossiers) |
+| Journal des achats | `journalAchats.pas` | ✅ 3 794 lignes (7 dossiers) |
+| Avances clients / fournisseurs | `ConstSql.pas` | ⚠️ même filtre ; une seule avance existe (fournisseur, `khal`/`khlil`) |
+| Recalcul du stock | `UpdateAllArticlesStockOptimized` | ✅ sur copie : aucun des 2 246 articles ne change, valeur 25 315 477,18 |
+
+### Défauts trouvés et corrigés (sos-agent, branche `claude/acces-reseau-local`)
+
+1. **Stat 104 excluait les factures de regroupement** (`e03e856`) : le filtre `grouped = 0` retirait les factures
+   `Type 5` / `grouped = 1` (3 661 960,49 TTC sur `overlab 2025`, 4 clients). Le Delphi les compte.
+2. **Jointures en double sur `Code`** (`e03e856`, `cc592de`, `2fe51ac`) : `clients.Code` et `fournisseurs.Code` ne sont
+   pas uniques dans les dossiers issus du Delphi ; `LEFT JOIN clients c ON c.Code = …` comptait deux fois chaque pièce
+   (Stat 104, recouvrement, achats par fournisseur). Les jointures prennent maintenant un seul tiers par code.
+3. **Achats par fournisseur** (`2fe51ac`) : TTC calculé sur le total d'en-tête (timbre inclus, parfois ≠ somme des
+   lignes) au lieu des lignes × (1 − remise %) comme `StatAchats.pas` (−196 DA sur `bon 2026`, −553 DA sur `bon 2025`).
+4. **Recouvrement** (`cc592de`) : nouveau mode `mode: 'delphi'` (résumé par client, détail par pièce) qui reproduit
+   le formulaire. Non exposé par le cloud : le schéma `recouvrement(...)` de `sos-cloud-server` n'a pas les arguments
+   `mode`, `annee`, `code_cli`, `detail`.
+
+### Choix assumés (écarts volontaires avec le Delphi)
+
+- **Stat 104 retranche les avoirs liés à une facture** ; le Delphi (`WHERE code IS NOT NULL`) les ignore
+  (exemple : `bon 2025`, −18 571). À confirmer par le propriétaire.
+- **Bénéfices suivent `StatVentes.pas`** (avoirs nettés, `Net_HT`). `Benefices.pas` les ignore et utilise `Total_HT` ;
+  la différence s'explique exactement par les avoirs (7 512 495,19) et les remises (2 229 487,72) sur `bon 2026`.
+- **Recouvrement par défaut = solde client** (crédit initial, avoirs, pièces trop payées) : 157 clients et
+  75 523 447,82 contre 69 et 20 614 305,45 pour le formulaire Delphi, qui ne somme que le reste à payer des
+  factures et BL.
+- **Règlements sans `uuid`** : le Delphi fusionne ceux d'un même jour en une ligne, l'agent les garde séparés
+  (soldes identiques ; 57 règlements concernés dans `overlab2024`, aucun dans `bon 2026/2025`).
+- **Stock** : la procédure plafonne à 0, `ficheStock` montre l'arithmétique brute (AR489 : −1 contre 0).
+
+### Reste à faire / à surveiller
+
+- Exposer `mode: 'delphi'` dans le schéma GraphQL du cloud et ajouter un sélecteur à l'écran Recouvrement.
+- `getSoldeClient` ne lit qu'une fiche quand un code client est en double (`facture 2025`, client 060 :
+  14 442 080,43 contre 15 331 336,88 pour le relevé et le recouvrement).
+- Jointures encore sensibles aux codes en double : journal des achats et listes d'avances (aucun cas réel pour
+  vérifier une correction).
+- Avances clients : aucune donnée réelle (aucune avance cliente dans les bases du poste).
+- Stat 104 sur le dossier de production : `bon *` n'a pas de facture, confirmer sur un dossier qui en a.
+- Le filtre de dates de la fenêtre Stat 104 du Delphi semble défectueux (second `where` après `WHERE code IS NOT NULL`,
+  colonne `FFDate` inexistante dans `vente`) — lu dans le code, non exécuté.
