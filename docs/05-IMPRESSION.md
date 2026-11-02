@@ -31,7 +31,7 @@ un générateur façon FastReport :
 - **Chargement** : le moteur sans interface (`@softly/report/core`) est chargé au démarrage ; l'aperçu, le designer et
   la bibliothèque ne sont chargés qu'à la première impression (`impression/ImpressionModeleDiffere.tsx`).
 
-## 2. Modèles livrés (33, lecture seule)
+## 2. Modèles livrés (35, lecture seule)
 
 Déclarés dans `app/src/impression/modelesIntegres.ts`. Pour un même type, le **premier** est proposé par défaut ;
 l'utilisateur peut en choisir un autre comme défaut, ou **dupliquer** un modèle livré pour le modifier dans le designer.
@@ -40,7 +40,7 @@ l'utilisateur peut en choisir un autre comme défaut, ou **dupliquer** un modèl
 |---|---|---|
 | Pièces (9) | `modelesPieces.ts` | Facture A4 Moderne / Classique / Prestige, BL A4, BL avec lot et péremption, BL sans prix, bon de comptoir A5, pièce d'achat Moderne / Classique |
 | Tickets (4) | `modelesTickets.ts` | Ticket 80 mm, ticket 58 mm, ticket « articles / familles vendus », reçu de transfert d'espèces |
-| États (17) | `modelesEtats.ts` | Relevés client et fournisseur (moderne, classique), impayés, créances, recouvrement, trésorerie, arrêté de caisse, état du stock, bon de stock, inventaire (état chiffré, feuille de comptage), bordereau, journaux des ventes / achats, État 104 |
+| États (19) | `modelesEtats.ts` | Relevés client et fournisseur (moderne, classique), impayés, créances, recouvrement (+ 2 variantes « comme le logiciel de bureau » : par client, par pièce), trésorerie, arrêté de caisse, état du stock, bon de stock, inventaire (état chiffré, feuille de comptage), bordereau, journaux des ventes / achats, État 104 |
 | Étiquettes (3) | `modelesEtiquettes.ts` | Étiquettes de prix 2, 3 ou 4 colonnes sur A4 (code-barres) |
 
 Le kit `impression/kit.ts` fournit les briques communes (en-tête société, cadre tiers, tableau, totaux, signatures, thèmes).

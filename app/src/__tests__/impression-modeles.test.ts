@@ -3,7 +3,7 @@ import {
   Scope, creerEtatStandard, evaluerExpression, expressionsDuTexte, kindDe, listerModelesIntegres, listerTypes, normaliserEtat, rendreEtat, validerExpression, verifierModele,
 } from '@softly/report/core';
 import { initialiserImpression } from '../impression';
-import { donneesVente } from '../impression/types';
+import { donneesRecouvrementBureau, donneesVente } from '../impression/types';
 import { MODELES_INTEGRES } from '../impression/modelesIntegres';
 
 initialiserImpression();
@@ -114,4 +114,47 @@ describe('pagination des modèles livrés avec de gros volumes', () => {
       }
     });
   }
+});
+
+describe('recouvrement « comme le logiciel de bureau »', () => {
+  const lignes = [
+    { code_cli: '102', raison: 'LABO BEN SALEM', nb_pieces: 3, net_a_payer: 500000, regler: 200000, reste_a_payer: 300000, plus_ancienne: '2026-03-02', derniere: '2026-08-30' },
+    { code_cli: '049', raison: 'PHARMACIE ZEROUAL', nb_pieces: 1, net_a_payer: 200000, regler: 49999.5, reste_a_payer: 150000.5, plus_ancienne: '2026-07-07', derniere: '2026-07-07' },
+  ];
+  const pieces = [
+    { code: 'BL N° 1261/2026', operation: 'Bon de Livraison', date_piece: '2026-07-07', code_cli: '049', raison: 'PHARMACIE ZEROUAL', net_a_payer: 200000, regler: 49999.5, reste_a_payer: 150000.5 },
+    { code: 'FA N° 0042/2026', operation: 'Facture Client', date_piece: '2026-03-02', code_cli: '102', raison: 'LABO BEN SALEM', net_a_payer: 500000, regler: 200000, reste_a_payer: 300000 },
+    { code: 'BL N° 1295/2026', operation: 'Bon de Livraison', date_piece: '2026-08-30', code_cli: '102', raison: 'LABO BEN SALEM', net_a_payer: 100000, regler: 0, reste_a_payer: 100000 },
+  ];
+
+  it('les totaux sont ceux des lignes, jamais un solde client', () => {
+    const r = donneesRecouvrementBureau({ rows: lignes, nbrjour: 30, annee: 2026, detail: false }) as any;
+    expect(r.Etat).toMatchObject({ nb_clients: 2, nb_pieces: 4, net_a_payer: 700000, regler: 249999.5, reste_a_payer: 450000.5, total_du: 450000.5 });
+    expect(r.Etat.critere).toContain('30 jours');
+    expect(r.Clients).toHaveLength(2);
+    expect(r.Pieces).toEqual([]);
+    const p = donneesRecouvrementBureau({ rows: pieces, nbrjour: 0, annee: 2026, detail: true }) as any;
+    expect(p.Etat).toMatchObject({ nb_clients: 2, nb_pieces: 3, reste_a_payer: 550000.5 });
+    expect(p.Pieces).toHaveLength(3);
+    expect(p.Clients).toEqual([]);
+  });
+
+  for (const [id, detail, rows, attendu] of [
+    ['integre-recouvrement-bureau', false, lignes, 'LABO BEN SALEM'],
+    ['integre-recouvrement-bureau-pieces', true, pieces, 'BL N° 1261/2026'],
+  ] as const) {
+    it(`${id} : le modèle livré imprime les lignes et le total à recouvrer, sans avertissement`, () => {
+      const def = MODELES_INTEGRES.find((m) => m.id === id)!.build();
+      expect(def.kind).toBe('recouvrement');
+      const data = donneesRecouvrementBureau({ rows: [...rows] as never, nbrjour: 30, annee: 2026, detail });
+      const res = rendreEtat(def, data, { mesureur });
+      expect(res.warnings).toEqual([]);
+      expect(res.html).toContain(attendu);
+      expect(res.html).toContain('TOTAL À RECOUVRER');
+    });
+  }
+
+  it('le modèle par défaut du type reste le recouvrement par solde client', () => {
+    expect(MODELES_INTEGRES.filter((m) => m.build().kind === 'recouvrement').map((m) => m.id)[0]).toBe('integre-recouvrement');
+  });
 });

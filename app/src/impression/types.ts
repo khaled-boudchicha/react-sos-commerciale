@@ -238,16 +238,24 @@ const KINDS: Record<string, KindDef> = {
     id: 'recouvrement', label: 'État de recouvrement',
     datasets: [
       SOCIETE,
-      un('Etat', 'Synthèse', [t('critere', 'Critère'), n('nb_clients', 'Clients'), n('total_du', 'Total dû'), n('du_en_retard', 'En retard'), n('echu', 'Échu'), n('b_0_30', '0–30 j'), n('b_31_60', '31–60 j'), n('b_61_90', '61–90 j'), n('b_90_plus', '+90 j')]),
-      liste('Clients', 'Clients', [t('code_cli', 'Code'), t('raison', 'Client'), t('tel', 'Téléphone'), n('nb_pieces', 'Pièces'), d('plus_ancienne', 'Plus ancienne'), n('jours_max', 'Jours max'), n('total_du', 'Dû total'), n('du_en_retard', 'En retard'), n('echu', 'Échu')]),
+      // Les champs net_a_payer / regler / reste_a_payer / nb_pieces servent au calcul « logiciel de bureau »
+      // (factures et BL impayés seulement) ; ceux d'ancienneté au calcul par solde client.
+      un('Etat', 'Synthèse', [t('critere', 'Critère'), n('nb_clients', 'Clients'), n('nb_pieces', 'Pièces'), n('total_du', 'Total dû'), n('du_en_retard', 'En retard'), n('echu', 'Échu'), n('b_0_30', '0–30 j'), n('b_31_60', '31–60 j'), n('b_61_90', '61–90 j'), n('b_90_plus', '+90 j'), n('net_a_payer', 'Net à payer'), n('regler', 'Réglé'), n('reste_a_payer', 'Reste à payer')]),
+      liste('Clients', 'Clients', [t('code_cli', 'Code'), t('raison', 'Client'), t('tel', 'Téléphone'), n('nb_pieces', 'Pièces'), d('plus_ancienne', 'Plus ancienne'), d('derniere', 'Dernière pièce'), n('jours_max', 'Jours max'), n('total_du', 'Dû total'), n('du_en_retard', 'En retard'), n('echu', 'Échu'), n('net_a_payer', 'Net à payer'), n('regler', 'Réglé'), n('reste_a_payer', 'Reste à payer')]),
+      liste('Pieces', 'Pièces impayées', [t('code', 'Pièce'), t('operation', 'Opération'), d('date_piece', 'Date'), t('code_cli', 'Code client'), t('raison', 'Client'), n('net_a_payer', 'Net à payer'), n('regler', 'Réglé'), n('reste_a_payer', 'Reste à payer')]),
     ],
     sample: {
       Societe: societeExemple,
-      Etat: { critere: 'Créances de plus de 30 jours', nb_clients: 3, total_du: 442300, du_en_retard: 402300, echu: 180300, b_0_30: 40000, b_31_60: 180300, b_61_90: 82000, b_90_plus: 140000 },
+      Etat: { critere: 'Créances de plus de 30 jours', nb_clients: 3, nb_pieces: 6, total_du: 442300, du_en_retard: 402300, echu: 180300, b_0_30: 40000, b_31_60: 180300, b_61_90: 82000, b_90_plus: 140000, net_a_payer: 520000, regler: 77700, reste_a_payer: 442300 },
       Clients: [
-        { code_cli: 'C0042', raison: 'LABORATOIRE EL AMEL', tel: '0550 12 34 56', nb_pieces: 3, plus_ancienne: jours(120), jours_max: 120, total_du: 222000, du_en_retard: 222000, echu: 140000 },
-        { code_cli: 'C0017', raison: 'CLINIQUE AL SHIFA', tel: '0661 22 33 44', nb_pieces: 2, plus_ancienne: jours(61), jours_max: 61, total_du: 180300, du_en_retard: 180300, echu: 40300 },
-        { code_cli: 'C0003', raison: 'PHARMACIE CENTRALE', tel: '021 45 67 89', nb_pieces: 1, plus_ancienne: jours(15), jours_max: 15, total_du: 40000, du_en_retard: 0, echu: 0 },
+        { code_cli: 'C0042', raison: 'LABORATOIRE EL AMEL', tel: '0550 12 34 56', nb_pieces: 3, plus_ancienne: jours(120), derniere: jours(45), jours_max: 120, total_du: 222000, du_en_retard: 222000, echu: 140000, net_a_payer: 260000, regler: 38000, reste_a_payer: 222000 },
+        { code_cli: 'C0017', raison: 'CLINIQUE AL SHIFA', tel: '0661 22 33 44', nb_pieces: 2, plus_ancienne: jours(61), derniere: jours(40), jours_max: 61, total_du: 180300, du_en_retard: 180300, echu: 40300, net_a_payer: 200300, regler: 20000, reste_a_payer: 180300 },
+        { code_cli: 'C0003', raison: 'PHARMACIE CENTRALE', tel: '021 45 67 89', nb_pieces: 1, plus_ancienne: jours(15), derniere: jours(15), jours_max: 15, total_du: 40000, du_en_retard: 0, echu: 0, net_a_payer: 59700, regler: 19700, reste_a_payer: 40000 },
+      ],
+      Pieces: [
+        { code: 'BL N° 1029/2026', operation: 'Bon de Livraison', date_piece: jours(120), code_cli: 'C0042', raison: 'LABORATOIRE EL AMEL', net_a_payer: 130000, regler: 20000, reste_a_payer: 110000 },
+        { code: 'BL N° 1295/2026', operation: 'Bon de Livraison', date_piece: jours(75), code_cli: 'C0042', raison: 'LABORATOIRE EL AMEL', net_a_payer: 130000, regler: 18000, reste_a_payer: 112000 },
+        { code: 'FA N° 0042/2026', operation: 'Facture Client', date_piece: jours(61), code_cli: 'C0017', raison: 'CLINIQUE AL SHIFA', net_a_payer: 200300, regler: 20000, reste_a_payer: 180300 },
       ],
     },
   },
@@ -542,6 +550,37 @@ export function donneesRecouvrement({ rows, totaux, nbrjour, inactifs }: { rows:
     Societe: societeDonnees(societe),
     Etat: { ...totaux, nb_clients: rows.length, critere: inactifs ? `Clients sans pièce depuis plus de ${nbrjour} jours` : `Créances de plus de ${nbrjour} jours` },
     Clients: rows,
+  };
+}
+
+export type RecouvrementBureauLigne = {
+  code_cli: string; raison: string; net_a_payer: number; reste_a_payer: number; regler: number;
+  nb_pieces?: number; plus_ancienne?: string | null; derniere?: string | null;
+  code?: string; operation?: string; date_piece?: string | null;
+};
+
+/**
+ * Recouvrement « comme le logiciel de bureau » (RecouverementForm.pas) : un seul total qui compte, le reste à payer des
+ * factures et BL impayés. `detail` = une ligne par pièce (jeu `Pieces`), sinon une ligne par client (jeu `Clients`).
+ * Les champs d'ancienneté du calcul par solde client restent à 0 : ils n'existent pas dans ce calcul.
+ */
+export function donneesRecouvrementBureau(
+  { rows, nbrjour, annee, detail }: { rows: RecouvrementBureauLigne[]; nbrjour: number; annee: number; detail: boolean },
+  societe?: Societe | null,
+): ReportData {
+  const som = (f: (r: RecouvrementBureauLigne) => number) => rows.reduce((s, r) => s + (f(r) || 0), 0);
+  const reste = som((r) => r.reste_a_payer);
+  return {
+    Societe: societeDonnees(societe),
+    Etat: {
+      critere: `Factures et BL impayés de plus de ${nbrjour} jours — année ${annee}`,
+      nb_clients: detail ? new Set(rows.map((r) => r.code_cli)).size : rows.length,
+      nb_pieces: detail ? rows.length : som((r) => r.nb_pieces ?? 0),
+      net_a_payer: som((r) => r.net_a_payer), regler: som((r) => r.regler), reste_a_payer: reste,
+      total_du: reste, du_en_retard: reste, echu: 0, b_0_30: 0, b_31_60: 0, b_61_90: 0, b_90_plus: 0,
+    },
+    Clients: detail ? [] : rows,
+    Pieces: detail ? rows : [],
   };
 }
 

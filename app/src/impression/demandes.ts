@@ -4,7 +4,7 @@ import type { TicketExtras } from './types';
 import type { Vente } from '../api/types';
 import {
   donneesVente, donneesAchat, donneesArreteCaisse, donneesArticles, donneesBonStock, donneesBordereau, donneesCreances, donneesEtat104, donneesEtatClient,
-  donneesEtatFournisseur, donneesImpayes, donneesInventaire, donneesJournal, donneesRecouvrement, donneesRecuTransfert, donneesTicketVentes, donneesTresorerie,
+  donneesEtatFournisseur, donneesImpayes, donneesInventaire, donneesJournal, donneesRecouvrement, donneesRecouvrementBureau, donneesRecuTransfert, donneesTicketVentes, donneesTresorerie,
 } from './types';
 
 /**
@@ -39,6 +39,13 @@ export const demandeImpayes = (a: Args<typeof donneesImpayes>, societe: S): Dema
 export const demandeCreances = (a: Args<typeof donneesCreances>, societe: S): DemandeImpression => ({ kind: 'creances', data: donneesCreances(a, societe), titre: 'État des créances' });
 
 export const demandeRecouvrement = (a: Args<typeof donneesRecouvrement>, societe: S): DemandeImpression => ({ kind: 'recouvrement', data: donneesRecouvrement(a, societe), titre: 'État de recouvrement' });
+
+/** Recouvrement tel que le logiciel de bureau : modèle imposé selon la présentation (par client / par pièce). */
+export const demandeRecouvrementBureau = (a: Args<typeof donneesRecouvrementBureau>, societe: S): DemandeImpression => ({
+  kind: 'recouvrement', data: donneesRecouvrementBureau(a, societe),
+  titre: `État de recouvrement (${a.detail ? 'par pièce' : 'par client'})`,
+  modele: a.detail ? 'integre-recouvrement-bureau-pieces' : 'integre-recouvrement-bureau',
+});
 
 export const demandeTresorerie = (a: Args<typeof donneesTresorerie>, societe: S): DemandeImpression => ({ kind: 'tresorerie', data: donneesTresorerie(a, societe), titre: `Trésorerie ${a.compte}` });
 

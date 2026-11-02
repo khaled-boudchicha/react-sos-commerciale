@@ -1,7 +1,7 @@
 # Impression — modèles du moteur d'états (`src/impression/`)
 
 Branchement de l'application sur le paquet générique `@softly/report` (`packages/report`) : types de documents,
-**33 modèles professionnels livrés**, adaptateurs de données, et composant d'impression utilisé par tous les écrans.
+**35 modèles professionnels livrés**, adaptateurs de données, et composant d'impression utilisé par tous les écrans.
 
 ```
 impression/
@@ -22,7 +22,7 @@ impression/
 | `achat` | Fiche achat | Pièce d'achat Moderne / Classique |
 | `articles` | Stock | État du stock, étiquettes de prix 2 / 3 / 4 colonnes |
 | `etatClient`, `etatFournisseur` | Fiches client / fournisseur | Relevé Moderne / Classique |
-| `impayes`, `creances`, `recouvrement` | Client, Tiers, Recouvrement | Situation des impayés, état des créances, état de recouvrement |
+| `impayes`, `creances`, `recouvrement` | Client, Tiers, Recouvrement | Situation des impayés, état des créances, état de recouvrement (par solde client, ou « comme le logiciel de bureau » par client / par pièce, modèle imposé par la demande) |
 | `tresorerie`, `arreteCaisse`, `recuTransfert` | Trésorerie, Arrêté de caisse | État de trésorerie, arrêté de caisse (avec / sans comptage), reçu de transfert 80 mm |
 | `bonStock`, `inventaire` | Mouvements de stock, Inventaire | Bon d'entrée / sortie, inventaire chiffré, feuille de comptage |
 | `bordereau`, `journal`, `etat104`, `ticketVentes` | Ventes, Achats, Journal, Statistiques | Bordereau, journal des ventes / des achats, état 104 (paysage), ticket « articles vendus » |

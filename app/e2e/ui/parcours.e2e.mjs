@@ -437,9 +437,19 @@ describe('droits et saisie', () => {
     assert.equal(requete.variables.detail, false);
     assert.equal(requete.variables.nbrjour, 30);
     assert.equal(requete.variables.annee, new Date().getFullYear());
+    // Impression : le modèle livré « comme le logiciel de bureau » est imposé, avec les lignes affichées
+    const apercu = page.locator('[role="dialog"][aria-label^="Aperçu"]');
+    await page.click('button:has-text("Imprimer")');
+    await apercu.waitFor({ timeout: 8000 });
+    assert.match(await apercu.getAttribute('aria-label'), /recouvrement \(par client\)/i);
+    await apercu.locator('button[aria-label="Fermer"]').click();
+    await apercu.waitFor({ state: 'detached', timeout: 4000 });
     await page.click('button[role="radio"]:has-text("Par pièce")');
     await page.locator('text=BL N° 1261/2026').first().waitFor({ timeout: 8000 });
     assert.equal(page.appels.filter((a) => a.operationName === 'RecouvrementDelphi').at(-1).variables.detail, true);
+    await page.click('button:has-text("Imprimer")');
+    await apercu.waitFor({ timeout: 8000 });
+    assert.match(await apercu.getAttribute('aria-label'), /recouvrement \(par pièce\)/i);
     assert.deepEqual(page.erreurs, []);
     await page.context().close();
   });

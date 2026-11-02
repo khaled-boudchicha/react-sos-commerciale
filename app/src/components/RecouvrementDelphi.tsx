@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@apollo/client';
 import { useNavigate } from 'react-router-dom';
-import { RECOUVREMENT_DELPHI } from '../api/queries';
+import { COORDONNEES_SOCIETE, RECOUVREMENT_DELPHI } from '../api/queries';
 import { fmtDate, fmtMoney } from '../lib/format';
 import { exporterCsv, ExportColumn } from '../lib/export';
 import DataGrid, { Column } from './ui/DataGrid';
 import { ExportBtn, Toolbar } from './ui/atoms';
+import { Button } from './ui/Button';
 import { Field, SegmentedControl, TextInput } from './ui/Field';
 import { KpiTile } from './ui/Kpi';
+import ImprimerDocument from '../impression/ImprimerDocument';
+import type { DemandeImpression } from '../impression/demandes';
+import { demandeRecouvrementBureau } from '../impression/demandes';
 
 type Resume = {
   code_cli: string; raison: string; nb_pieces: number;
@@ -53,6 +57,8 @@ export default function RecouvrementDelphi({ search }: { search: string }) {
   const [annee, setAnnee] = useState(new Date().getFullYear());
   const [vue, setVue] = useState<'resume' | 'detail'>('resume');
   const detail = vue === 'detail';
+  const [printDoc, setPrintDoc] = useState<DemandeImpression | null>(null);
+  const { data: socData } = useQuery(COORDONNEES_SOCIETE);
   const { data, loading, error } = useQuery(RECOUVREMENT_DELPHI, {
     variables: { nbrjour, annee, detail }, fetchPolicy: 'network-only',
   });
@@ -104,13 +110,19 @@ export default function RecouvrementDelphi({ search }: { search: string }) {
         </Field>
         <SegmentedControl label="Présentation" value={vue} onChange={setVue}
                           options={[{ value: 'resume', label: 'Par client' }, { value: 'detail', label: 'Par pièce' }]} />
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button icon="printer" disabled={loading || lignes.length === 0}
+                  onClick={() => setPrintDoc(demandeRecouvrementBureau(
+                    { rows: lignes, nbrjour, annee, detail }, (socData?.coordonneesSociete ?? {}) as Record<string, unknown>))}>
+            Imprimer
+          </Button>
           <ExportBtn loading={loading}
                      onClick={() => (detail
                        ? exporterCsv('recouvrement-delphi-pieces', CSV_DETAIL, lignes as Piece[])
                        : exporterCsv('recouvrement-delphi-clients', CSV_RESUME, lignes as Resume[]))} />
         </div>
       </Toolbar>
+      {printDoc && <ImprimerDocument demande={printDoc} onClose={() => setPrintDoc(null)} />}
       <div className="grid grid-cols-4 gap-3">
         <KpiTile size="sm" label="Reste à payer" value={fmtMoney(tot.reste)} valueTone="danger"
                  sub={detail ? `${lignes.length} pièce(s)` : `${lignes.length} client(s)`} />

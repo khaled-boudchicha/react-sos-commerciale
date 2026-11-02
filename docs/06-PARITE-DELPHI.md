@@ -81,8 +81,8 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
 4. **Recouvrement** (`cc592de`) : nouveau mode `mode: 'delphi'` (résumé par client, détail par pièce) qui reproduit
    le formulaire. Exposé de bout en bout : arguments `mode`, `annee`, `code_cli`, `detail` ajoutés au schéma
    `recouvrement(...)` de `sos-cloud-server`, copie de l'agent régénérée, et l'écran Tiers › Recouvrement de l'app
-   propose « Solde client » ou « Comme le logiciel de bureau » (par client / par pièce, export CSV ; pas d'impression
-   dans ce mode).
+   propose « Solde client » ou « Comme le logiciel de bureau » (par client / par pièce, impression et export CSV ;
+   modèles livrés `integre-recouvrement-bureau` et `integre-recouvrement-bureau-pieces`).
 
 5. **`getSoldeClient` et les codes clients en double** : il ne lisait que la première fiche du code, donc ratait le
    crédit initial de l'autre (`facture 2025`, client 060 : 14 442 080,43 contre 15 331 336,88 pour le relevé et le
@@ -108,8 +108,6 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
 
 ### Reste à faire / à surveiller
 
-- Imprimer le recouvrement « comme le logiciel de bureau » (le modèle d'impression attend les tranches d'ancienneté
-  du mode par défaut).
 - Jointures encore sensibles aux codes en double : journal des achats et listes d'avances (aucun cas réel pour
   vérifier une correction).
 - Avances clients : aucune donnée réelle (aucune avance cliente dans les bases du poste).

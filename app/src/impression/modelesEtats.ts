@@ -172,6 +172,37 @@ const recouvrement = (): ReportDef => etat({
   totaux: { lignes: [{ label: 'Total dû', expr: 'Etat.total_du' }], final: { label: 'Total en retard', expr: 'Etat.du_en_retard', suffixe: ' DA' } },
 });
 
+/** Recouvrement « comme le logiciel de bureau » (RecouverementForm.pas) : factures et BL impayés, sans crédit initial ni avoirs. */
+const recouvrementBureau = (parPiece: boolean): ReportDef => etat({
+  nom: `État de recouvrement — Comme le logiciel de bureau (${parPiece ? 'par pièce' : 'par client'})`, kind: 'recouvrement',
+  description: parPiece ? 'Une ligne par facture ou BL impayé, comme le formulaire du logiciel de bureau.' : 'Reste à payer des factures et BL impayés, par client, comme le formulaire du logiciel de bureau.',
+  titre: 'ÉTAT DE RECOUVREMENT', reference: parPiece ? '[Etat.nb_pieces] pièce(s) — [Etat.nb_clients] client(s)' : '[Etat.nb_clients] client(s) — [Etat.nb_pieces] pièce(s)',
+  date: AUJOURDHUI, intro: '[Etat.critere]',
+  cartes: [{ label: 'Reste à payer', expr: 'Etat.reste_a_payer', ton: 'danger' }, { label: 'Net à payer', expr: 'Etat.net_a_payer' }, { label: 'Déjà réglé', expr: 'Etat.regler', ton: 'ok' }],
+  tableaux: [parPiece ? {
+    source: 'Pieces', tri: 'Pieces.raison', cols: [
+      { titre: 'Pièce', expr: 'Pieces.code', w: 26, mono: true, bold: true },
+      { titre: 'Date', expr: 'Pieces.date_piece', w: 14, fmt: 'date' },
+      { titre: 'Client', expr: 'Pieces.raison', w: 38, grow: true },
+      { titre: 'Net à payer', expr: 'Pieces.net_a_payer', w: 17, align: 'right', fmt: 'money' },
+      { titre: 'Réglé', expr: 'Pieces.regler', w: 15, align: 'right', fmt: 'money', muted: true },
+      { titre: 'Reste à payer', expr: 'Pieces.reste_a_payer', w: 18, align: 'right', fmt: 'money', bold: true, si: [rouge('moderne', 'Pieces.reste_a_payer > 0')] },
+    ],
+  } : {
+    source: 'Clients', tri: 'Clients.raison', cols: [
+      { titre: 'Client', expr: 'Clients.raison', w: 38, bold: true, grow: true },
+      { titre: 'Pièces', expr: 'Clients.nb_pieces', w: 8, align: 'right', fmt: 'int' },
+      { titre: 'Plus ancienne', expr: 'Clients.plus_ancienne', w: 16, fmt: 'date', align: 'right' },
+      { titre: 'Dernière', expr: 'Clients.derniere', w: 16, fmt: 'date', align: 'right' },
+      { titre: 'Net à payer', expr: 'Clients.net_a_payer', w: 17, align: 'right', fmt: 'money' },
+      { titre: 'Réglé', expr: 'Clients.regler', w: 15, align: 'right', fmt: 'money', muted: true },
+      { titre: 'Reste à payer', expr: 'Clients.reste_a_payer', w: 18, align: 'right', fmt: 'money', bold: true, si: [rouge('moderne', 'Clients.reste_a_payer > 0')] },
+    ],
+  }],
+  totaux: { lignes: [{ label: 'Net à payer', expr: 'Etat.net_a_payer' }, { label: 'Déjà réglé', expr: 'Etat.regler' }], final: { label: 'Total à recouvrer', expr: 'Etat.reste_a_payer', suffixe: ' DA' } },
+  refPied: 'Recouvrement [Etat.nb_clients] client(s)',
+});
+
 // ─── Trésorerie et caisse ───────────────────────────────────────────────────
 
 const tresorerie = (): ReportDef => etat({
@@ -394,6 +425,8 @@ export const MODELES_ETATS: { id: string; build: () => ReportDef }[] = [
   { id: 'integre-impayes', build: impayes },
   { id: 'integre-creances', build: creances },
   { id: 'integre-recouvrement', build: recouvrement },
+  { id: 'integre-recouvrement-bureau', build: () => recouvrementBureau(false) },
+  { id: 'integre-recouvrement-bureau-pieces', build: () => recouvrementBureau(true) },
   { id: 'integre-tresorerie', build: tresorerie },
   { id: 'integre-arrete-caisse', build: arreteCaisse },
   { id: 'integre-etat-stock', build: stock },
