@@ -41,6 +41,7 @@ check:
     - npm run typecheck
     - npx tsc -p tsconfig.electron.json --noEmit
     - TZ=Africa/Algiers npm test
+    - TZ=Africa/Algiers npm run test:report
 
 # Parcours d'interface (build de production + GraphQL simulé, aucun agent) : connexion, comptoir,
 # anti-doublon, cache hors ligne, droits, garde de saisie. Image Playwright de la même version que la

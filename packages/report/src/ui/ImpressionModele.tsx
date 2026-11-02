@@ -36,7 +36,12 @@ function ImpressionModeleInterne({ modeleRef, data, titre, onClose }: {
   if (edition) {
     return (
       <ReportDesigner initial={def} fichier={ref.startsWith('fichier:') ? ref.slice('fichier:'.length) : undefined} donneesApercu={data}
-                      onSaved={(f) => setRef(`fichier:${f}`)}
+                      onSaved={(f) => {
+                        // Modèle livré personnalisé depuis l'impression : la version personnalisée sert désormais pour ce type
+                        const nouveau = `fichier:${f}`;
+                        if (!ref.startsWith('fichier:')) definirModeleParDefaut(def.kind, nouveau);
+                        setRef(nouveau);
+                      }}
                       onClose={() => { setEdition(false); setDef(null); /* recharge le modèle enregistré */ void chargerModele(ref).then(setDef).catch(() => onClose()); }} />
     );
   }

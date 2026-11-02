@@ -4,8 +4,9 @@ import {
   creerObjet, dimensionsPage,
 } from '../../model';
 import { segmenter } from '../../expr/parser';
-import { Scope, resoudreTexte } from '../../expr/eval';
+import { Scope, evaluerCondition, resoudreTexte } from '../../expr/eval';
 import { codeBarresSvg } from '../../engine/barcode';
+import { familleCss } from '../../engine/render';
 import { PX_PAR_MM, ptVersPx } from '../../engine/measure';
 import { Ic } from '../icons';
 import type { DesignerApi } from './useDesigner';
@@ -40,7 +41,7 @@ type Rect = { x: number; y: number; w: number; h: number };
 
 const SEUIL_PX = 6;
 
-export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer, onEditionTexte }: {
+export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer, onEditionTexte, onSupprimerBande }: {
   D: DesignerApi;
   /** Portée d'aperçu : affiche les valeurs d'exemple à la place des expressions (null = expressions brutes). */
   valeurs?: Scope | null;
@@ -51,6 +52,8 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
   onDeposer: (bandeId: string, x: number, y: number, champ: ChampDepose) => void;
   /** Ouvre l'éditeur d'expression d'un objet (double-clic sur un objet non texte). */
   onEditionTexte?: (id: string) => void;
+  /** Suppression d'une bande depuis son bandeau (le designer affiche le message d'annulation). */
+  onSupprimerBande?: (id: string) => void;
 }) {
   const { def } = D;
   const { w: pageW, h: pageH } = dimensionsPage(def.page);
@@ -289,6 +292,13 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
     setEdition(null);
   }
 
+  // Bande sélectionnée (ajoutée, choisie dans la vérification…) : amenée à l'écran si elle est hors de vue
+  const racine = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!D.bandeSel) return;
+    racine.current?.querySelector(`[data-bande="${D.bandeSel}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [D.bandeSel]);
+
   const styles = def.styles;
   const bandes = def.bands;
   const quadrillage = useMemo(() => (grille.afficher && grille.pas * pxMm >= 4
@@ -296,7 +306,7 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
     : {}), [grille.afficher, grille.pas, pxMm]);
 
   return (
-    <div className="relative select-none" style={{ width: pageW * pxMm, minHeight: 200 }}
+    <div ref={racine} className="relative select-none" style={{ width: pageW * pxMm, minHeight: 200 }}
          onPointerDown={(e) => { if (e.target === e.currentTarget && !D.outil) { D.selectBande(null); } }}>
       {/* Feuille */}
       <div style={{ position: 'relative', width: pageW * pxMm, background: def.page.background || '#fff', boxShadow: '0 4px 18px rgb(10 18 34 / .22)', paddingTop: m.top * pxMm, paddingBottom: m.bottom * pxMm, paddingLeft: m.left * pxMm, boxSizing: 'border-box', minHeight: Math.min(pageH, 60) * pxMm }}>
@@ -307,9 +317,11 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
           const accent = COULEUR_BANDE[b.type];
           const selectionnee = D.bandeSel === b.id && D.sel.length === 0;
           const retrait = b.parent ? 14 : 0;
+          // Bande dont la condition « Imprimer si » est fausse avec les données d'exemple : estompée
+          const bandeMasquee = !!(valeurs && b.visible && !evaluerCondition(b.visible, valeurs));
           return (
             <Fragment key={b.id}>
-              <div style={{ marginLeft: retrait * 0, width: largeur * pxMm, position: 'relative' }}>
+              <div data-bande={b.id} style={{ marginLeft: retrait * 0, width: largeur * pxMm, position: 'relative' }}>
                 {/* Bandeau de bande */}
                 <div onPointerDown={(e) => { if (e.button === 0 && !D.outil) { e.stopPropagation(); D.selectBande(b.id); } }}
                      className="flex items-center gap-1.5 px-2 text-[10.5px] font-bold"
@@ -317,12 +329,13 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
                   {b.parent && <span title="Bande de détail">↳</span>}
                   <span>{BAND_LABELS[b.type]}</span>
                   <span style={{ opacity: .75, fontWeight: 600 }}>{b.name !== BAND_LABELS[b.type] ? `· ${b.name}` : ''}{b.dataSource ? ` · ${b.dataSource}` : ''}{b.groupBy ? ` · par ${b.groupBy}` : ''}{b.columns && b.columns > 1 ? ` · ${b.columns} col.` : ''}</span>
+                  {bandeMasquee && <span title={`Imprimée si : ${b.visible}`} style={{ fontWeight: 600, fontStyle: 'italic', opacity: .9 }}>· non imprimée avec ces données</span>}
                   {selectionnee && (
                     <span className="ml-auto flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
                       <button title="Monter" onClick={() => D.set(deplacerBande(def, b.id, -1))} className="p-0.5 rounded hover:bg-white/25"><Ic n="chevU" size={13} /></button>
                       <button title="Descendre" onClick={() => D.set(deplacerBande(def, b.id, 1))} className="p-0.5 rounded hover:bg-white/25"><Ic n="chevD" size={13} /></button>
                       <button title="Dupliquer la bande" onClick={() => { const r = dupliquerBande(def, b.id); D.set(r.def); D.selectBande(r.id); }} className="p-0.5 rounded hover:bg-white/25"><Ic n="copy" size={13} /></button>
-                      <button title="Supprimer la bande" onClick={() => { D.set(supprimerBande(def, b.id)); D.selectBande(null); }} className="p-0.5 rounded hover:bg-white/25"><Ic n="trash" size={13} /></button>
+                      <button title="Supprimer la bande (Suppr)" onClick={() => (onSupprimerBande ? onSupprimerBande(b.id) : (D.set(supprimerBande(def, b.id)), D.selectBande(null)))} className="p-0.5 rounded hover:bg-white/25"><Ic n="trash" size={13} /></button>
                     </span>
                   )}
                 </div>
@@ -337,6 +350,7 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
                      style={{ position: 'relative', height: b.height * pxMm, width: largeur * pxMm, backgroundColor: '#fff', outline: selectionnee ? `1.5px solid ${accent}` : '1px solid rgb(148 163 184 / .5)', cursor: D.outil ? 'crosshair' : 'default', ...quadrillage }}>
                   {b.objects.map((o) => (
                     <ObjetVisuel key={o.id} o={o} styles={styles} pxMm={pxMm} zoom={zoom} valeurs={valeurs ?? null}
+                                 masque={bandeMasquee || !!(valeurs && o.visible && !evaluerCondition(o.visible, valeurs))}
                                  selectionne={D.sel.includes(o.id)}
                                  onPointerDown={(e) => debutObjet(e, o, b)}
                                  onDoubleClick={() => {
@@ -384,7 +398,7 @@ export default function Canvas({ D, pxMm, grille, valeurs, onPointeur, onDeposer
                                   else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) validerEdition();
                                 }}
                                 style={{ position: 'absolute', left: o.x * pxMm, top: o.y * pxMm, width: Math.max(o.w * pxMm, 120), height: Math.max(o.h * pxMm, 28), zIndex: 10, resize: 'both',
-                                  font: `${(o.font?.bold ? 'bold ' : '')}${ptVersPx(o.font?.size ?? DEFAULT_FONT.size) * zoom}px ${o.font?.family ?? DEFAULT_FONT.family}`, border: '2px solid #2450E0', background: '#fff', color: '#000', padding: 2, boxShadow: '0 4px 14px rgb(0 0 0 / .25)' }} />
+                                  font: `${(o.font?.bold ? 'bold ' : '')}${ptVersPx(o.font?.size ?? DEFAULT_FONT.size) * zoom}px ${familleCss(o.font?.family ?? DEFAULT_FONT.family)}`, border: '2px solid #2450E0', background: '#fff', color: '#000', padding: 2, boxShadow: '0 4px 14px rgb(0 0 0 / .25)' }} />
                     );
                   })()}
                 </div>
@@ -421,14 +435,20 @@ function cadreCss(o: ObjDef, styles: StyleDef[], pxMm: number): CSSProperties {
   };
 }
 
-function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDown, onDoubleClick }: {
-  o: ObjDef; styles: StyleDef[]; pxMm: number; zoom: number; valeurs: Scope | null; selectionne: boolean;
+function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, masque, selectionne, onPointerDown, onDoubleClick }: {
+  o: ObjDef; styles: StyleDef[]; pxMm: number; zoom: number; valeurs: Scope | null;
+  /** Condition d'impression fausse avec les données d'exemple : l'objet ne sera pas imprimé. */
+  masque: boolean;
+  selectionne: boolean;
   onPointerDown: (e: React.PointerEvent) => void; onDoubleClick: () => void;
 }) {
+  // Info-bulle : condition d'impression de l'objet
+  const info = o.visible ? `${masque ? 'Non imprimé avec ces données — ' : ''}Imprimé si : ${o.visible}` : undefined;
   const boite: CSSProperties = {
     position: 'absolute', left: o.x * pxMm, top: o.y * pxMm, width: o.w * pxMm, height: o.h * pxMm, boxSizing: 'border-box',
     outline: selectionne ? '1.5px solid #2450E0' : '1px dashed rgb(100 116 139 / .0)', cursor: o.locked ? 'not-allowed' : 'move', overflow: 'hidden',
     ...cadreCss(o, styles, pxMm),
+    ...(masque ? { opacity: selectionne ? 0.55 : 0.16 } : {}),
   };
   const survol = 'hover:outline hover:outline-1 hover:outline-[rgb(36_80_224_/_.45)]';
 
@@ -441,9 +461,9 @@ function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDow
       const segs = segmenter(o.text);
       const resolu = valeurs ? resoudreTexte(o.text, valeurs, o.format) : null;
       return (
-        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} className={survol} style={{ ...boite, display: 'flex', flexDirection: 'column', justifyContent: va }}>
+        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} title={info} data-objet={o.id} className={survol} style={{ ...boite, display: 'flex', flexDirection: 'column', justifyContent: va }}>
           <div style={{
-            fontFamily: `'${f.family}', Arial, sans-serif`, fontSize: ptVersPx(f.size) * zoom, fontWeight: f.bold ? 700 : 400, fontStyle: f.italic ? 'italic' : 'normal',
+            fontFamily: familleCss(f.family), fontSize: ptVersPx(f.size) * zoom, fontWeight: f.bold ? 700 : 400, fontStyle: f.italic ? 'italic' : 'normal',
             color: f.color, textAlign: o.align ?? st?.align ?? 'left', lineHeight: o.lineHeight ?? 1.2, padding: pad,
             textDecoration: [f.underline ? 'underline' : '', f.strike ? 'line-through' : ''].filter(Boolean).join(' ') || undefined,
             whiteSpace: o.wordWrap === false ? 'pre' : 'pre-wrap', overflowWrap: 'anywhere', width: '100%', boxSizing: 'border-box',
@@ -458,7 +478,7 @@ function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDow
     }
     case 'image':
       return (
-        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} className={survol} style={{ ...boite, background: o.fill ?? '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
+        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} title={info} data-objet={o.id} className={survol} style={{ ...boite, background: o.fill ?? '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
           {o.src && !o.expr
             ? <img src={o.src} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: o.fit === 'stretch' ? 'fill' : o.fit ?? 'contain', opacity: o.opacity ?? 1, pointerEvents: 'none' }} />
             : <div className="flex flex-col items-center text-[10px] gap-0.5 px-1 text-center"><Ic n="image" size={Math.min(24, o.w * pxMm * 0.5)} />{o.expr ? `[${o.expr}]` : 'Image'}</div>}
@@ -468,7 +488,7 @@ function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDow
       const w = Math.max(o.w, 0.1), h = Math.max(o.h, 0.1);
       const [x1, y1, x2, y2] = o.direction === 'v' ? [w / 2, 0, w / 2, h] : o.direction === 'diag' ? [0, 0, w, h] : o.direction === 'antidiag' ? [0, h, w, 0] : [0, h / 2, w, h / 2];
       return (
-        <div onPointerDown={onPointerDown} className={survol} style={{ ...boite, overflow: 'visible', minWidth: 6, minHeight: 6 }}>
+        <div onPointerDown={onPointerDown} title={info} data-objet={o.id} className={survol} style={{ ...boite, overflow: 'visible', minWidth: 6, minHeight: 6 }}>
           <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
             <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={o.color ?? '#000'} strokeWidth={o.lineWidth ?? 0.3}
                   strokeDasharray={o.dash === 'dashed' ? '2 1.2' : o.dash === 'dotted' ? '0.4 0.8' : undefined} />
@@ -478,11 +498,11 @@ function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDow
       );
     }
     case 'shape':
-      return <div onPointerDown={onPointerDown} className={survol} style={{ ...boite, borderRadius: o.shape === 'ellipse' ? '50%' : boite.borderRadius }} />;
+      return <div onPointerDown={onPointerDown} title={info} data-objet={o.id} className={survol} style={{ ...boite, borderRadius: o.shape === 'ellipse' ? '50%' : boite.borderRadius }} />;
     case 'barcode': {
       const valeur = valeurs ? resoudreTexte(o.value, valeurs).texte : o.value.includes('[') ? '123456789012' : o.value;
       return (
-        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} className={survol} style={{ ...boite, background: o.fill ?? '#fff' }}>
+        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} title={info} data-objet={o.id} className={survol} style={{ ...boite, background: o.fill ?? '#fff' }}>
           <div style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
                dangerouslySetInnerHTML={{ __html: codeBarresSvg(o.symbology, valeur, o.w, o.h, { texte: o.showText !== false, couleur: o.color }) }} />
           {!valeurs && o.value.includes('[') && <span style={{ position: 'absolute', left: 2, top: 1, fontSize: 9, background: 'rgb(255 255 255 / .85)', color: '#1D3FB8', padding: '0 2px', borderRadius: 2 }}>{o.value}</span>}
@@ -491,7 +511,7 @@ function ObjetVisuel({ o, styles, pxMm, zoom, valeurs, selectionne, onPointerDow
     }
     case 'checkbox':
       return (
-        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} className={survol} style={boite}>
+        <div onPointerDown={onPointerDown} onDoubleClick={onDoubleClick} title={info} data-objet={o.id} className={survol} style={boite}>
           <svg width="100%" height="100%" viewBox="0 0 10 10" preserveAspectRatio="none">
             <rect x="0.6" y="0.6" width="8.8" height="8.8" fill="none" stroke={o.color ?? '#000'} strokeWidth="0.6" />
             <path d="M2.2 5.2 L4.3 7.3 L7.9 2.8" fill="none" stroke={o.color ?? '#000'} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" opacity=".5" />

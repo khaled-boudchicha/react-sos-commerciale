@@ -66,12 +66,20 @@ export const REPORT_CSS_BASE = `
 .rpt-o svg{display:block}
 `;
 
+/**
+ * Pile CSS d'une police, identique à l'impression, à l'aperçu et dans le designer : les polices à chasse fixe
+ * (Courier, Consolas, « … Mono ») retombent sur `monospace`, les autres sur Arial / Helvetica.
+ */
+export function familleCss(famille: string): string {
+  const nom = famille.replace(/['"<>&]/g, '');
+  return /courier|consolas|mono/i.test(famille) ? `'${nom}',monospace` : `'${nom}',Arial,Helvetica,sans-serif`;
+}
+
 /** Le bloc de texte tel qu'il est imprimé (partagé par l'émission HTML et par la mesure DOM). */
 function fragmentTexte(o: TextObj, police: FontDef, texte: string, align: string): string {
   const pad = o.padding ?? 0.5;
   const deco = [police.underline ? 'underline' : '', police.strike ? 'line-through' : ''].filter(Boolean).join(' ');
-  const nomPolice = police.family.replace(/['"<>&]/g, '');
-  const famille = /courier|consolas|mono/i.test(police.family) ? `'${nomPolice}',monospace` : `'${nomPolice}',Arial,Helvetica,sans-serif`;
+  const famille = familleCss(police.family);
   const style = `font-family:${famille};font-size:${police.size}pt;font-weight:${police.bold ? 700 : 400};font-style:${police.italic ? 'italic' : 'normal'};color:${police.color};text-align:${align};line-height:${o.lineHeight ?? 1.2};padding:${mm(pad)};${deco ? `text-decoration:${deco};` : ''}`;
   return `<div class="rpt-tx${o.wordWrap === false ? ' nw' : ''}" style="${style}">${echapper(texte)}</div>`;
 }

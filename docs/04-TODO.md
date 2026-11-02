@@ -182,3 +182,20 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
   impression (`impression/ImpressionModeleDiffere.tsx`) ; le reste de l'app n'importe que `@softly/report/core`. Script
   principal 1 282 → 1 166 kB. Parcours d'interface ajoutés : aperçu de l'état du stock, bibliothèque des modèles (51 tests).
 - ☐ Passer à Electron 45 après quelques correctifs de cette branche (sortie fin octobre 2026) ; electron-builder 26.
+
+## Designer de modèles d'impression (02/11/2026)
+- ☑ Audit en conditions réelles (build de production piloté par Playwright) puis corrections :
+  - **fidélité** : mêmes polices qu'à l'impression (les champs en Consolas s'affichaient en Arial) ; objets et bandes dont
+    la condition « Imprimer si » est fausse estompés avec les données d'exemple (les variantes « avec / sans logo » de
+    l'en-tête se superposaient) ;
+  - **nouveau modèle** : choix du type et du point de départ ; « modèle standard » prêt à imprimer pour les 17 types
+    (avant : page sans aucune bande) ;
+  - **enregistrement** : un modèle livré personnalisé n'est plus enregistré sous le nom de l'original (« … (personnalisé) »
+    proposé) ; depuis l'aperçu d'impression, il devient le modèle par défaut de son type ;
+  - **sécurité de la saisie** : la palette Ctrl+K s'ouvrait, invisible, derrière le designer (la saisie y partait, Entrée
+    faisait quitter l'écran et perdre le modèle) ; les raccourcis de l'application sont suspendus pendant l'édition ;
+  - **ergonomie** : menu du clic droit (objets, bandes), `Suppr` sur une bande avec « Ctrl+Z pour annuler », bande ajoutée
+    amenée à l'écran, position / taille de la sélection dans la barre d'état et sur la règle, icônes distinctes
+    (couper, dupliquer, premier / arrière-plan).
+- ☑ Tests : 5 tests du moteur (modèle standard, polices) + modèle standard des 17 types dans l'app ; 2 parcours
+  d'interface du designer (53 au total) ; tests du paquet `@softly/report` ajoutés à la CI (`npm run test:report`, 112).

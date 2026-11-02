@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  Scope, evaluerExpression, expressionsDuTexte, kindDe, listerModelesIntegres, listerTypes, normaliserEtat, rendreEtat, validerExpression, verifierModele,
+  Scope, creerEtatStandard, evaluerExpression, expressionsDuTexte, kindDe, listerModelesIntegres, listerTypes, normaliserEtat, rendreEtat, validerExpression, verifierModele,
 } from '@softly/report/core';
 import { initialiserImpression } from '../impression';
 import { donneesVente } from '../impression/types';
@@ -23,6 +23,15 @@ describe('branchement métier sur @softly/report', () => {
   });
   it('la fonction métier ARRETE est disponible dans les expressions', () => {
     expect(evaluerExpression('ARRETE(1250)', new Scope()).valeur).toBe('Mille Deux Cent Cinquante Dinars Algerien et zéro Centimes');
+  });
+  it('nouveau modèle « standard » : valide et imprimable pour chacun des 17 types de documents', () => {
+    for (const k of listerTypes()) {
+      const def = creerEtatStandard(k, `Nouveau ${k.label}`);
+      expect(verifierModele(def).filter((x) => x.niveau === 'erreur'), k.id).toEqual([]);
+      const r = rendreEtat(def, k.sample, { mesureur });
+      expect(r.pages.length, k.id).toBeGreaterThan(0);
+      expect(r.pages.join(''), k.id).toContain('Page 1 /');
+    }
   });
   it('les modèles livrés n’ont aucune erreur de vérification', () => {
     for (const m of MODELES_INTEGRES) expect(verifierModele(m.build()).filter((x) => x.niveau === 'erreur'), m.id).toEqual([]);

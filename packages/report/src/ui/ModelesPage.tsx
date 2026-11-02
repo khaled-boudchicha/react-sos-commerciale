@@ -12,9 +12,8 @@ import { useToast } from './toast';
 import { ConfirmDialog } from './dialogs';
 import { PageHeader, Tabs } from './atoms';
 import { Ic } from './icons';
-import ReportDesigner from './ReportDesigner';
+import ReportDesigner, { NouveauModeleDialog } from './ReportDesigner';
 import ReportPreview from './ReportPreview';
-import { creerEtat } from '../model';
 import { Racine } from './Racine';
 
 const BTN = 'h-8 px-3 rounded-md border border-line text-ink-label font-bold text-[12px] inline-flex items-center gap-1.5 hover:bg-[var(--gcr-surface-sunken)] disabled:opacity-50';
@@ -29,6 +28,7 @@ function ModelesPageInterne() {
   const [aSupprimer, setASupprimer] = useState<ModeleInfo | null>(null);
   const [dossier, setDossier] = useState('');
   const [versionDefauts, setVersionDefauts] = useState(0);
+  const [nouveau, setNouveau] = useState(false);
 
   const recharger = useCallback(() => listerModeles().then(setListe), []);
   useEffect(() => { void recharger(); void cheminDossierModeles().then(setDossier); }, [recharger]);
@@ -66,7 +66,7 @@ function ModelesPageInterne() {
   return (
     <div className="gcr-ui flex flex-col gap-4 p-5">
       <PageHeader title="Modèles d’impression">
-        <button className={BTN} onClick={() => setEdition({ def: creerEtat(filtre === 'tous' ? kindDe('').id : filtre, 'Nouvel état') })} style={{ background: 'var(--gcr-brand-700)', color: '#fff', borderColor: 'transparent' }}>
+        <button className={BTN} onClick={() => setNouveau(true)} style={{ background: 'var(--gcr-brand-700)', color: '#fff', borderColor: 'transparent' }}>
           <Ic n="plus" size={14} /> Nouveau modèle
         </button>
         <button className={BTN} onClick={() => void importer()}><Ic n="upload" size={14} /> Importer…</button>
@@ -93,6 +93,8 @@ function ModelesPageInterne() {
         </div>
       )}
 
+      {nouveau && <NouveauModeleDialog kindInitial={filtre === 'tous' ? undefined : filtre} surFermer={() => setNouveau(false)}
+                                       surCreer={(d) => { setNouveau(false); setEdition({ def: d }); }} />}
       {apercu && <ReportPreview def={apercu} data={kindDe(apercu.kind).sample} titre={`${apercu.name} — exemple`} onClose={() => setApercu(null)} onEdit={() => { setEdition({ def: apercu }); setApercu(null); }} />}
       {aSupprimer && <ConfirmDialog title="Supprimer ce modèle ?" message={<>Le fichier « <b>{aSupprimer.file}</b> » sera supprimé définitivement.</>} confirmLabel="Supprimer" danger
                                     onConfirm={() => void supprimer(aSupprimer)} onCancel={() => setASupprimer(null)} />}

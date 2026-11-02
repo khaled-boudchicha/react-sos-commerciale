@@ -145,17 +145,35 @@ sélecteur de modèle (`ImpressionModele`) et `ReportPreview` accepte un contenu
 - Vérifié en PDF réel (Electron `printToPDF`) sur 29 combinaisons (A4/A3/A5/Letter/paysage, tickets, étiquettes,
   4 à 400 lignes) : nombre de pages identique au moteur, dimensions exactes à ±0,2 mm (arrondi de Chromium).
 
+## Designer : comportements
+
+- **Nouveau modèle** (`NouveauModeleDialog`, `creerEtatStandard(kind, nom)`) : type de document, puis point de départ —
+  *modèle standard* (en-tête société, tableau du premier jeu « liste » avec la désignation en colonne large, quantités
+  et pourcentages sans décimales inutiles, nombre de lignes et total du premier montant, pied de page « Page n / N »),
+  *page vierge*, ou copie d'un modèle livré. Le modèle standard est valide d'emblée (aucune erreur de vérification).
+- **Enregistrer** un modèle jamais enregistré (modèle livré personnalisé, nouveau modèle) demande d'abord son nom ; un
+  modèle livré personnalisé est proposé sous « <nom> (personnalisé) » — les modèles livrés ne sont jamais modifiés.
+  Depuis `ImpressionModele`, la version personnalisée devient le modèle par défaut de son type.
+- **Clic droit** sur un objet (modifier le contenu, couper, copier, coller, dupliquer, premier / arrière-plan,
+  verrouiller, supprimer) ou sur une bande (coller dans la bande, tout sélectionner, monter / descendre, dupliquer,
+  supprimer) ; `Suppr` sur une bande sélectionnée la supprime (message « Ctrl+Z pour annuler »).
+- **Fidélité** : mêmes polices qu'à l'impression (`familleCss`) ; en mode « valeurs d'exemple », les objets et bandes
+  dont la condition « Imprimer si » est fausse sont estompés (info-bulle avec la condition).
+- Barre d'état : position du pointeur, puis position et taille de la sélection ; la règle repère la sélection.
+- Le designer est une fenêtre modale (`role="dialog"`, `aria-modal="true"`) : l'application hôte peut s'en servir pour
+  suspendre ses propres raccourcis pendant l'édition.
+
 ## Raccourcis du designer
 
 `T I L R B C` outils · `Ctrl+Z/Y` annuler/rétablir · `Ctrl+C/X/V/D` copier/couper/coller/dupliquer ·
-`Suppr` supprimer · flèches déplacer (`Maj` ×10, `Alt` fin) · `Ctrl+A` tout sélectionner · `Ctrl+S` enregistrer ·
-`F5` aperçu · `Ctrl+molette` zoom.
+`Suppr` supprimer (objets, ou la bande sélectionnée) · flèches déplacer (`Maj` ×10, `Alt` fin) · `Ctrl+A` tout
+sélectionner · `Ctrl+S` enregistrer · `F5` aperçu · `Ctrl+molette` zoom · clic droit : menu d'actions.
 
 ## Scripts
 
 | Commande | Effet |
 |---|---|
-| `npm test` | tests unitaires (vitest) |
+| `npm test` | tests unitaires (vitest) ; depuis `app/` : `npm run test:report` (aussi lancé par la CI) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run build` | `dist/` : `index.js`, `core.js`, `.d.ts`, `report.css` |
 | `npm run demo` | bac à sable sur http://localhost:5188 (sans Tailwind) |

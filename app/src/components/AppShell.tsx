@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import Ruban from '../navigation/Ruban';
 import { Icone } from '../navigation/icones';
@@ -42,6 +42,8 @@ export default function AppShell() {
   const [changerDossier, setChangerDossier] = useState(false);
   const [changerAgent, setChangerAgent] = useState(false);
   const [aide, setAide] = useState(false);
+  const ouvertes = useRef({ palette: false, aide: false });
+  ouvertes.current = { palette: paletteOuverte, aide };
   const [replie, setReplie] = useState(lireRepli);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'));
   const disposition = usePreferencesNavigation((s) => s.disposition);
@@ -58,11 +60,17 @@ export default function AppShell() {
 
   // ⌘K / Ctrl+K : palette de commandes ; Ctrl+/ : aide aux raccourcis
   useEffect(() => {
+    // Une autre fenêtre modale (designer d'états, aperçu, boîte de dialogue) garde la main : la palette ne
+    // s'ouvre pas derrière elle (la saisie y partirait et Entrée ferait quitter l'écran sans prévenir)
+    // (le raccourci referme toujours sa propre fenêtre)
+    const modaleOuverte = () => !!document.querySelector('[role="dialog"][aria-modal="true"]');
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (!ouvertes.current.palette && modaleOuverte()) return;
         e.preventDefault();
         setPaletteOuverte((v) => !v);
       } else if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        if (!ouvertes.current.aide && modaleOuverte()) return;
         e.preventDefault();
         setAide((v) => !v);
       }
