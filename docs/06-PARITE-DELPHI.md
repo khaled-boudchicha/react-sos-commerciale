@@ -84,7 +84,16 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
    propose « Solde client » ou « Comme le logiciel de bureau » (par client / par pièce, export CSV ; pas d'impression
    dans ce mode).
 
+5. **`getSoldeClient` et les codes clients en double** : il ne lisait que la première fiche du code, donc ratait le
+   crédit initial de l'autre (`facture 2025`, client 060 : 14 442 080,43 contre 15 331 336,88 pour le relevé et le
+   recouvrement). Il additionne maintenant le crédit initial de toutes les fiches du code, comme le relevé. Vérifié
+   sur 7 dossiers (script `14-solde-client.js`).
+
 ### Choix assumés (écarts volontaires avec le Delphi)
+
+- **Règlement sur une pièce sans numéro** (devis, Type 3) : la liste des soldes du Delphi (`EtatClients.pas`) le
+  compte, son relevé (`servermodule.dfm`) l'ignore. L'agent reproduit chacun des deux écrans (2 clients dans
+  `overlab2024`) ; ce n'est pas un défaut de l'agent mais une incohérence du logiciel de bureau.
 
 - **Stat 104 retranche les avoirs liés à une facture** ; le Delphi (`WHERE code IS NOT NULL`) les ignore
   (exemple : `bon 2025`, −18 571). À confirmer par le propriétaire.
@@ -101,8 +110,6 @@ sans identité du tiers. Corrigé partout par `COALESCE(NULLIF(TRIM(raison),''),
 
 - Imprimer le recouvrement « comme le logiciel de bureau » (le modèle d'impression attend les tranches d'ancienneté
   du mode par défaut).
-- `getSoldeClient` ne lit qu'une fiche quand un code client est en double (`facture 2025`, client 060 :
-  14 442 080,43 contre 15 331 336,88 pour le relevé et le recouvrement).
 - Jointures encore sensibles aux codes en double : journal des achats et listes d'avances (aucun cas réel pour
   vérifier une correction).
 - Avances clients : aucune donnée réelle (aucune avance cliente dans les bases du poste).
