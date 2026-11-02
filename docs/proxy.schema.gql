@@ -1,0 +1,334 @@
+# Copie de sos-cloud-server/src/proxy/proxy.schema.gql — état du commit 9cc3c79 (02/11/2026).
+# À recopier à chaque évolution du cloud (demande D0, docs/12-DEMANDES-AGENT-CLOUD.md).
+# Source de vérité des arguments des commandes de l agent (les réponses sont des JSON! : voir docs/12, D20 à D22).
+
+# ─── Proxy GraphQL → PC Agent ────────────────────────────────────────────────
+# Toutes les queries/mutations sont forwardées au PC agent de l'utilisateur.
+# Les types retournés sont JSON (String) pour rester générique côté cloud.
+# Le mobile parse le JSON dans ses propres modèles.
+
+scalar JSON
+
+# ─── Session ──────────────────────────────────────────────────────────────────
+# Vérif légère d'accès (blocage compte + abonnement) SANS router vers l'agent.
+# Utilisée par le watchdog du mobile pour réagir au blocage en temps réel.
+extend type Query {
+  sessionStatus: Boolean!
+}
+
+# ─── Dossiers ─────────────────────────────────────────────────────────────────
+extend type Query {
+  dossiers: JSON!
+}
+
+extend type Mutation {
+  # Change le dossier actif (et le marque par défaut le cas échéant) → mutation d'état.
+  switchDossier(name: String!, marquerDefaut: Boolean): JSON!
+}
+
+# ─── Clients ──────────────────────────────────────────────────────────────────
+extend type Query {
+  clients(search: String, actif: Boolean, segment: String, limit: Int, offset: Int, grille: JSON): JSON!
+  client(id: Int!): JSON
+  clientParCode(code: String!): JSON
+  etatClient(code_cli: String!, date_debut: String, date_fin: String): JSON!
+  soldeClient(code_cli: String!): JSON!
+  etatClients(search: String, famille: String, sans_zeros: Boolean, limit: Int, offset: Int, grille: JSON): JSON!
+  facturesNonReglees(code_cli: String!, type_doc: String): JSON!
+  etatPaiementsClient(code_cli: String!, date_debut: String, date_fin: String): JSON!
+}
+
+extend type Mutation {
+  createClient(input: JSON!): JSON!
+  updateClient(id: Int!, input: JSON!): JSON!
+  deleteClient(id: Int!): Boolean!
+  setCreditInitialClient(code: String!, montant: Float!, date: String!): JSON!
+}
+
+# ─── Articles ─────────────────────────────────────────────────────────────────
+extend type Query {
+  articles(search: String, famille: String, type: String, depot: String, actif: Boolean, stock_alerte: Boolean, marge_negative: Boolean, limit: Int, offset: Int, grille: JSON): JSON!
+  article(id: Int!): JSON
+  articleParCode(code: String!): JSON
+  articleParCodeBarre(code: String!): JSON
+  stocks(search: String, depot: String, sous_minimum: Boolean, limit: Int, offset: Int): JSON!
+  stockArticle(article_id: Int!): JSON
+  # Lots / péremption (multilot)
+  lots(article_id: Int!): JSON!
+  lotPrix(lot_id: Int!): JSON!
+  # Tarification
+  tarifsArticle(code_article: String!): JSON!
+  prixPourQte(code_article: String!, qte: Float!, type_prix: Int): JSON!
+  promotions(article_id: Int!): JSON!
+  nomenclature(article_id: Int!): JSON!
+  # Codes-barres multiples
+  barcodesArticle(article_id: Int!): JSON!
+  # Alertes stock / marges
+  alertesStock: JSON!
+  articlesMargeNegative: JSON!
+}
+
+extend type Mutation {
+  createArticle(input: JSON!): JSON!
+  updateArticle(id: Int!, input: JSON!): JSON!
+  deleteArticle(id: Int!): Boolean!
+  addLot(article_id: Int!, n_lot: String!, date_peremption: String, qte: Float): JSON!
+  deleteLot(lot_id: Int!): Boolean!
+  # Simulation de prix (pmp/tva/marge → prix_ht/ttc), calcul pur côté agent
+  calculerPrix(input: JSON!): JSON!
+  # Procédure stockée de recalcul des quantités (lourde)
+  recalculerStock: Boolean!
+  recalculerStockArticle(article_id: Int!): JSON!
+}
+
+# ─── Ventes ───────────────────────────────────────────────────────────────────
+extend type Query {
+  ventes(type_doc: String, code_cli: String, date_debut: String, date_fin: String, non_reglees: Boolean, user_id: Int, limit: Int, offset: Int, grille: JSON): JSON!
+  vente(id: Int!): JSON
+  journalVentes(date_debut: String, date_fin: String, code_cli: String, code_article: String, limit: Int, offset: Int, grille: JSON): JSON!
+}
+
+extend type Mutation {
+  createVente(input: JSON!): JSON!
+  deleteVente(id: Int!): Boolean!
+}
+
+# ─── Achats ───────────────────────────────────────────────────────────────────
+extend type Query {
+  achats(type_doc: String, code_four: String, date_debut: String, date_fin: String, non_reglees: Boolean, user_id: Int, limit: Int, offset: Int, grille: JSON): JSON!
+  achat(id: Int!): JSON
+  journalAchats(date_debut: String, date_fin: String, code_four: String, code_article: String, limit: Int, offset: Int, grille: JSON): JSON!
+}
+
+extend type Mutation {
+  createAchat(input: JSON!): JSON!
+  deleteAchat(id: Int!): Boolean!
+}
+
+# ─── Fournisseurs ─────────────────────────────────────────────────────────────
+extend type Query {
+  fournisseurs(search: String, actif: Boolean, limit: Int, offset: Int, grille: JSON): JSON!
+  fournisseur(id: Int!): JSON
+  fournisseurParCode(code: String!): JSON
+  # Relevé fournisseur (achats débit + règlements crédit + solde glissant, en SQL)
+  etatFournisseur(code_four: String!, date_debut: String, date_fin: String): JSON!
+  soldeFournisseur(code_four: String!): JSON!
+  etatFournisseurs(search: String, famille: String, sans_zeros: Boolean, limit: Int, offset: Int, grille: JSON): JSON!
+  etatPaiementsFournisseur(code_four: String!, date_debut: String, date_fin: String): JSON!
+}
+
+extend type Mutation {
+  createFournisseur(input: JSON!): JSON!
+  updateFournisseur(id: Int!, input: JSON!): JSON!
+  deleteFournisseur(id: Int!): Boolean!
+}
+
+# ─── Règlements ───────────────────────────────────────────────────────────────
+extend type Query {
+  reglementsClients(code_tiers: String, date_debut: String, date_fin: String, mode_payement: String, limit: Int, offset: Int): JSON!
+  reglementsFournisseurs(code_tiers: String, date_debut: String, date_fin: String, mode_payement: String, limit: Int, offset: Int): JSON!
+  avancesClients(code_cli: String): JSON!
+  ventesNonReglees(code_cli: String): JSON!
+  # Débiteurs agrégés par client (créances) — paginé + totaux globaux + ancienneté, tout en SQL
+  debiteurs(search: String, limit: Int, offset: Int, grille: JSON): JSON!
+  echeances(statut: String, code_cli: String, search: String, limit: Int, offset: Int): JSON!
+  achatsNonRegles(code_four: String): JSON!
+}
+
+extend type Mutation {
+  addReglementClient(input: JSON!): JSON!
+  marquerEcheancePayee(input: JSON!): JSON!
+  addReglementFournisseur(input: JSON!): JSON!
+  reglerClient(input: JSON!): JSON!
+  reglerFournisseur(input: JSON!): JSON!
+  deleteReglementClient(id: Int!): Boolean!
+  deleteReglementFournisseur(id: Int!): Boolean!
+  addAvanceClient(input: JSON!): JSON!
+}
+
+# ─── Statistiques ─────────────────────────────────────────────────────────────
+extend type Query {
+  statVentes(date_debut: String, date_fin: String, groupement: String, code_cli: String, famille: String): JSON!
+  statVentesParArticle(date_debut: String, date_fin: String, code_cli: String, famille: String): JSON!
+  statVentesParClient(date_debut: String, date_fin: String, famille: String): JSON!
+  statVentesParFamille(date_debut: String, date_fin: String, code_cli: String, user: String): JSON!
+  statVentesParUtilisateur(date_debut: String, date_fin: String, code_cli: String): JSON!
+  benefices(date_debut: String, date_fin: String, groupement: String): JSON!
+  statAchats(date_debut: String, date_fin: String, groupement: String): JSON!
+  statAchatsParFournisseur(date_debut: String, date_fin: String): JSON!
+  statAchatsParArticle(date_debut: String, date_fin: String, code_four: String, famille: String): JSON!
+  statStock(search: String, famille: String, limit: Int, offset: Int, grille: JSON): JSON!
+}
+
+# ─── Caisse & Trésorerie ──────────────────────────────────────────────────────
+extend type Query {
+  caisse(compte_id: Int, date_debut: String, date_fin: String, banque: String, mode_payement: String, limit: Int, offset: Int): JSON!
+  encaissements(compte_id: Int, date_debut: String, date_fin: String, banque: String, mode_payement: String, limit: Int, offset: Int): JSON!
+  decaissements(compte_id: Int, date_debut: String, date_fin: String, banque: String, mode_payement: String, limit: Int, offset: Int): JSON!
+  soldesCaisse: JSON!
+  tresorieComplete(compte_id: Int, date_debut: String, date_fin: String, categorie: String, code_tier: String, mode_payement: String, limit: Int, offset: Int, grille: JSON, groupe: Boolean): JSON!
+  soldesComptes: JSON!
+  charges(date_debut: String, date_fin: String, categorie: String, limit: Int, offset: Int, grille: JSON): JSON!
+  charge(id: Int!): JSON
+  categoriesCharges: JSON!
+  totalChargesPeriode(date_debut: String!, date_fin: String!): JSON!
+  # Trésorerie simple (table tresorie seule, avec solde global)
+  tresorie(date_debut: String, date_fin: String, bank_id: Int, limit: Int, offset: Int): JSON!
+}
+
+extend type Mutation {
+  addEncaissement(input: JSON!): JSON!
+  addDecaissement(input: JSON!): JSON!
+  deleteEncaissement(id: Int!): Boolean!
+  deleteDecaissement(id: Int!): Boolean!
+  createCharge(input: JSON!): JSON!
+  updateCharge(id: Int!, input: JSON!): JSON!
+  deleteCharge(id: Int!): Boolean!
+  transfertCompte(input: JSON!): Boolean!
+}
+
+# ─── Stocks & Mouvements ──────────────────────────────────────────────────────
+extend type Query {
+  bonsSortie(date_debut: String, date_fin: String, depot: String, search: String, limit: Int, offset: Int, grille: JSON): JSON!
+  bonsEntree(date_debut: String, date_fin: String, depot: String, search: String, limit: Int, offset: Int, grille: JSON): JSON!
+  mouvementsStock(article_id: Int, code_article: String, depot: String, type: String, date_debut: String, date_fin: String, limit: Int, offset: Int): JSON!
+  "Fiche de stock d'un article : mouvements depuis le dernier inventaire, stock progressif"
+  ficheStock(article_id: Int, code_article: String, date_debut: String, date_fin: String): JSON!
+}
+
+extend type Mutation {
+  createBonSortie(input: JSON!): JSON!
+  createBonEntree(input: JSON!): JSON!
+  deleteBonSortie(id: Int!): Boolean!
+  deleteBonEntree(id: Int!): Boolean!
+}
+
+# ─── Inventaire ───────────────────────────────────────────────────────────────
+extend type Query {
+  inventaires(date_debut: String, date_fin: String, statut: String, limit: Int, offset: Int, grille: JSON): JSON!
+  inventaire(id: Int!): JSON
+}
+
+extend type Mutation {
+  preparerInventaire(depot: String): JSON!
+  # Création d'un inventaire à partir de lignes fournies (hors préparation auto)
+  createInventaire(input: JSON!): JSON!
+  updateLigneInventaire(id: Int!, qte_reale: Float!): JSON!
+  cloturerInventaire(id: Int!): JSON!
+  deleteInventaire(id: Int!): Boolean!
+}
+
+# ─── Paramètres & Référentiels ────────────────────────────────────────────────
+extend type Query {
+  familles: JSON!
+  sousFamilles(famille: String): JSON!
+  depots: JSON!
+  rayons(depot: String): JSON!
+  unitesMesure: JSON!
+  tauxTVA: JSON!
+  banques: JSON!
+  modesPayement: JSON!
+  numerotationDocs: JSON!
+  coordonneesSociete: JSON!
+  commerciaux(search: String): JSON!
+  commercial(id: Int!): JSON
+  centresCout: JSON!
+  centreCout(id: Int!): JSON
+}
+
+extend type Mutation {
+  createFamille(input: JSON!): JSON!
+  updateFamille(id: Int!, input: JSON!): JSON!
+  deleteFamille(id: Int!): Boolean!
+  createSousFamille(input: JSON!): JSON!
+  deleteSousFamille(id: Int!): Boolean!
+  createDepot(input: JSON!): JSON!
+  updateDepot(id: Int!, input: JSON!): JSON!
+  deleteDepot(id: Int!): Boolean!
+  createRayon(input: JSON!): JSON!
+  deleteRayon(id: Int!): Boolean!
+  createUniteMesure(input: JSON!): JSON!
+  deleteUniteMesure(id: Int!): Boolean!
+  createTauxTVA(input: JSON!): JSON!
+  deleteTauxTVA(id: Int!): Boolean!
+  createBanque(input: JSON!): JSON!
+  updateBanque(id: Int!, input: JSON!): JSON!
+  deleteBanque(id: Int!): Boolean!
+  createModePayement(input: JSON!): JSON!
+  deleteModePayement(id: Int!): Boolean!
+  setNumerotation(type: String!, valeur: Int!, prefixe: String, suffixe: String): JSON!
+  updateCoordonneesSociete(input: JSON!): JSON!
+  createCommercial(input: JSON!): JSON!
+  updateCommercial(id: Int!, input: JSON!): JSON!
+  deleteCommercial(id: Int!): Boolean!
+  createCentreCout(input: JSON!): JSON!
+  updateCentreCout(id: Int!, input: JSON!): JSON!
+  deleteCentreCout(id: Int!): Boolean!
+}
+
+# ─── Utilisateurs dossier (commercecommun.users sur le PC agent) ─────────────
+extend type Query {
+  dossierUsers: JSON!
+}
+
+extend type Mutation {
+  loginDossierUser(username: String!, password: String!): JSON!
+}
+
+# ─── Cycle de vie des pièces : modification, transformation, regroupement, retours ─
+extend type Mutation {
+  updateVente(id: Int!, input: JSON!): JSON!
+  transformerVente(id: Int!, cible: String!, date: String): JSON!
+  grouperBL(input: JSON!): JSON!
+  creerRetourVente(input: JSON!): JSON!
+  updateAchat(id: Int!, input: JSON!): JSON!
+  transformerAchat(id: Int!, cible: String!, date: String): JSON!
+  creerRetourAchat(input: JSON!): JSON!
+}
+
+# ─── Avances, arrêté de caisse, annulation de mouvements ─────────────────────
+extend type Query {
+  avancesFournisseurs(code_four: String): JSON!
+  arreteCaisse(compte_id: Int, compte: String, date: String!): JSON!
+}
+
+extend type Mutation {
+  addAvanceFournisseur(input: JSON!): JSON!
+  deleteAvance(id: Int!, sens: String!): Boolean!
+  cloturerCaisse(input: JSON!): JSON!
+  annulerMouvement(cle: String!): Boolean!
+}
+
+# ─── Stock : bon unitaire, transferts inter-dépôts ───────────────────────────
+extend type Query {
+  bon(sens: String!, id: Int!): JSON
+  transferts(date_debut: String, date_fin: String, limit: Int, offset: Int, grille: JSON): JSON!
+}
+
+extend type Mutation {
+  transfertStock(input: JSON!): JSON!
+}
+
+# ─── Utilisateurs dossier : droits & administration ──────────────────────────
+extend type Query {
+  droitsDossierUser(user_id: Int!): JSON!
+}
+
+extend type Mutation {
+  createDossierUser(input: JSON!): JSON!
+  updateDossierUser(id: Int!, input: JSON!): JSON!
+  deleteDossierUser(id: Int!, acteur_id: Int): Boolean!
+}
+
+# ─── Recouvrement, État 104, péremption ──────────────────────────────────────
+extend type Query {
+  # mode "delphi" : les deux requêtes de RecouverementForm.pas (résumé par client, ou détail par pièce avec detail: true)
+  recouvrement(nbrjour: Int, search: String, inactifs: Boolean, limit: Int, offset: Int, grille: JSON, mode: String, annee: Int, code_cli: String, detail: Boolean): JSON!
+  etat104(annee: Int, date_debut: String, date_fin: String, inclure_bl: Boolean): JSON!
+  lotsExpirant(jours: Int, limit: Int): JSON!
+}
+
+# ─── Proxy brut ───────────────────────────────────────────────────────────────
+extend type Query {
+  proxyRaw(command: String!, payload: String): JSON!
+}

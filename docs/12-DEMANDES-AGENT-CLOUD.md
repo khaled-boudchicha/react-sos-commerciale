@@ -16,7 +16,7 @@ Priorité : **P0** intégrité des données / sécurité · **P1** fonction atte
 
 | # | Dépôt | Demande | Pourquoi |
 |---|---|---|---|
-| D0 | cloud | Publier `src/proxy/proxy.schema.gql` (ou un export à jour) dans `docs/` de ce dépôt, ou en artefact de chaque version du cloud. | Plusieurs commandes de l'agent sont « disponibles » mais leurs **arguments et formes de réponse** ne sont pas documentés ici. L'app ne les branche pas à l'aveugle : une erreur de signature ne se voit qu'en production (la recette locale utilise un serveur simulé). Bloque D20, D21, D22. |
+| D0 | cloud | Publier `src/proxy/proxy.schema.gql` (ou un export à jour) dans `docs/` de ce dépôt, ou en artefact de chaque version du cloud. **Fait en partie** : copie du 02/11/2026 (cloud `9cc3c79`) dans [proxy.schema.gql](proxy.schema.gql) — les **arguments** sont connus ; les **formes de réponse** restent `JSON!` et sont à documenter (D20, D21, D22). À recopier à chaque évolution du cloud. | Plusieurs commandes de l'agent sont « disponibles » mais leurs **arguments et formes de réponse** ne sont pas documentés ici. L'app ne les branche pas à l'aveugle : une erreur de signature ne se voit qu'en production (la recette locale utilise un serveur simulé). Bloque D20, D21, D22. |
 
 ## 1. Intégrité et sécurité (P0)
 
