@@ -191,7 +191,7 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
   - **nouveau modèle** : choix du type et du point de départ ; « modèle standard » prêt à imprimer pour les 17 types
     (avant : page sans aucune bande) ;
   - **enregistrement** : un modèle livré personnalisé n'est plus enregistré sous le nom de l'original (« … (personnalisé) »
-    proposé) ; depuis l'aperçu d'impression, il devient le modèle par défaut de son type ;
+    proposé) ; il devient la version personnelle du modèle livré (voir la section suivante) ;
   - **sécurité de la saisie** : la palette Ctrl+K s'ouvrait, invisible, derrière le designer (la saisie y partait, Entrée
     faisait quitter l'écran et perdre le modèle) ; les raccourcis de l'application sont suspendus pendant l'édition ;
   - **ergonomie** : menu du clic droit (objets, bandes), `Suppr` sur une bande avec « Ctrl+Z pour annuler », bande ajoutée
@@ -199,3 +199,13 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
     (couper, dupliquer, premier / arrière-plan).
 - ☑ Tests : 5 tests du moteur (modèle standard, polices) + modèle standard des 17 types dans l'app ; 2 parcours
   d'interface du designer (53 au total) ; tests du paquet `@softly/report` ajoutés à la CI (`npm run test:report`, 112).
+
+## Impression et mise en page (02/11/2026)
+- ☑ **Version personnelle d'un modèle livré** (remplace le « modèle par défaut du type » posé par la PR #20, trop large :
+  personnaliser le ticket faisait proposer le ticket pour les factures, et les tickets suivants restaient sur l'original).
+  Le fichier enregistré remplace exactement le modèle livré personnalisé, partout où il servait : ticket du poste
+  (impression directe comprise), « Imprimer la pièce » (sauf choix explicite plus récent), variantes du journal ;
+  fichier supprimé = retour à l'original. Choix centralisé dans `impression/choixModele.ts` (aperçu et impression directe).
+- ☑ **Portables 1280 × 720** : barre de caisse du comptoir compacte sous 1440 px (« T1…T5 », libellés courts, rien ne
+  passe à la ligne ; noms accessibles complets) ; colonnes par défaut des listes Ventes / Achats ajustées (plus de colonne
+  « Statut » coupée). Audit des 18 écrans principaux en 1280 × 720 : aucun débordement horizontal. Test d'interface ajouté.

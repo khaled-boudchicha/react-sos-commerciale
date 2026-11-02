@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { kindDe, listerTypes, typeDe } from '../registre';
 import { ReportDef } from '../model';
 import {
-  ModeleInfo, chargerModele, cheminDossierModeles, definirModeleParDefaut, dupliquerModele, exporterModele, importerModeles,
-  listerModeles, modeleParDefaut, ouvrirDossierModeles, peutOuvrirDossier, supprimerModele,
+  ModeleInfo, chargerModele, cheminDossierModeles, definirModeleParDefaut, definirVersionPersonnelle, dupliquerModele, exporterModele,
+  importerModeles, listerModeles, modeleParDefaut, modelesRemplaces, oublierVersionsDe, ouvrirDossierModeles, peutOuvrirDossier, supprimerModele,
 } from '../store';
 import { rendreEtat } from '../engine/render';
 import { PX_PAR_MM } from '../engine/measure';
@@ -23,7 +23,8 @@ function ModelesPageInterne() {
   const toast = useToast();
   const [liste, setListe] = useState<ModeleInfo[] | null>(null);
   const [filtre, setFiltre] = useState('tous');
-  const [edition, setEdition] = useState<{ def: ReportDef; fichier?: string } | null>(null);
+  // refLivre : modèle livré personnalisé (son enregistrement en devient la version personnelle)
+  const [edition, setEdition] = useState<{ def: ReportDef; fichier?: string; refLivre?: string } | null>(null);
   const [apercu, setApercu] = useState<ReportDef | null>(null);
   const [aSupprimer, setASupprimer] = useState<ModeleInfo | null>(null);
   const [dossier, setDossier] = useState('');
@@ -35,9 +36,14 @@ function ModelesPageInterne() {
 
   const types = useMemo(() => [{ code: 'tous', label: 'Tous', count: liste?.length }, ...listerTypes().map((k) => ({ code: k.id, label: k.label.split(' (')[0], count: liste?.filter((m) => m.kind === k.id).length }))], [liste]);
   const visibles = (liste ?? []).filter((m) => filtre === 'tous' || m.kind === filtre);
+  // Versions personnelles : « remplace « Facture A4 — Moderne » à l'impression »
+  const remplaces = useMemo(() => {
+    const noms = new Map((liste ?? []).map((m) => [m.ref, m.name]));
+    return Object.fromEntries(Object.entries(modelesRemplaces()).map(([perso, livres]) => [perso, livres.map((l) => noms.get(l)).filter(Boolean).join(', ')]));
+  }, [liste]);
 
   async function ouvrir(m: ModeleInfo) {
-    try { setEdition({ def: await chargerModele(m.ref), fichier: m.source === 'fichier' ? m.file : undefined }); } catch (e) { toast.error((e as Error).message); }
+    try { setEdition({ def: await chargerModele(m.ref), fichier: m.source === 'fichier' ? m.file : undefined, refLivre: m.source === 'integre' ? m.ref : undefined }); } catch (e) { toast.error((e as Error).message); }
   }
   async function previsualiser(m: ModeleInfo) {
     try { setApercu(await chargerModele(m.ref)); } catch (e) { toast.error((e as Error).message); }
@@ -55,12 +61,18 @@ function ModelesPageInterne() {
     void recharger();
   }
   async function supprimer(m: ModeleInfo) {
-    try { await supprimerModele(m.file); if (modeleParDefaut(m.kind) === m.ref) definirModeleParDefaut(m.kind, null); toast.success('Modèle supprimé.'); void recharger(); } catch (e) { toast.error((e as Error).message); }
+    try {
+      await supprimerModele(m.file);
+      if (modeleParDefaut(m.kind) === m.ref) definirModeleParDefaut(m.kind, null);
+      oublierVersionsDe(m.ref);
+      toast.success('Modèle supprimé.'); void recharger();
+    } catch (e) { toast.error((e as Error).message); }
     setASupprimer(null);
   }
 
   if (edition) {
-    return <ReportDesigner initial={edition.def} fichier={edition.fichier} onClose={() => { setEdition(null); void recharger(); }} onSaved={() => void recharger()} />;
+    return <ReportDesigner initial={edition.def} fichier={edition.fichier} onClose={() => { setEdition(null); void recharger(); }}
+                           onSaved={(f) => { if (edition.refLivre) definirVersionPersonnelle(edition.refLivre, `fichier:${f}`); void recharger(); }} />;
   }
 
   return (
@@ -85,7 +97,7 @@ function ModelesPageInterne() {
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))' }} data-version={versionDefauts}>
           {visibles.map((m) => (
-            <Carte key={m.ref} m={m} defaut={modeleParDefaut(m.kind) === m.ref}
+            <Carte key={m.ref} m={m} defaut={modeleParDefaut(m.kind) === m.ref} remplace={remplaces[m.ref]}
                    surApercu={() => void previsualiser(m)} surModifier={() => void ouvrir(m)} surDupliquer={() => void dupliquer(m)}
                    surExporter={() => void exporter(m)} surSupprimer={() => setASupprimer(m)}
                    surDefaut={() => { definirModeleParDefaut(m.kind, modeleParDefaut(m.kind) === m.ref ? null : m.ref); setVersionDefauts((v) => v + 1); }} />
@@ -102,8 +114,10 @@ function ModelesPageInterne() {
   );
 }
 
-function Carte({ m, defaut, surApercu, surModifier, surDupliquer, surExporter, surSupprimer, surDefaut }: {
-  m: ModeleInfo; defaut: boolean; surApercu: () => void; surModifier: () => void; surDupliquer: () => void; surExporter: () => void; surSupprimer: () => void; surDefaut: () => void;
+function Carte({ m, defaut, remplace, surApercu, surModifier, surDupliquer, surExporter, surSupprimer, surDefaut }: {
+  m: ModeleInfo; defaut: boolean;
+  /** Nom du (des) modèle(s) livré(s) que ce modèle personnel remplace à l'impression. */
+  remplace?: string; surApercu: () => void; surModifier: () => void; surDupliquer: () => void; surExporter: () => void; surSupprimer: () => void; surDefaut: () => void;
 }) {
   const [mini, setMini] = useState<{ html: string; w: number; h: number } | null>(null);
   useEffect(() => {
@@ -144,6 +158,11 @@ function Carte({ m, defaut, surApercu, surModifier, surDupliquer, surExporter, s
             <Ic n="star" size={16} />
           </button>
         </div>
+        {remplace && (
+          <p className="text-[11px] font-semibold leading-snug flex items-center gap-1" style={{ color: 'var(--gcr-brand-700)' }}>
+            <Ic n="check" size={12} /> Remplace « {remplace} » à l’impression
+          </p>
+        )}
         {m.description && <p className="text-[11px] text-ink-label leading-snug line-clamp-2">{m.description}</p>}
         <div className="flex items-center gap-1 mt-auto pt-1">
           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mr-auto" style={{ background: m.source === 'integre' ? 'var(--gcr-surface-sunken)' : 'rgb(36 80 224 / .1)', color: m.source === 'integre' ? 'var(--gcr-text-muted)' : 'var(--gcr-brand-700)' }}>

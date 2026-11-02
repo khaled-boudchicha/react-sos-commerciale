@@ -115,7 +115,7 @@ export default function Ventes() {
   const vide = <span className="text-ink-muted">—</span>;
   const montantOpt = (v: unknown) => (v === null || v === undefined || v === '' ? vide : <Money value={v} />);
   const columns: Column<Vente>[] = [
-    { key: 'numero', header: 'N° pièce', field: 'numero', width: '190px', pinned: 'left',
+    { key: 'numero', header: 'N° pièce', field: 'numero', width: '158px', pinned: 'left',
       render: (v) => <span className="flex items-center gap-2"><DocBadge code={type} /><span className="money font-semibold">{v.numero}</span>
         {Number(v.grouped) > 0 && <Badge tone="neutral" title="Pièce regroupée (BL facturé / facture de regroupement)">groupée</Badge>}</span> },
     { key: 'date', header: 'Date', width: '96px', field: 'date', type: 'date', render: (v) => <span className="money">{fmtDate(v.date)}</span> },
@@ -125,17 +125,17 @@ export default function Ventes() {
     { key: 'code_cli', header: 'Code client', width: '100px', hidden: true, render: (v) => (v.code_cli ? <span className="money">{v.code_cli}</span> : vide) },
     { key: 'client', header: 'Client', field: 'raison', render: (v) => <b title={v.raison ?? undefined}>{v.raison ?? v.code_cli ?? '—'}</b> },
     { key: 'tel', header: 'Téléphone', width: '120px', hidden: true, render: (v) => (v.tel ? <span className="money">{v.tel}</span> : vide) },
-    { key: 'mode', header: 'Mode', width: '96px', field: 'mode_payement', render: (v) => <span className="text-ink-label">{v.mode_payement ?? '—'}</span> },
+    { key: 'mode', header: 'Mode', width: '88px', field: 'mode_payement', render: (v) => <span className="text-ink-label">{v.mode_payement ?? '—'}</span> },
     { key: 'ht', header: 'Total HT', align: 'right', width: '120px', hidden: true, render: (v) => montantOpt(v.total_ht) },
     { key: 'remise', header: 'Remise', align: 'right', width: '104px', hidden: true, render: (v) => montantOpt(v.remise) },
     { key: 'tva', header: 'TVA', align: 'right', width: '110px', hidden: true, render: (v) => montantOpt(v.tva ?? v.total_taxe) },
     { key: 'timbre', header: 'Timbre', align: 'right', width: '96px', hidden: true, render: (v) => montantOpt(v.timbre) },
     { key: 'ttc', header: 'Net à payer', align: 'right', width: '124px', field: 'net_a_payer', render: (v) => <Money value={v.net_a_payer ?? v.total_ttc} className="font-semibold" /> },
-    { key: 'regler', header: 'Réglé', align: 'right', width: '116px', field: 'regler', render: (v) => <Money value={v.regler} /> },
-    { key: 'reste', header: 'Reste', align: 'right', width: '116px', field: 'reste_a_payer', render: (v) => (
+    { key: 'regler', header: 'Réglé', align: 'right', width: '108px', field: 'regler', render: (v) => <Money value={v.regler} /> },
+    { key: 'reste', header: 'Reste', align: 'right', width: '108px', field: 'reste_a_payer', render: (v) => (
       <span className="money font-medium" style={{ color: Number(v.reste_a_payer) > 0 ? 'var(--danger-text)' : undefined }}>{fmtMoney(v.reste_a_payer)}</span>
     ) },
-    { key: 'statut', header: 'Statut', width: '92px', render: (v) => isAvoir ? null : <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} /> },
+    { key: 'statut', header: 'Statut', width: '104px', render: (v) => isAvoir ? null : <PayStatus regler={Number(v.regler)} reste={Number(v.reste_a_payer)} /> },
     { key: 'observation', header: 'Observation', width: '220px', hidden: true,
       render: (v) => (v.observation ? <span className="text-ink-label" title={v.observation}>{v.observation}</span> : vide) },
   ];
