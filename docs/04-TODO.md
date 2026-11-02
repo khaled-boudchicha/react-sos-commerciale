@@ -209,3 +209,17 @@ Reste à faire : déploiement (cf. guide), commit + publication du mobile, activ
 - ☑ **Portables 1280 × 720** : barre de caisse du comptoir compacte sous 1440 px (« T1…T5 », libellés courts, rien ne
   passe à la ligne ; noms accessibles complets) ; colonnes par défaut des listes Ventes / Achats ajustées (plus de colonne
   « Statut » coupée). Audit des 18 écrans principaux en 1280 × 720 : aucun débordement horizontal. Test d'interface ajouté.
+
+## Designer : saisies protégées (02/11/2026)
+- ☑ Deuxième passe d'audit (éditeur d'expressions, arbre des données, aperçu, panneau des propriétés) :
+  - **valeur perdue** : une propriété tapée sans Entrée (X, largeur, contenu…) était perdue si l'on cliquait sur un
+    autre objet — la sélection changeait avant la validation. Le champ est désormais validé avant tout clic ailleurs ;
+  - **expression invalide enregistrée** : Ctrl+Entrée validait l'éditeur d'expression malgré une erreur de syntaxe
+    (le bouton « Valider » était pourtant grisé) — l'erreur s'imprimait ensuite (« # ») ; un clic à côté de la fenêtre
+    ne jette plus une expression modifiée ; le résultat est calculé sur les vraies données de la pièce quand le designer
+    est ouvert depuis une impression ;
+  - **insertion par double-clic** d'un champ de l'arbre : sous les objets de la bande (qui s'agrandit), plus par-dessus ;
+    objet nommé d'après le libellé du champ (« Fax » et non « fax »).
+  - Vérifié sans défaut : glisser-déposer de champs, recherche dans l'arbre, aperçu (zoom jusqu'à 400 %, défilement).
+  - Tests d'interface : 55 (dont 4 sur le designer).
+

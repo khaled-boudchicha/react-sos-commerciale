@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, RefObject, useEffect, useRef, useState } from 'react';
 import { Ic, NomIc } from '../icons';
 
 const ENTREE = 'h-7 w-full rounded border border-line bg-surface text-ink text-[12px] px-2 focus:outline-none focus:border-[var(--gcr-brand-700)]';
@@ -28,15 +28,33 @@ export function Ligne({ label, children, large }: { label?: string; children: Re
   );
 }
 
+/**
+ * Valide la saisie en cours AVANT qu'un clic ailleurs (autre objet du plan de travail, autre bande…) ne change la
+ * sélection : sans cela, la valeur tapée sans Entrée était perdue (le champ se recalait sur le nouvel objet).
+ * Le clic est intercepté en phase de capture sur la fenêtre, avant tout gestionnaire de l'interface.
+ */
+function useValiderAvantClicExterieur(ref: RefObject<HTMLElement>) {
+  useEffect(() => {
+    const avant = (e: PointerEvent) => {
+      const el = ref.current;
+      if (el && document.activeElement === el && !el.contains(e.target as Node)) el.blur();
+    };
+    window.addEventListener('pointerdown', avant, true);
+    return () => window.removeEventListener('pointerdown', avant, true);
+  }, [ref]);
+}
+
 /** Texte validé à la sortie du champ ou sur Entrée (une seule entrée d'historique). */
 export function Texte({ value, onChange, placeholder, mono, multiligne, lignes = 3, disabled }: {
   value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean; multiligne?: boolean; lignes?: number; disabled?: boolean;
 }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
+  const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  useValiderAvantClicExterieur(ref);
   const valider = () => { if (v !== value) onChange(v); };
   const commun = {
-    value: v, placeholder, disabled, spellCheck: false as const,
+    ref, value: v, placeholder, disabled, spellCheck: false as const,
     onChange: (e: React.ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => setV(e.target.value),
     onBlur: valider,
     className: `${ENTREE} ${mono ? 'font-mono text-[11.5px]' : ''} ${multiligne ? 'h-auto py-1.5 resize-y' : ''}`,
@@ -52,6 +70,8 @@ export function Nombre({ value, onChange, min, max, step = 0.5, unite, decimales
   const fmt = (n: number | undefined) => (mixte || n === undefined || Number.isNaN(n) ? '' : String(Math.round(n * 10 ** decimales) / 10 ** decimales));
   const [v, setV] = useState(fmt(value));
   useEffect(() => setV(fmt(value)), [value, mixte]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ref = useRef<HTMLInputElement>(null);
+  useValiderAvantClicExterieur(ref);
   const valider = (brut: string) => {
     const n = parseFloat(brut.replace(',', '.'));
     if (!Number.isFinite(n)) { setV(fmt(value)); return; }
@@ -61,7 +81,7 @@ export function Nombre({ value, onChange, min, max, step = 0.5, unite, decimales
   };
   return (
     <div className="relative">
-      <input type="text" inputMode="decimal" value={v} disabled={disabled} placeholder={mixte ? '—' : undefined}
+      <input ref={ref} type="text" inputMode="decimal" value={v} disabled={disabled} placeholder={mixte ? '—' : undefined}
              onChange={(e) => setV(e.target.value)} onBlur={(e) => valider(e.target.value)}
              onKeyDown={(e) => {
                if (e.key === 'Enter') { valider((e.target as HTMLInputElement).value); (e.target as HTMLElement).blur(); }

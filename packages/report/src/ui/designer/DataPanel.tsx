@@ -65,7 +65,7 @@ export default function DataPanel({ def, onInserer, compact }: { def: ReportDef;
                     <span className="ml-auto text-[10px] font-semibold text-ink-muted">{ds.mode === 'list' ? 'liste' : 'unique'}</span>
                   </button>
                   {ouvert && champs.map((f) => {
-                    const c: ChampDepose = { texte: `[${ds.name}.${f.name}]`, type: f.type, nom: f.name };
+                    const c: ChampDepose = { texte: `[${ds.name}.${f.name}]`, type: f.type, nom: f.label || f.name };
                     return (
                       <div key={f.name} draggable onDragStart={(e) => glisser(e, c)} onDoubleClick={() => onInserer(c)}
                            title={`${ds.name}.${f.name} — glisser sur une bande, ou double-clic`}
