@@ -162,6 +162,9 @@ sélecteur de modèle (`ImpressionModele`) et `ReportPreview` accepte un contenu
 - **Fidélité** : mêmes polices qu'à l'impression (`familleCss`) ; en mode « valeurs d'exemple », les objets et bandes
   dont la condition « Imprimer si » est fausse sont estompés (info-bulle avec la condition).
 - Barre d'état : position du pointeur, puis position et taille de la sélection ; la règle repère la sélection.
+- Saisies protégées : une propriété en cours de saisie est validée avant qu'un clic ailleurs ne change la sélection ;
+  l'éditeur d'expression ne valide jamais une expression invalide (bouton ni Ctrl+Entrée) et ne se ferme pas sur un
+  clic à côté quand l'expression a été modifiée.
 - Le designer est une fenêtre modale (`role="dialog"`, `aria-modal="true"`) : l'application hôte peut s'en servir pour
   suspendre ses propres raccourcis pendant l'édition.
 

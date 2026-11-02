@@ -296,6 +296,32 @@ describe('designer d’états', () => {
     await page.context().close();
   });
 
+  test('saisies protégées : propriété validée au clic ailleurs, expression invalide jamais enregistrée', async () => {
+    const page = await ouvrirDesigner();
+    const proprietes = page.locator('aside[aria-label="Propriétés"]');
+    const facture = await page.getByText('FACTURE', { exact: true }).first().boundingBox();
+    await page.mouse.click(facture.x + 30, facture.y + 10);
+    // X tapé sans Entrée, puis clic sur un autre objet : la valeur est appliquée au premier objet
+    await proprietes.locator('input').first().fill('50');
+    const client = await page.getByText('LABORATOIRE EL AMEL', { exact: true }).first().boundingBox();
+    await page.mouse.click(client.x + 20, client.y + 5);
+    await page.keyboard.press('Control+z');            // la modification est bien une entrée d'historique…
+    await page.keyboard.press('Control+y');            // …rétablie
+    await page.mouse.click(facture.x + 30, facture.y + 10);
+    assert.equal(await proprietes.locator('input').first().inputValue(), '50');
+
+    // Éditeur d'expression : Ctrl+Entrée ne valide pas une expression invalide
+    await proprietes.locator('button:has-text("Éditeur d’expression…")').click();
+    const editeur = page.locator('[role="dialog"][aria-label="Contenu du texte"]');
+    await editeur.locator('textarea[aria-label="Expression"]').fill('[SUM(Lignes.total_ht]');
+    await page.keyboard.press('Control+Enter');
+    assert.equal(await editeur.count(), 1, 'éditeur fermé sur une expression invalide');
+    await page.keyboard.press('Escape');
+    assert.equal(await proprietes.locator('textarea').first().inputValue(), '[UPPER(Vente.titre)]');
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+
   test('nouveau modèle : squelette standard prêt à imprimer', async () => {
     const page = await ouvrir(navigateur, { route: '/modeles', viewport: { width: 1440, height: 900 }, gql: serveur() });
     await page.click('button:has-text("Nouveau modèle")');
@@ -304,6 +330,11 @@ describe('designer d’états', () => {
     await dialogue.locator('button:has-text("Créer")').click();
     await page.locator('[aria-label="Designer d’états"]').waitFor();
     assert.equal(await page.locator('main [data-bande]').count(), 5);
+    // Double-clic sur un champ de l'arbre : inséré dans la bande courante (« Données », cellules de 6 mm) SOUS ses
+    // objets, sans chevauchement — la bande s'agrandit
+    await page.locator('[aria-label="Outils et données"] >> text=Fax').first().dblclick();
+    const geo = (await page.locator('[aria-label="Position et taille de la sélection"]').innerText()).match(/Y ([\d,]+)/);
+    assert.ok(Number(geo[1].replace(',', '.')) >= 6, `champ inséré par-dessus les cellules (Y ${geo[1]})`);
     await page.keyboard.press('F5');
     const apercu = page.locator('[role="dialog"][aria-label^="Aperçu"]');
     await apercu.waitFor({ timeout: 8000 });

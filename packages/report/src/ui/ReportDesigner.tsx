@@ -134,10 +134,22 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
     D.selectBande(b.id);
   }, [def, kind, D, bandeCourante]);
 
-  const insererChamp = useCallback((c: ChampDepose, bandeId?: string, x = 2, y = 0.5) => {
+  const insererChamp = useCallback((c: ChampDepose, bandeId?: string, xDepot?: number, yDepot?: number) => {
     const id = bandeId ?? bandeCourante();
-    const bande = def.bands.find((b) => b.id === id);
+    let bande = def.bands.find((b) => b.id === id);
     if (!bande) { toast.info('Ajoutez d’abord une bande (menu « Bandes »).'); return; }
+    // Insertion sans position (double-clic dans l'arbre) : sous le dernier objet de la bande, jamais par-dessus ;
+    // la bande s'agrandit au besoin
+    let base = def;
+    let x = xDepot ?? 2, y = yDepot ?? 0.5;
+    if (xDepot === undefined) {
+      const hauteur = c.type === 'image' ? 20 : 5.5;
+      y = bande.objects.length ? Math.round((Math.max(...bande.objects.map((o) => o.y + o.h)) + 0.5) * 10) / 10 : 0.5;
+      if (y + hauteur > bande.height) {
+        base = { ...def, bands: def.bands.map((b) => (b.id === bande!.id ? { ...b, height: Math.ceil((y + hauteur + 0.5) * 2) / 2 } : b)) };
+        bande = base.bands.find((b) => b.id === id)!;
+      }
+    }
     const numerique = c.type === 'number';
     const nom = c.nom;
     let o: ObjDef;
@@ -147,7 +159,7 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
       align: numerique ? 'right' : 'left', ...(numerique ? { format: { kind: 'number', pattern: '#,##0.00' } } : {}),
     });
     o.x = Math.min(Math.max(0, x), Math.max(0, largeur - o.w));
-    D.set(ajouterObjet(def, bande.id, o), [o.id]);
+    D.set(ajouterObjet(base, bande.id, o), [o.id]);
   }, [bandeCourante, def, largeur, D, toast]);
 
   const supprimer = useCallback(() => { if (D.sel.length) D.set(supprimerObjets(def, D.sel), []); }, [D, def]);
@@ -443,7 +455,7 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
         </MenuContextuel>
       )}
       {apercu && <ReportPreview def={def} data={donneesApercu ?? kind.sample} titre={`${def.name} — aperçu`} onClose={() => setApercu(false)} />}
-      {expression && <ExprEditor def={def} titre={expression.titre} valeur={expression.valeur} multiple={expression.multiple} surValider={expression.surValider} surFermer={() => setExpression(null)} />}
+      {expression && <ExprEditor def={def} titre={expression.titre} valeur={expression.valeur} multiple={expression.multiple} donnees={donneesApercu} surValider={expression.surValider} surFermer={() => setExpression(null)} />}
 
       {dialogue === 'nouveau' && (
         <NouveauModeleDialog kindInitial={def.kind} surFermer={() => setDialogue(null)} surCreer={(d) => { D.charger(d, true); setFichier(undefined); setDialogue(null); }} />
