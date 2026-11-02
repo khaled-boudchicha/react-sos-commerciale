@@ -194,6 +194,30 @@ describe('comptoir', () => {
   });
 });
 
+describe('mise en page sur un portable (1280 × 720)', () => {
+  test('barre de caisse sur une ligne, colonnes des ventes visibles sans défilement', async () => {
+    const page = await ouvrir(navigateur, { route: '/comptoir', viewport: { width: 1280, height: 720 }, gql: serveur() });
+    const barre = await page.evaluate(() => {
+      const h = document.querySelector('header');
+      const elements = [...h.querySelectorAll('button, a, [role="status"]')].filter((e) => e.getClientRects().length);
+      return { hauteur: h.getBoundingClientRect().height, debordement: h.scrollWidth - h.clientWidth, multilignes: elements.filter((e) => e.getBoundingClientRect().height > 40).map((e) => e.textContent) };
+    });
+    assert.equal(barre.hauteur, 60);
+    assert.ok(barre.debordement <= 0, `barre de caisse : ${barre.debordement} px de trop`);
+    assert.deepEqual(barre.multilignes, []);
+    assert.equal(await page.getByRole('button', { name: /^Ticket 1/ }).count(), 1); // nom accessible complet
+    await page.context().close();
+
+    const ventes = await ouvrir(navigateur, { route: '/ventes?type=FA', viewport: { width: 1280, height: 720 }, gql: serveur({
+      Ventes: { ventes: { data: [{ id: 1, numero: '1008/2026', type_doc: 'FA', date: '2026-11-01', raison: 'LABORATOIRE EL AMEL', net_a_payer: 1234567.5, regler: 0, reste_a_payer: 1234567.5, mode_payement: 'Chèque' }], total: 1 } },
+    }) });
+    await ventes.locator('th:has-text("Statut")').waitFor({ timeout: 8000 });
+    const t = await ventes.evaluate(() => { const t = document.querySelector('table'); return t.scrollWidth - t.parentElement.clientWidth; });
+    assert.ok(t <= 0, `liste des ventes : ${t} px masqués à droite`);
+    await ventes.context().close();
+  });
+});
+
 describe('impression', () => {
   test('aperçu chargé à la demande : état du stock rendu avec ses lignes, puis fermé', async () => {
     const page = await ouvrir(navigateur, { route: '/stock', gql: serveur({ Articles: { articles: { data: ARTICLES, total: 2 } } }) });

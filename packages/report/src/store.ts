@@ -25,6 +25,7 @@ export type ModeleInfo = {
 
 const cleFichiers = () => `${configReport().espaceNoms}.fichiers`;
 const cleDefaut = () => `${configReport().espaceNoms}.defaut`;
+const cleVersions = () => `${configReport().espaceNoms}.versions`;
 
 /** Stockage fourni par l'hôte, sinon null (repli localStorage). */
 const api = (): StockageModeles | null => configReport().stockage ?? null;
@@ -161,4 +162,46 @@ export function definirModeleParDefaut(kind: string, ref: string | null): void {
   const d = lireDefauts();
   if (ref) d[kind] = ref; else delete d[kind];
   try { localStorage.setItem(cleDefaut(), JSON.stringify(d)); } catch { /* ignoré */ }
+}
+
+// ─── Version personnelle d'un modèle livré ──────────────────────────────────
+//
+// « Personnaliser » un modèle livré crée un fichier ; ce fichier devient sa VERSION PERSONNELLE : partout où le
+// modèle livré était utilisé (modèle imposé par un écran, ticket de caisse, défaut d'une pièce…), c'est la version
+// personnelle qui sert. Le choix reste précis (un ticket personnalisé ne remplace que le ticket, jamais la facture).
+
+type Versions = Record<string, { ref: string; date: number }>;
+function lireVersions(): Versions {
+  try { return JSON.parse(localStorage.getItem(cleVersions()) || '{}') as Versions; } catch { return {}; }
+}
+/** Enregistre (ou retire avec `null`) la version personnelle d'un modèle livré (`integre:<id>`). */
+export function definirVersionPersonnelle(refLivre: string, refPerso: string | null, maintenant = Date.now()): void {
+  const v = lireVersions();
+  if (refPerso) v[refLivre] = { ref: refPerso, date: maintenant }; else delete v[refLivre];
+  try { localStorage.setItem(cleVersions(), JSON.stringify(v)); } catch { /* ignoré */ }
+}
+/** Modèles livrés remplacés par chacune de leurs versions personnelles : `{ 'fichier:x.gcr': ['integre:…'] }`. */
+export function modelesRemplaces(): Record<string, string[]> {
+  const r: Record<string, string[]> = {};
+  for (const [livre, v] of Object.entries(lireVersions())) (r[v.ref] ??= []).push(livre);
+  return r;
+}
+/** Version personnelle d'un modèle livré (référence et date), ou null. */
+export function versionPersonnelle(refLivre: string): { ref: string; date: number } | null {
+  return lireVersions()[refLivre] ?? null;
+}
+/**
+ * Modèle à utiliser pour une référence : sa version personnelle si elle existe encore parmi `disponibles`
+ * (un fichier supprimé est ignoré), sinon la référence elle-même.
+ */
+export function resoudreVersion(ref: string, disponibles: { ref: string }[]): string {
+  const v = ref.startsWith('integre:') ? versionPersonnelle(ref) : null;
+  return v && disponibles.some((m) => m.ref === v.ref) ? v.ref : ref;
+}
+/** Oublie les versions personnelles qui pointent vers un fichier (supprimé, renommé). */
+export function oublierVersionsDe(refPerso: string): void {
+  const v = lireVersions();
+  let change = false;
+  for (const k of Object.keys(v)) if (v[k].ref === refPerso) { delete v[k]; change = true; }
+  if (change) try { localStorage.setItem(cleVersions(), JSON.stringify(v)); } catch { /* ignoré */ }
 }

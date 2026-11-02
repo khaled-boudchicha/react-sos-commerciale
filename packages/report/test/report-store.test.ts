@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { configurerReport } from '../src/config';
 import {
   chargerModele, definirModeleParDefaut, dupliquerModele, enregistrerModele, importerModeles,
-  listerModeles, modeleParDefaut, nomFichier, supprimerModele,
+  definirVersionPersonnelle, listerModeles, modeleParDefaut, modelesRemplaces, nomFichier, oublierVersionsDe, resoudreVersion,
+  supprimerModele, versionPersonnelle,
 } from '../src/store';
 import { creerEtat } from '../src/model';
 import { installerExemples } from '../src/exemples';
@@ -99,5 +100,21 @@ describe('espace de noms du stockage navigateur', () => {
     expect(localStorage.getItem('monapp.etats.defaut')).toContain('Namespace.gcr');
     expect(localStorage.getItem('gcr.modeles.fichiers')).toBeNull();
     configurerReport({ espaceNoms: 'gcr.modeles' });
+  });
+
+  it('version personnelle d’un modèle livré : remplace l’original tant que le fichier existe', async () => {
+    const livre = 'integre:exemple-facture-a4';
+    expect(resoudreVersion(livre, await listerModeles())).toBe(livre);
+    const f = await dupliquerModele(livre, 'Ma facture');
+    definirVersionPersonnelle(livre, `fichier:${f}`, 1000);
+    expect(versionPersonnelle(livre)).toEqual({ ref: `fichier:${f}`, date: 1000 });
+    expect(resoudreVersion(livre, await listerModeles())).toBe(`fichier:${f}`);
+    expect(resoudreVersion('integre:autre', await listerModeles())).toBe('integre:autre');  // les autres modèles ne bougent pas
+    expect(modelesRemplaces()).toEqual({ [`fichier:${f}`]: [livre] });
+    // fichier supprimé : l'original revient, et la version est oubliée
+    await supprimerModele(f);
+    expect(resoudreVersion(livre, await listerModeles())).toBe(livre);
+    oublierVersionsDe(`fichier:${f}`);
+    expect(versionPersonnelle(livre)).toBeNull();
   });
 });

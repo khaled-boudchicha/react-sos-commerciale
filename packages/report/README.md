@@ -153,7 +153,9 @@ sélecteur de modèle (`ImpressionModele`) et `ReportPreview` accepte un contenu
   *page vierge*, ou copie d'un modèle livré. Le modèle standard est valide d'emblée (aucune erreur de vérification).
 - **Enregistrer** un modèle jamais enregistré (modèle livré personnalisé, nouveau modèle) demande d'abord son nom ; un
   modèle livré personnalisé est proposé sous « <nom> (personnalisé) » — les modèles livrés ne sont jamais modifiés.
-  Depuis `ImpressionModele`, la version personnalisée devient le modèle par défaut de son type.
+  Ce fichier devient la **version personnelle** du modèle livré (`definirVersionPersonnelle`, `resoudreVersion`) :
+  partout où le modèle livré servait (modèle imposé par un écran, défaut d'une pièce), c'est lui qui sert, tant que le
+  fichier existe — un ticket personnalisé remplace le ticket, jamais la facture. La bibliothèque l'indique sur la carte.
 - **Clic droit** sur un objet (modifier le contenu, couper, copier, coller, dupliquer, premier / arrière-plan,
   verrouiller, supprimer) ou sur une bande (coller dans la bande, tout sélectionner, monter / descendre, dupliquer,
   supprimer) ; `Suppr` sur une bande sélectionnée la supprime (message « Ctrl+Z pour annuler »).

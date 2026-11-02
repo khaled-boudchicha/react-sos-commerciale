@@ -7,12 +7,14 @@ import { cn } from '../ui/cn';
 import { PrintDocument } from '../../print/engine/types';
 import { getCachet } from '../../print/engine/cachet';
 import { buildVenteModelePrint, modelesPour, ModeleVenteId, Societe } from '../../print/templates';
-import { type ModeleInfo, listerModeles, modeleParDefaut } from '@softly/report/core';
+import { type ModeleInfo, listerModeles, modeleParDefaut, versionPersonnelle } from '@softly/report/core';
 
 /** Modèle professionnel proposé par défaut selon le type de pièce (premier modèle livré sinon). */
 const PRO_PAR_TYPE: Record<string, string> = { BL: 'integre-bl-a4', BCT: 'integre-bon-comptoir-a5' };
 const proDefaut = (code: string) => `perso:integre:${PRO_PAR_TYPE[code] ?? 'integre-facture-a4'}`;
 const cleModele = (code: string) => `gc.impression.modele.${code}`;
+/** Date du dernier choix (une personnalisation plus récente du modèle livré choisi l'emporte). */
+const cleDateChoix = (code: string) => `gc.impression.modele.${code}.date`;
 
 /**
  * Choix du modèle d'impression d'une pièce de vente (équivalent du sélecteur de modèles
@@ -29,12 +31,25 @@ export default function ImprimerPieceDialog({ vente, code, societe, onApercu, on
   onClose: () => void;
 }) {
   const [perso, setPerso] = useState<ModeleInfo[]>([]);
-  useEffect(() => { void listerModeles('vente').then(setPerso).catch(() => setPerso([])); }, []);
+  useEffect(() => {
+    void listerModeles('vente').then((liste) => {
+      setPerso(liste);
+      // Modèle personnel mémorisé puis supprimé : retour au modèle proposé par défaut
+      setChoix((c) => (c.startsWith('perso:fichier:') && !liste.some((m) => `perso:${m.ref}` === c) ? proDefaut(code) : c));
+    }).catch(() => setPerso([]));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const modeles = modelesPour(code);
   const [choix, setChoix] = useState<string>(() => {
     try {
       const m = localStorage.getItem(cleModele(code));
-      if (m && m !== 'generique' && (m.startsWith('perso:') || modeles.some((x) => x.id === m))) return m;
+      const base = m && m !== 'generique' && (m.startsWith('perso:') || modeles.some((x) => x.id === m)) ? m : proDefaut(code);
+      // Modèle livré personnalisé depuis le dernier choix : sa version personnelle le remplace ; un choix fait
+      // ensuite en connaissance de cause (même le modèle livré) est respecté.
+      if (base.startsWith('perso:integre:')) {
+        const v = versionPersonnelle(base.slice('perso:'.length));
+        if (v && v.date > Number(localStorage.getItem(cleDateChoix(code)) ?? 0)) return `perso:${v.ref}`;
+      }
+      return base;
     } catch { /* stockage indisponible */ }
     return proDefaut(code);
   });
@@ -43,7 +58,10 @@ export default function ImprimerPieceDialog({ vente, code, societe, onApercu, on
   useEffect(() => { void getCachet().then(setCachet); }, []);
 
   function apercu() {
-    try { localStorage.setItem(cleModele(code), choix); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(cleModele(code), choix);
+      localStorage.setItem(cleDateChoix(code), String(Date.now()));
+    } catch { /* ignore */ }
     if (choix.startsWith('perso:')) { onModele?.(choix.slice('perso:'.length)); return; }
     onApercu(buildVenteModelePrint(vente, societe, choix as ModeleVenteId, { cachet: avecCachet ? cachet : null }));
   }

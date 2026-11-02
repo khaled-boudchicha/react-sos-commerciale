@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReportData, ReportDef } from '../model';
-import { ModeleInfo, chargerModele, definirModeleParDefaut, listerModeles } from '../store';
+import { ModeleInfo, chargerModele, definirModeleParDefaut, definirVersionPersonnelle, listerModeles } from '../store';
 import { useToast } from './toast';
 import ReportPreview from './ReportPreview';
 import ReportDesigner from './ReportDesigner';
@@ -37,9 +37,9 @@ function ImpressionModeleInterne({ modeleRef, data, titre, onClose }: {
     return (
       <ReportDesigner initial={def} fichier={ref.startsWith('fichier:') ? ref.slice('fichier:'.length) : undefined} donneesApercu={data}
                       onSaved={(f) => {
-                        // Modèle livré personnalisé depuis l'impression : la version personnalisée sert désormais pour ce type
+                        // Modèle livré personnalisé depuis l'impression : sa version personnelle le remplace désormais
                         const nouveau = `fichier:${f}`;
-                        if (!ref.startsWith('fichier:')) definirModeleParDefaut(def.kind, nouveau);
+                        if (ref.startsWith('integre:')) definirVersionPersonnelle(ref, nouveau);
                         setRef(nouveau);
                       }}
                       onClose={() => { setEdition(false); setDef(null); /* recharge le modèle enregistré */ void chargerModele(ref).then(setDef).catch(() => onClose()); }} />

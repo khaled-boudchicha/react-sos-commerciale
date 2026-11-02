@@ -328,9 +328,9 @@ export default function Comptoir() {
 
   return (
     <div className="h-full flex flex-col bg-bg">
-      {/* ░░ Barre de caisse (60 px) ░░ */}
-      <header className="h-[60px] flex-none flex items-center gap-5 px-5 bg-surface border-b border-line-soft">
-        <div className="flex items-center gap-2.5">
+      {/* ░░ Barre de caisse (60 px) ░░ — compacte sous 1440 px (portables 1280 / 1366) : libellés courts, rien ne passe à la ligne */}
+      <header className="h-[60px] flex-none flex items-center gap-3 min-[1440px]:gap-5 px-4 min-[1440px]:px-5 bg-surface border-b border-line-soft whitespace-nowrap">
+        <div className="flex items-center gap-2.5 flex-none">
           <div className="w-[34px] h-[34px] rounded-md bg-brand-700 text-white font-extrabold text-base leading-[1.45] flex items-center justify-center">GC</div>
           <div className="flex flex-col">
             <span className="font-extrabold text-[15px] leading-[1.1]">Vente au comptoir</span>
@@ -338,42 +338,43 @@ export default function Comptoir() {
           </div>
         </div>
 
-        <nav aria-label="Tickets en attente" className="flex gap-1.5 ml-3">
+        <nav aria-label="Tickets en attente" className="flex gap-1.5 ml-1 min-[1440px]:ml-3 flex-none">
           {tickets.map((t, i) => {
             const sel = i === actif;
             const n = t.lignes.length;
             const plein = sel ? (t.retour ? 'var(--pos-return)' : 'var(--brand-700)') : undefined;
             return (
-              <button key={i} type="button" onClick={() => setActif(i)} aria-current={sel ? 'true' : undefined} title={`Ctrl+${i + 1}`}
-                      className={`h-[38px] px-3 rounded-md text-[12.5px] flex items-center gap-2 ${sel ? 'text-white font-bold' : n > 0 ? 'bg-surface border border-line text-ink-label font-bold' : 'bg-transparent border border-dashed border-line font-semibold text-ink-muted'}`}
+              <button key={i} type="button" onClick={() => setActif(i)} aria-current={sel ? 'true' : undefined} title={`Ticket ${i + 1} — Ctrl+${i + 1}`}
+                      aria-label={`Ticket ${i + 1}${n > 0 ? ` (${n} ligne${n > 1 ? 's' : ''})` : ''}${t.retour ? ', retour' : ''}`}
+                      className={`h-[38px] px-2.5 min-[1440px]:px-3 rounded-md text-[12.5px] flex items-center gap-2 ${sel ? 'text-white font-bold' : n > 0 ? 'bg-surface border border-line text-ink-label font-bold' : 'bg-transparent border border-dashed border-line font-semibold text-ink-muted'}`}
                       style={sel ? { background: plein, border: `1px solid ${plein}` } : undefined}>
                 {t.retour && <Icon name="retour" size={14} strokeWidth={2.2} />}
-                Ticket {i + 1}
+                <span aria-hidden><span className="min-[1440px]:hidden">T</span><span className="hidden min-[1440px]:inline">Ticket </span>{i + 1}</span>
                 {n > 0 && (
                   <span className={`money text-xs leading-[1.45] px-1.5 py-px rounded-md ${sel ? 'bg-white/[.22]' : 'bg-brand-50 text-brand-text'}`}>{n}</span>
                 )}
               </button>
             );
           })}
-          <span className="self-center text-xs leading-[1.45] font-semibold ml-1 text-ink-muted">Ctrl + 1…5</span>
+          <span className="hidden min-[1440px]:inline self-center text-xs leading-[1.45] font-semibold ml-1 text-ink-muted">Ctrl + 1…5</span>
         </nav>
 
-        <div className="ml-auto flex items-center gap-4 text-sm leading-[1.45] font-semibold text-ink-label">
+        <div className="ml-auto flex items-center gap-3 min-[1440px]:gap-4 text-sm leading-[1.45] font-semibold text-ink-label min-w-0">
           <span className="flex items-center gap-[7px]">
             <span className={`w-2 h-2 rounded-full ${enLigne ? 'bg-success-solid' : 'bg-danger-solid'}`} />
-            <span role="status" title={connexion.detail}>{enLigne ? 'Agent connecté' : connexion.libelle}</span>
+            <span role="status" title={connexion.detail} className={enLigne ? 'sr-only min-[1440px]:not-sr-only' : undefined}>{enLigne ? 'Agent connecté' : connexion.libelle}</span>
           </span>
           <button type="button" onClick={() => setOptions({ ticketAuto: !options.ticketAuto })} aria-pressed={options.ticketAuto}
-                  title="Impression automatique du ticket après l’encaissement (F2)"
+                  title="Impression automatique du ticket après l’encaissement (F2)" aria-label="Ticket automatique"
                   className={`flex items-center gap-[7px] ${options.ticketAuto ? '' : 'text-ink-muted line-through'}`}>
-            <Icon name="imprimante" size={16} />Ticket auto
+            <Icon name="imprimante" size={16} />Ticket<span className="hidden min-[1440px]:inline">&nbsp;auto</span>
           </button>
           <span className="flex items-center gap-[7px] px-2.5 py-[5px] rounded-md bg-bg border border-line-soft">
-            <Icon name="utilisateur" size={16} />Caissier : <b className="text-ink">{caissier}</b>
+            <Icon name="utilisateur" size={16} /><span className="sr-only min-[1440px]:not-sr-only">Caissier :</span> <b className="text-ink">{caissier}</b>
           </span>
           <span className="money text-md leading-[1.45] font-bold text-ink">{heure}</span>
-          <Link to="/ventes" className="h-9 px-3.5 rounded-md border border-line text-brand-text font-bold flex items-center hover:border-brand-300">
-            Quitter la caisse
+          <Link to="/ventes" title="Quitter la caisse" className="h-9 px-3.5 rounded-md border border-line text-brand-text font-bold flex items-center hover:border-brand-300">
+            Quitter<span className="hidden min-[1440px]:inline">&nbsp;la caisse</span>
           </Link>
         </div>
       </header>

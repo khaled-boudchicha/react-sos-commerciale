@@ -56,8 +56,10 @@ Le kit `impression/kit.ts` fournit les briques communes (en-tête société, cad
 - **Nouveau modèle** : choix du type de document puis du point de départ — modèle standard (en-tête société, tableau,
   total, pied de page numéroté, prêt à imprimer), page vierge ou copie d'un modèle livré.
 - **Personnaliser** un modèle livré ouvre une copie : à l'enregistrement, son nom est demandé (« … (personnalisé) »
-  proposé) et elle rejoint « Mes modèles ». Personnalisé depuis l'aperçu d'impression, il devient le modèle par défaut
-  de son type.
+  proposé) et elle rejoint « Mes modèles ». Elle devient la **version personnelle** du modèle livré : partout où
+  celui-ci servait (ticket de caisse du poste, modèle d'une pièce dans « Imprimer la pièce », variantes du journal…),
+  c'est elle qui sert, tant que le fichier existe. Un ticket personnalisé ne remplace que le ticket. La carte de la
+  bibliothèque indique « Remplace « … » à l'impression » ; supprimer le fichier rétablit le modèle livré.
 - **Designer** : objets au millimètre, bandes, champs glissés depuis l'arbre de données, éditeur d'expressions,
   menu du clic droit, annuler / rétablir, vérification du modèle, aperçu immédiat (F5) ; mêmes polices qu'à
   l'impression ; objets dont la condition d'impression est fausse estompés avec les données d'exemple. Pendant

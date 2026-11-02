@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { listerModeles, modeleParDefaut } from '@softly/report/core';
+import { listerModeles } from '@softly/report/core';
+import { choisirModele } from './choixModele';
 import ImpressionModele from './ImpressionModeleDiffere';
 import type { DemandeImpression } from './demandes';
 
 /**
  * Imprime un document avec le moteur d'états. Modèle retenu : celui imposé par la demande (variantes : journal des
- * ventes / achats…), sinon le modèle par défaut de l'utilisateur pour ce type de document, sinon le premier modèle livré.
+ * ventes / achats…), sinon le modèle par défaut de l'utilisateur pour ce type de document, sinon le premier modèle livré ;
+ * un modèle livré personnalisé est remplacé par sa version personnelle (voir `choixModele.ts`).
  * L'aperçu propose un sélecteur de modèle, « Modifier le modèle » (designer), PDF, HTML et impression.
  */
 export default function ImprimerDocument({ demande, onClose }: { demande: DemandeImpression; onClose: () => void }) {
@@ -15,10 +17,7 @@ export default function ImprimerDocument({ demande, onClose }: { demande: Demand
     let vivant = true;
     void listerModeles(demande.kind).then((liste) => {
       if (!vivant) return;
-      const refs = new Set(liste.map((m) => m.ref));
-      const impose = demande.modele ? (demande.modele.includes(':') ? demande.modele : `integre:${demande.modele}`) : null;
-      const defaut = modeleParDefaut(demande.kind);
-      setRef(impose && refs.has(impose) ? impose : defaut && refs.has(defaut) ? defaut : liste[0]?.ref ?? null);
+      setRef(choisirModele(demande, liste));
     });
     return () => { vivant = false; };
   }, [demande]);
