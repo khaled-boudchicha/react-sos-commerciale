@@ -53,6 +53,15 @@ Le kit `impression/kit.ts` fournit les briques communes (en-tête société, cad
 - **Navigateur (développement)** : `localStorage`, espace de noms `gc.modeles`.
 - Écran **Paramètres › Modèles d'impression** (`/modeles`) : bibliothèque avec miniatures, aperçu, duplication, import /
   export, modèle par défaut. Accès soumis au droit « Paramètres ».
+- **Nouveau modèle** : choix du type de document puis du point de départ — modèle standard (en-tête société, tableau,
+  total, pied de page numéroté, prêt à imprimer), page vierge ou copie d'un modèle livré.
+- **Personnaliser** un modèle livré ouvre une copie : à l'enregistrement, son nom est demandé (« … (personnalisé) »
+  proposé) et elle rejoint « Mes modèles ». Personnalisé depuis l'aperçu d'impression, il devient le modèle par défaut
+  de son type.
+- **Designer** : objets au millimètre, bandes, champs glissés depuis l'arbre de données, éditeur d'expressions,
+  menu du clic droit, annuler / rétablir, vérification du modèle, aperçu immédiat (F5) ; mêmes polices qu'à
+  l'impression ; objets dont la condition d'impression est fausse estompés avec les données d'exemple. Pendant
+  l'édition, les raccourcis de l'application (palette Ctrl+K, aide Ctrl+/, Ctrl+N) sont suspendus.
 
 ## 4. Sorties
 

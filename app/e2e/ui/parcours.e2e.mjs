@@ -218,6 +218,78 @@ describe('impression', () => {
   });
 });
 
+describe('designer d’états', () => {
+  const ouvrirDesigner = async () => {
+    const page = await ouvrir(navigateur, { route: '/modeles', viewport: { width: 1440, height: 900 }, gql: serveur() });
+    await page.locator('button:has-text("Personnaliser")').first().click();
+    await page.locator('[aria-label="Designer d’états"]').waitFor({ timeout: 8000 });
+    await page.waitForTimeout(500);
+    return page;
+  };
+
+  test('modèle livré : déplacer puis annuler, clic droit, enregistrement sous un nouveau nom', async () => {
+    const page = await ouvrirDesigner();
+    const titre = page.getByText('FACTURE', { exact: true }).first();
+    const avant = await titre.boundingBox();
+    await page.mouse.move(avant.x + 30, avant.y + 10);
+    await page.mouse.down(); await page.mouse.move(avant.x - 10, avant.y + 14, { steps: 8 }); await page.mouse.up();
+    assert.ok(Math.abs((await titre.boundingBox()).x - avant.x + 40) < 3, 'objet déplacé');
+    assert.match(await page.locator('[aria-label="Position et taille de la sélection"]').innerText(), /^X .* · L .* mm$/);
+    await page.keyboard.press('Control+z');
+    assert.ok(Math.abs((await titre.boundingBox()).x - avant.x) < 1, 'déplacement annulé');
+
+    // Clic droit : actions de l'objet, Échap referme
+    await page.mouse.click(avant.x + 30, avant.y + 10, { button: 'right' });
+    const menu = page.locator('[role="menu"][aria-label="Actions"]');
+    await menu.waitFor();
+    for (const action of ['Modifier le contenu…', 'Copier', 'Dupliquer', 'Premier plan', 'Verrouiller', 'Supprimer']) {
+      assert.equal(await menu.locator(`[role="menuitem"]:has-text("${action}")`).count(), 1, action);
+    }
+    await page.keyboard.press('Escape');
+    await menu.waitFor({ state: 'detached' });
+
+    // Bande supprimée par le clic droit, rétablie par Ctrl+Z
+    await page.locator('main [data-bande] >> text=Synthèse du rapport').first().click({ button: 'right' });
+    await page.locator('[role="menuitem"]:has-text("Supprimer la bande")').click();
+    assert.equal(await page.locator('main [data-bande] >> text=Synthèse du rapport').count(), 0);
+    await page.keyboard.press('Control+z');
+    assert.equal(await page.locator('main [data-bande] >> text=Synthèse du rapport').count(), 1);
+
+    // Ctrl+K : la palette de l'application ne s'ouvre pas derrière le designer
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(200);
+    assert.equal(await page.locator('[aria-label="Recherche globale"]').count(), 0);
+
+    // Ctrl+S sur un modèle livré : demande un nom, jamais celui de l'original
+    await page.keyboard.press('Control+s');
+    const nom = page.locator('[role="dialog"][aria-label="Enregistrer le modèle"] input');
+    assert.equal(await nom.inputValue(), 'Facture A4 — Moderne (personnalisé)');
+    await page.keyboard.press('Enter');
+    await page.locator('text=Facture A4 — Moderne (personnalisé).gcr ·').waitFor({ timeout: 4000 });
+    await page.click('button:has-text("Retour")');
+    await page.locator('[title="Facture A4 — Moderne (personnalisé)"]').waitFor({ timeout: 4000 });
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+
+  test('nouveau modèle : squelette standard prêt à imprimer', async () => {
+    const page = await ouvrir(navigateur, { route: '/modeles', viewport: { width: 1440, height: 900 }, gql: serveur() });
+    await page.click('button:has-text("Nouveau modèle")');
+    const dialogue = page.locator('[role="dialog"][aria-label="Nouveau modèle"]');
+    await dialogue.locator('input').first().fill('Bon de préparation');
+    await dialogue.locator('button:has-text("Créer")').click();
+    await page.locator('[aria-label="Designer d’états"]').waitFor();
+    assert.equal(await page.locator('main [data-bande]').count(), 5);
+    await page.keyboard.press('F5');
+    const apercu = page.locator('[role="dialog"][aria-label^="Aperçu"]');
+    await apercu.waitFor({ timeout: 8000 });
+    await apercu.locator('text=BON DE PRÉPARATION').first().waitFor();
+    await apercu.locator('text=/Page 1 \\/ 1/').first().waitFor();
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+});
+
 describe('droits et saisie', () => {
   test('profil vendeur : ni PMP ni marge dans le stock', async () => {
     const page = await ouvrir(navigateur, {

@@ -21,9 +21,10 @@ import ExprEditor from './designer/ExprEditor';
 import { BoutonIcone } from './designer/fields';
 import { useDesigner } from './designer/useDesigner';
 import {
-  Alignement, aligner, ajouterObjet, coller, copier, deplacerObjets, distribuer, dupliquer, largeurBande, memeTaille, objetsSelectionnes,
-  ordreZ, supprimerObjets, trouverObjet,
+  Alignement, aligner, ajouterObjet, coller, copier, deplacerBande, deplacerObjets, distribuer, dupliquer, dupliquerBande, englobant,
+  largeurBande, majObjets, memeTaille, objetsSelectionnes, ordreZ, supprimerBande, supprimerObjets, trouverObjet,
 } from './designer/ops';
+import { creerEtatStandard } from '../standard';
 import { Racine } from './Racine';
 
 const ZOOMS = [0.4, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4];
@@ -69,6 +70,7 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
   const [dialogue, setDialogue] = useState<'nouveau' | 'ouvrir' | 'enregistrerSous' | 'quitter' | 'verification' | null>(null);
   const [curseur, setCurseur] = useState<{ x: number; y: number; bande: string } | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
+  const [menuCtx, setMenuCtx] = useState<{ x: number; y: number; cible: { t: 'objet' | 'bande'; id: string } } | null>(null);
   const zone = useRef<HTMLDivElement>(null);
 
   const kind = kindDe(def.kind);
@@ -99,6 +101,8 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
   }, [D.sel, D.bandeSel, def]);
 
   const enregistrer = useCallback(async (sous?: string) => {
+    // Modèle jamais enregistré (modèle intégré personnalisé, nouveau modèle) : on demande d'abord son nom
+    if (!sous && !fichier) { setDialogue('enregistrerSous'); return; }
     try {
       const modele = sous ? { ...cloner(def), id: nouvelId('r'), name: sous } : def;
       const cible = sous ? undefined : fichier;
@@ -147,6 +151,23 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
   }, [bandeCourante, def, largeur, D, toast]);
 
   const supprimer = useCallback(() => { if (D.sel.length) D.set(supprimerObjets(def, D.sel), []); }, [D, def]);
+  const supprimerUneBande = useCallback((id: string) => {
+    const b = def.bands.find((x) => x.id === id);
+    if (!b) return;
+    D.set(supprimerBande(def, id));
+    D.selectBande(null);
+    toast.info(`Bande « ${b.name} » supprimée — Ctrl+Z pour annuler.`);
+  }, [D, def, toast]);
+  const majObjet = useCallback((id: string, patch: Partial<ObjDef>) => D.set(majObjets(def, [id], patch)), [D, def]);
+  /** Éditeur adapté au type d'objet : contenu d'un texte, valeur d'un code-barres, source d'une image, condition d'une case. */
+  const editerContenu = useCallback((id: string) => {
+    const o = trouverObjet(def, id)?.objet;
+    if (!o || o.locked) return;
+    if (o.type === 'text') setExpression({ titre: 'Contenu du texte', valeur: o.text, multiple: true, surValider: (v) => majObjet(id, { text: v } as Partial<ObjDef>) });
+    else if (o.type === 'barcode') setExpression({ titre: 'Valeur du code-barres', valeur: o.value, multiple: true, surValider: (v) => majObjet(id, { value: v } as Partial<ObjDef>) });
+    else if (o.type === 'image') setExpression({ titre: 'Source de l’image', valeur: o.expr ?? '', surValider: (v) => majObjet(id, { expr: v || undefined } as Partial<ObjDef>) });
+    else if (o.type === 'checkbox') setExpression({ titre: 'Condition de la case', valeur: o.checked, surValider: (v) => majObjet(id, { checked: v } as Partial<ObjDef>) });
+  }, [def, majObjet]);
   const copierSel = useCallback(() => { const p = copier(def, D.sel); if (p) D.setPresse(p); }, [def, D]);
   const collerSel = useCallback(() => {
     if (!D.presse) return;
@@ -163,7 +184,7 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
   // ── Raccourcis clavier ────────────────────────────────────────────────────
   useEffect(() => {
     function touche(e: KeyboardEvent) {
-      if (apercu || expression || dialogue) return;
+      if (apercu || expression || dialogue || menuCtx) return;
       const cible = e.target as HTMLElement | null;
       const saisie = !!cible && (/^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName) || cible.isContentEditable);
       const ctrl = e.ctrlKey || e.metaKey;
@@ -181,7 +202,10 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
         const b = def.bands.find((x) => x.id === bandeCourante());
         if (b) D.select(b.objects.map((o) => o.id));
       }
-      else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimer(); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        if (D.sel.length) supprimer(); else if (D.bandeSel && e.key === 'Delete') supprimerUneBande(D.bandeSel);
+      }
       else if (e.key === 'Escape') { if (D.outil) D.setOutil(null); else if (D.sel.length) D.select([]); else if (D.bandeSel) D.selectBande(null); }
       else if (e.key === 'F5') { e.preventDefault(); setApercu(true); }
       else if (e.key.startsWith('Arrow') && D.sel.length) {
@@ -197,7 +221,7 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
     }
     window.addEventListener('keydown', touche);
     return () => window.removeEventListener('keydown', touche);
-  }, [apercu, expression, dialogue, D, def, grille, largeur, enregistrer, copierSel, couper, collerSel, dupliquerSel, supprimer, bandeCourante]);
+  }, [apercu, expression, dialogue, menuCtx, D, def, grille, largeur, enregistrer, copierSel, couper, collerSel, dupliquerSel, supprimer, supprimerUneBande, bandeCourante]);
 
   // Zoom Ctrl + molette
   useEffect(() => {
@@ -224,11 +248,31 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
 
   const selObjets = objetsSelectionnes(def, D.sel);
   const nbSel = selObjets.length;
+  const boiteSel = nbSel ? englobant(def, D.sel) : null;
+  const mm = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+
+  /** Clic droit : objet (sélectionné au besoin) ou bande. */
+  const surMenuContextuel = (e: React.MouseEvent) => {
+    const el = e.target as HTMLElement;
+    const objet = el.closest<HTMLElement>('[data-objet]');
+    const bande = el.closest<HTMLElement>('[data-bande]');
+    if (!objet && !bande) return;
+    e.preventDefault();
+    setMenu(null);
+    if (objet) {
+      const id = objet.dataset.objet!;
+      if (!D.sel.includes(id)) D.select([id]);
+      setMenuCtx({ x: e.clientX, y: e.clientY, cible: { t: 'objet', id } });
+    } else {
+      D.selectBande(bande!.dataset.bande!);
+      setMenuCtx({ x: e.clientX, y: e.clientY, cible: { t: 'bande', id: bande!.dataset.bande! } });
+    }
+  };
   const zoomSuivant = (sens: 1 | -1) => setZoom((z) => (sens > 0 ? ZOOMS.find((v) => v > z + 0.01) : [...ZOOMS].reverse().find((v) => v < z - 0.01)) ?? z);
 
   // ── Rendu ─────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: 'var(--gcr-bg, #F4F6FB)' }} role="application" aria-label="Designer d’états" onPointerDown={() => menu && setMenu(null)}>
+    <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: 'var(--gcr-bg, #F4F6FB)' }} role="dialog" aria-modal="true" aria-label="Designer d’états" onPointerDown={() => menu && setMenu(null)}>
       {/* Barre supérieure */}
       <header className="flex items-center gap-2 px-3 h-12 flex-none border-b border-line-soft bg-surface">
         <button onClick={fermer} className="h-8 px-2.5 rounded-md border border-line text-ink-label font-bold text-[12px] inline-flex items-center gap-1.5 hover:bg-[var(--gcr-surface-sunken)]" title="Fermer le designer">
@@ -280,9 +324,10 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
         <BoutonIcone icone="undo" titre="Annuler (Ctrl+Z)" onClick={D.undo} disabled={!D.canUndo} />
         <BoutonIcone icone="redo" titre="Rétablir (Ctrl+Y)" onClick={D.redo} disabled={!D.canRedo} />
         <Barre />
+        <BoutonIcone icone="cut" titre="Couper (Ctrl+X)" onClick={couper} disabled={!nbSel} />
         <BoutonIcone icone="copy" titre="Copier (Ctrl+C)" onClick={copierSel} disabled={!nbSel} />
         <BoutonIcone icone="paste" titre="Coller (Ctrl+V)" onClick={collerSel} disabled={!D.presse} />
-        <BoutonIcone icone="front" titre="Dupliquer (Ctrl+D)" onClick={dupliquerSel} disabled={!nbSel} />
+        <BoutonIcone icone="duplicate" titre="Dupliquer (Ctrl+D)" onClick={dupliquerSel} disabled={!nbSel} />
         <BoutonIcone icone="trash" titre="Supprimer (Suppr)" onClick={supprimer} disabled={!nbSel} />
         <Barre />
         <BoutonIcone icone="alignLeft" titre="Aligner à gauche" onClick={() => D.set(aligner(def, D.sel, 'left'))} disabled={nbSel < 2} />
@@ -332,20 +377,13 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
         </aside>
 
         {/* Plan de travail */}
-        <main ref={zone} className="flex-1 overflow-auto relative" style={{ background: '#CDD5E3' }} aria-label="Plan de travail">
-          <Regle def={def} pxMm={pxMm} />
+        <main ref={zone} className="flex-1 overflow-auto relative" style={{ background: '#CDD5E3' }} aria-label="Plan de travail" onContextMenu={surMenuContextuel}>
+          <Regle def={def} pxMm={pxMm} sel={boiteSel} />
           <div style={{ padding: '10px 24px 60px', width: 'max-content', minWidth: '100%', boxSizing: 'border-box' }}>
             <div style={{ margin: '0 auto', width: 'max-content' }}>
               <Canvas D={D} pxMm={pxMm} grille={grille} valeurs={scopeValeurs} onPointeur={setCurseur}
                       onDeposer={(bandeId, x, y, c) => insererChamp(c, bandeId, x, y)}
-                      onEditionTexte={(id) => {
-                        const r = trouverObjet(def, id);
-                        if (!r) return;
-                        const o = r.objet;
-                        if (o.type === 'barcode') ouvrirExpression({ titre: 'Valeur du code-barres', valeur: o.value, multiple: true, surValider: (v) => D.set({ ...def, bands: def.bands.map((b) => ({ ...b, objects: b.objects.map((x) => (x.id === id ? ({ ...x, value: v } as ObjDef) : x)) })) }) });
-                        else if (o.type === 'image') ouvrirExpression({ titre: 'Source de l’image', valeur: o.expr ?? '', surValider: (v) => D.set({ ...def, bands: def.bands.map((b) => ({ ...b, objects: b.objects.map((x) => (x.id === id ? ({ ...x, expr: v || undefined } as ObjDef) : x)) })) }) });
-                        else if (o.type === 'checkbox') ouvrirExpression({ titre: 'Condition de la case', valeur: o.checked, surValider: (v) => D.set({ ...def, bands: def.bands.map((b) => ({ ...b, objects: b.objects.map((x) => (x.id === id ? ({ ...x, checked: v } as ObjDef) : x)) })) }) });
-                      }} />
+                      onEditionTexte={editerContenu} onSupprimerBande={supprimerUneBande} />
             </div>
           </div>
         </main>
@@ -357,22 +395,66 @@ function ReportDesignerInterne({ initial, fichier: fichierInitial, donneesApercu
       <footer className="flex items-center gap-4 px-3 h-6 flex-none text-[11px] border-t border-line-soft bg-surface text-ink-muted">
         <span>{curseur ? `X ${curseur.x.toFixed(1)} mm · Y ${curseur.y.toFixed(1)} mm · ${curseur.bande}` : 'Survolez une bande pour voir la position'}</span>
         <span>{nbSel ? `${nbSel} objet${nbSel > 1 ? 's' : ''} sélectionné${nbSel > 1 ? 's' : ''}` : D.bandeSel ? 'Bande sélectionnée' : ''}</span>
+        {boiteSel && <span className="money" aria-label="Position et taille de la sélection">X {mm(boiteSel.x)} · Y {mm(boiteSel.y)} · L {mm(boiteSel.w)} · H {mm(boiteSel.h)} mm</span>}
         {D.outil && <span style={{ color: 'var(--gcr-brand-700)' }} className="font-bold">Outil : {OUTILS.find((o) => o.type === D.outil)?.titre} — tracez sur une bande (Échap pour annuler)</span>}
         <span className="ml-auto">{def.bands.length} bande{def.bands.length > 1 ? 's' : ''} · {def.bands.reduce((s, b) => s + b.objects.length, 0)} objets · Ctrl+molette zoom</span>
       </footer>
 
       {/* Fenêtres */}
+      {menuCtx && (
+        <MenuContextuel x={menuCtx.x} y={menuCtx.y} surFermer={() => setMenuCtx(null)}>
+          {menuCtx.cible.t === 'objet' ? (() => {
+            const un = nbSel === 1 ? selObjets[0].objet : null;
+            const verrouilles = selObjets.every((r) => r.objet.locked);
+            return (
+              <>
+                {un && <Item icone="fx" libelle={un.type === 'text' ? 'Modifier le contenu…' : un.type === 'line' || un.type === 'shape' ? 'Propriétés à droite' : 'Modifier la valeur…'} onClick={() => editerContenu(un.id)} />}
+                {un && <Sep />}
+                <Item icone="cut" libelle="Couper" raccourci="Ctrl+X" onClick={couper} />
+                <Item icone="copy" libelle="Copier" raccourci="Ctrl+C" onClick={copierSel} />
+                <Item icone="paste" libelle="Coller" raccourci="Ctrl+V" onClick={collerSel} desactive={!D.presse} />
+                <Item icone="duplicate" libelle="Dupliquer" raccourci="Ctrl+D" onClick={dupliquerSel} />
+                <Sep />
+                <Item icone="front" libelle="Premier plan" onClick={() => D.set(ordreZ(def, D.sel, 'front'))} />
+                <Item icone="back" libelle="Arrière-plan" onClick={() => D.set(ordreZ(def, D.sel, 'back'))} />
+                <Item icone={verrouilles ? 'unlock' : 'lock'} libelle={verrouilles ? 'Déverrouiller' : 'Verrouiller'} onClick={() => D.set(majObjets(def, D.sel, { locked: !verrouilles }))} />
+                <Sep />
+                <Item icone="trash" libelle={nbSel > 1 ? `Supprimer les ${nbSel} objets` : 'Supprimer'} raccourci="Suppr" danger onClick={supprimer} />
+              </>
+            );
+          })() : (() => {
+            const id = menuCtx.cible.id;
+            const i = def.bands.findIndex((b) => b.id === id);
+            const b = def.bands[i];
+            if (!b) return null;
+            return (
+              <>
+                <Item icone="paste" libelle="Coller dans cette bande" raccourci="Ctrl+V" desactive={!D.presse} onClick={() => { if (D.presse) { const r = coller(def, D.presse, id); D.set(r.def, r.ids); } }} />
+                <Item icone="select" libelle="Tout sélectionner dans la bande" raccourci="Ctrl+A" desactive={!b.objects.length} onClick={() => D.select(b.objects.map((o) => o.id))} />
+                <Sep />
+                <Item icone="chevU" libelle="Monter la bande" desactive={i <= 0} onClick={() => D.set(deplacerBande(def, id, -1))} />
+                <Item icone="chevD" libelle="Descendre la bande" desactive={i >= def.bands.length - 1} onClick={() => D.set(deplacerBande(def, id, 1))} />
+                <Item icone="duplicate" libelle="Dupliquer la bande" onClick={() => { const r = dupliquerBande(def, id); D.set(r.def); D.selectBande(r.id); }} />
+                <Sep />
+                <Item icone="trash" libelle="Supprimer la bande" raccourci="Suppr" danger onClick={() => supprimerUneBande(id)} />
+              </>
+            );
+          })()}
+        </MenuContextuel>
+      )}
       {apercu && <ReportPreview def={def} data={donneesApercu ?? kind.sample} titre={`${def.name} — aperçu`} onClose={() => setApercu(false)} />}
       {expression && <ExprEditor def={def} titre={expression.titre} valeur={expression.valeur} multiple={expression.multiple} surValider={expression.surValider} surFermer={() => setExpression(null)} />}
 
       {dialogue === 'nouveau' && (
-        <NouveauDialog surFermer={() => setDialogue(null)} surCreer={(d) => { D.charger(d, true); setFichier(undefined); setDialogue(null); }} />
+        <NouveauModeleDialog kindInitial={def.kind} surFermer={() => setDialogue(null)} surCreer={(d) => { D.charger(d, true); setFichier(undefined); setDialogue(null); }} />
       )}
       {dialogue === 'ouvrir' && (
         <OuvrirDialog surFermer={() => setDialogue(null)} surOuvrir={(d, f) => { D.charger(d); setFichier(f); setDialogue(null); }} dirty={D.dirty} />
       )}
       {dialogue === 'enregistrerSous' && (
-        <SaisieNomDialog titre="Enregistrer sous…" libelle="Nom du modèle" valeur={`${def.name}${fichier ? '' : ''}`} surFermer={() => setDialogue(null)} surValider={(n) => { setDialogue(null); void enregistrer(n); }} />
+        <SaisieNomDialog titre={fichier ? 'Enregistrer sous…' : 'Enregistrer le modèle'} libelle="Nom du modèle" valeur={nomPropose(def.name, fichier)}
+                         aide={fichier ? undefined : 'Le modèle est enregistré dans « Mes modèles » ; les modèles livrés ne sont jamais modifiés.'}
+                         surFermer={() => setDialogue(null)} surValider={(n) => { setDialogue(null); void enregistrer(n); }} />
       )}
       {dialogue === 'quitter' && (
         <ConfirmDialog title="Fermer sans enregistrer ?" message="Les modifications de ce modèle seront perdues." confirmLabel="Fermer sans enregistrer" danger
@@ -406,9 +488,10 @@ function Menu({ id, libelle, icone, ouvert, setOuvert, children }: { id: string;
   );
 }
 
-function Item({ libelle, icone, raccourci, onClick }: { libelle: string; icone?: NomIc; raccourci?: string; onClick: () => void }) {
+function Item({ libelle, icone, raccourci, onClick, desactive, danger }: { libelle: string; icone?: NomIc; raccourci?: string; onClick: () => void; desactive?: boolean; danger?: boolean }) {
   return (
-    <button type="button" role="menuitem" onClick={onClick} className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-[var(--gcr-surface-sunken)]">
+    <button type="button" role="menuitem" onClick={onClick} disabled={desactive} style={danger ? { color: 'var(--gcr-danger)' } : undefined}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-[var(--gcr-surface-sunken)] disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-default">
       <span className="w-4 inline-flex">{icone && <Ic n={icone} size={14} />}</span>
       <span className="flex-1">{libelle}</span>
       {raccourci && <span className="text-[10.5px] text-ink-muted font-mono">{raccourci}</span>}
@@ -416,8 +499,55 @@ function Item({ libelle, icone, raccourci, onClick }: { libelle: string; icone?:
   );
 }
 
+/** Menu du clic droit : positionné au pointeur, maintenu dans la fenêtre, fermé au clic extérieur, à Échap ou au défilement. */
+function MenuContextuel({ x, y, surFermer, children }: { x: number; y: number; surFermer: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x, y });
+  useEffect(() => {
+    const el = ref.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      setPos({ x: Math.max(4, Math.min(x, window.innerWidth - r.width - 4)), y: Math.max(4, Math.min(y, window.innerHeight - r.height - 4)) });
+      el.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus();
+    }
+    const dehors = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) surFermer(); };
+    const clavier = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); surFermer(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])') ?? []);
+        const i = items.indexOf(document.activeElement as HTMLElement);
+        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
+      }
+    };
+    window.addEventListener('pointerdown', dehors, true);
+    window.addEventListener('keydown', clavier, true);
+    window.addEventListener('wheel', surFermer, { passive: true });
+    window.addEventListener('blur', surFermer);
+    return () => {
+      window.removeEventListener('pointerdown', dehors, true);
+      window.removeEventListener('keydown', clavier, true);
+      window.removeEventListener('wheel', surFermer);
+      window.removeEventListener('blur', surFermer);
+    };
+  }, [x, y, surFermer]);
+  return (
+    <div ref={ref} role="menu" aria-label="Actions" onClick={surFermer} onContextMenu={(e) => e.preventDefault()}
+         className="fixed z-[70] min-w-[240px] rounded-md border border-line bg-surface shadow-lifted py-1" style={{ left: pos.x, top: pos.y }}>
+      {children}
+    </div>
+  );
+}
+
+/** Nom proposé à l'enregistrement : un modèle livré personnalisé ne garde pas le nom de l'original. */
+function nomPropose(nom: string, fichier?: string): string {
+  if (fichier) return nom;
+  const livre = listerModelesIntegres().some((m) => m.build().name === nom);
+  return livre ? `${nom} (personnalisé)` : nom;
+}
+
 /** Règle horizontale (mm) collée en haut du plan de travail. */
-function Regle({ def, pxMm }: { def: ReportDef; pxMm: number }) {
+function Regle({ def, pxMm, sel }: { def: ReportDef; pxMm: number; sel?: { x: number; w: number } | null }) {
   const w = def.page.orientation === 'landscape' ? def.page.height : def.page.width;
   const m = def.page.margins.left;
   const pas = pxMm >= 6 ? 5 : pxMm >= 3 ? 10 : 20;
@@ -433,6 +563,7 @@ function Regle({ def, pxMm }: { def: ReportDef; pxMm: number }) {
       <div style={{ width: 'max-content', margin: '0 auto', paddingLeft: 24 - 24, position: 'relative' }}>
         <svg width={w * pxMm} height={22} style={{ display: 'block', margin: '0 auto', position: 'relative', left: 0 }}>
           <rect x={m * pxMm} y={0} width={Math.max(0, (w - m - def.page.margins.right) * pxMm)} height={22} fill="#F8FAFC" />
+          {sel && <rect x={(m + sel.x) * pxMm} y={0} width={Math.max(1, sel.w * pxMm)} height={22} fill="rgb(36 80 224 / .16)" />}
           {marques}
         </svg>
       </div>
@@ -462,7 +593,7 @@ function Fenetre({ titre, largeur = 560, surFermer, children, pied }: { titre: s
 
 const ENTREE = 'h-8 w-full rounded border border-line bg-surface text-ink text-[12.5px] px-2.5 focus:outline-none focus:border-[var(--gcr-brand-700)]';
 
-function SaisieNomDialog({ titre, libelle, valeur, surFermer, surValider }: { titre: string; libelle: string; valeur: string; surFermer: () => void; surValider: (v: string) => void }) {
+function SaisieNomDialog({ titre, libelle, valeur, aide, surFermer, surValider }: { titre: string; libelle: string; valeur: string; aide?: string; surFermer: () => void; surValider: (v: string) => void }) {
   const [v, setV] = useState(valeur);
   const ok = v.trim().length > 0;
   return (
@@ -471,39 +602,49 @@ function SaisieNomDialog({ titre, libelle, valeur, surFermer, surValider }: { ti
       <button disabled={!ok} onClick={() => surValider(v.trim())} className="h-8 px-4 rounded-md text-white font-bold text-[12px] disabled:opacity-50" style={{ background: 'var(--gcr-brand-700)' }}>Enregistrer</button>
     </>}>
       <label className="text-[12px] font-semibold text-ink-label">{libelle}
-        <input autoFocus value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && ok) surValider(v.trim()); }} className={`${ENTREE} mt-1`} />
+        <input autoFocus value={v} onChange={(e) => setV(e.target.value)} onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (e.key === 'Enter' && ok) surValider(v.trim()); }} className={`${ENTREE} mt-1`} />
       </label>
+      {aide && <p className="text-[11px] text-ink-muted mt-2">{aide}</p>}
     </Fenetre>
   );
 }
 
-function NouveauDialog({ surFermer, surCreer }: { surFermer: () => void; surCreer: (d: ReportDef) => void }) {
+/**
+ * Nouveau modèle : type de document et point de départ — modèle standard (en-tête, tableau, total, pied de page
+ * numéroté), page vierge, ou copie d'un modèle livré.
+ */
+export function NouveauModeleDialog({ kindInitial, surFermer, surCreer }: { kindInitial?: string; surFermer: () => void; surCreer: (d: ReportDef) => void }) {
   const [nom, setNom] = useState('Nouvel état');
-  const [kind, setKind] = useState(() => kindDe('').id);
-  const [depart, setDepart] = useState('');
+  const [kind, setKind] = useState(() => kindDe(kindInitial ?? '').id);
+  const [depart, setDepart] = useState('standard');
   // identifiant STABLE du modèle intégré (celui de build() est aléatoire) + titre affiché
   const modeles = listerModelesIntegres().map((m) => ({ id: m.id, def: m.build() })).filter((m) => m.def.kind === kind);
   function creer() {
-    const base = depart ? listerModelesIntegres().find((m) => m.id === depart)?.build() : null;
-    const e = base ? { ...cloner(base), id: nouvelId('r'), name: nom.trim() || base.name } : creerEtat(kind, nom.trim() || 'Nouvel état');
-    surCreer(e);
+    const titre = nom.trim() || 'Nouvel état';
+    if (depart === 'standard') { surCreer(creerEtatStandard(kindDe(kind), titre)); return; }
+    if (depart === 'vierge') { surCreer(creerEtat(kind, titre)); return; }
+    const base = listerModelesIntegres().find((m) => m.id === depart)?.build();
+    surCreer(base ? { ...cloner(base), id: nouvelId('r'), name: nom.trim() || base.name } : creerEtatStandard(kindDe(kind), titre));
   }
   return (
-    <Fenetre titre="Nouveau modèle" largeur={500} surFermer={surFermer} pied={<>
+    <Fenetre titre="Nouveau modèle" largeur={520} surFermer={surFermer} pied={<>
       <button onClick={surFermer} className="h-8 px-4 rounded-md border border-line text-ink-label font-bold text-[12px]">Annuler</button>
       <button onClick={creer} className="h-8 px-4 rounded-md text-white font-bold text-[12px]" style={{ background: 'var(--gcr-brand-700)' }}>Créer</button>
     </>}>
       <div className="flex flex-col gap-3">
-        <label className="text-[12px] font-semibold text-ink-label">Titre<input autoFocus value={nom} onChange={(e) => setNom(e.target.value)} className={`${ENTREE} mt-1`} /></label>
+        <label className="text-[12px] font-semibold text-ink-label">Titre<input autoFocus value={nom} onChange={(e) => setNom(e.target.value)} onFocus={(e) => e.target.select()} className={`${ENTREE} mt-1`} /></label>
         <label className="text-[12px] font-semibold text-ink-label">Type de document
-          <select value={kind} onChange={(e) => { setKind(e.target.value); setDepart(''); }} className={`${ENTREE} mt-1`}>
+          <select value={kind} onChange={(e) => { setKind(e.target.value); if (depart !== 'standard' && depart !== 'vierge') setDepart('standard'); }} className={`${ENTREE} mt-1`}>
             {listerTypes().map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
           </select>
         </label>
         <label className="text-[12px] font-semibold text-ink-label">Point de départ
           <select value={depart} onChange={(e) => setDepart(e.target.value)} className={`${ENTREE} mt-1`}>
-            <option value="">État vide</option>
-            {modeles.map((m) => <option key={m.id} value={m.id}>Copie de : {m.def.name}</option>)}
+            <option value="standard">Modèle standard — en-tête, tableau, total, pied de page numéroté</option>
+            <option value="vierge">Page vierge</option>
+            {modeles.length > 0 && <optgroup label="Copie d’un modèle livré">
+              {modeles.map((m) => <option key={m.id} value={m.id}>{m.def.name}</option>)}
+            </optgroup>}
           </select>
         </label>
       </div>

@@ -14,6 +14,7 @@
     "start": "electron .",
     "sync:pagedjs": "cp node_modules/pagedjs/dist/paged.polyfill.js public/vendor/paged.polyfill.js",
     "test": "vitest run",
+    "test:report": "vitest run --dir ../packages/report/test",
     "lint:ui": "node scripts/ui-lint.mjs --strict",
     "test:e2e": "node e2e/flux-critiques.mjs",
     "test:ui": "vite build && node --test --test-concurrency=1 e2e/ui/parcours.e2e.mjs",

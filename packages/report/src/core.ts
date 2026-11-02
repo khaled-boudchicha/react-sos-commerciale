@@ -18,3 +18,4 @@ export * from './engine/output';
 export * from './engine/barcode';
 export * from './engine/measure';
 export { installerExemples, TYPE_FACTURE, modeleFactureExemple, modeleTicketExemple } from './exemples';
+export { creerEtatStandard } from './standard';
