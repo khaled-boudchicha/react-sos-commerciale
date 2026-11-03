@@ -417,6 +417,34 @@ describe('droits et saisie', () => {
     await page.context().close();
   });
 
+  test('tableau de bord : les indicateurs lisent les formes réelles de l’agent (relevées sur un dossier réel)', async () => {
+    // Formes relevées avec sos-agent/test/parite/15-tableau-de-bord.js ; valeurs inventées, aucun nom réel
+    const jour = (j, ttc) => ({ periode: `2026-10-${String(j).padStart(2, '0')}`, total_ht: ttc / 1.19, total_ttc: ttc, total_marge: ttc / 10, total_taxe: 0, remise: 0, qte: 3, r_total_ht: 0, r_total_ttc: 0, r_total_marge: 0, r_qte: 0, charges: 0, marge_nette: ttc / 10, pct_marge: 10 });
+    const fam = (famille, ttc) => ({ famille, total_ht: ttc / 1.19, total_ttc: ttc, total_marge: ttc / 10, qte: 12, r_total_ht: 0, r_total_ttc: 0, r_qte: 0, remise: 0, nb_lignes: 7 });
+    const page = await ouvrir(navigateur, { route: '/', gql: serveur({
+      Dashboard: {
+        statVentes: { lignes: [jour(1, 1000000), jour(2, 2500000.5)], total_ht: 2941176.9, total_ttc: 3500000.5, total_marge: 350000.05, total_charges: 0, marge_nette_total: 350000.05, pct_marge_global: 10 },
+        statVentesParFamille: [fam('BIOCHIMIE', 1200000), fam('ANTALGIQUES', 2300000.5)],
+        soldesComptes: [{ compte: 'Caisse Magasin', compte_id: 2, solde: 208061326.39, total_entrees: 300000000, total_sorties: 91938673.61 }, { compte: 'CPA', compte_id: 3, solde: -162734860.48, total_entrees: 10, total_sorties: 162734870.48 }],
+        debiteurs: { data: [{ code_cli: '007', raison: 'CLIENT TEST', total_reste: 1 }], total_clients: 178, total_factures: 497, total_creances: 86033032.27, bucket_0_30: 25959914.12, bucket_30_60: 16437240.71, bucket_60_plus: 43635877.43 },
+        alertesStock: Array.from({ length: 1849 }, (_, i) => ({ id: i + 1, code: `AR${i}`, qte_reale: 0, stock_min: 0 })),
+      },
+      LotsExpirant: { lotsExpirant: [{ perime: true, valeur: 1000 }, { perime: false, valeur: 500 }] },
+    }) });
+    const texte = async () => (await page.locator('main').innerText().catch(() => page.locator('body').innerText()));
+    await page.getByText(/45\D+326\D+465\D+91/).first().waitFor({ timeout: 8000 });   // Σ des comptes (négatif compris)
+    const t = await texte();
+    assert.match(t, /3\D+500\D+000\D+50/);        // CA TTC du mois
+    assert.match(t, /86\D+033\D+032\D+27/);        // créances
+    assert.match(t, /178 débiteur\(s\)/);
+    assert.match(t, /1849 article\(s\)/);
+    assert.match(t, /en rupture ou sous le stock minimum/);
+    assert.match(t, /2 lot\(s\)/);
+    assert.ok(t.indexOf('ANTALGIQUES') < t.indexOf('BIOCHIMIE'), 'familles classées par CA décroissant');
+    assert.deepEqual(page.erreurs, []);
+    await page.context().close();
+  });
+
   test('recouvrement « comme le logiciel de bureau » : par client puis par pièce, totaux du Delphi', async () => {
     const resume = { mode: 'delphi', detail: false, nbrjour: 30, annee: 2026, total: 2, totaux: { net_a_payer: 700000, reste_a_payer: 450000.5, regler: 249999.5 }, data: [
       { code_cli: '102', raison: 'LABO BEN SALEM', nb_pieces: 3, net_a_payer: 500000, reste_a_payer: 300000, regler: 200000, plus_ancienne: '2026-03-02', derniere: '2026-08-30' },

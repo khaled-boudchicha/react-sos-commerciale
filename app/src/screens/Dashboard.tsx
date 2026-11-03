@@ -119,7 +119,7 @@ export default function Dashboard() {
                  value={<>{fmtMoney(deb?.total_creances)} <span className="text-sm text-ink-muted">DA</span></>}
                  sub={deb ? `${deb.total_clients} débiteur(s) · +60 j : ${fmtMoney(deb.bucket_60_plus)} DA` : undefined} />
         <KpiTile label="Alertes stock" icon="alert" tone="warning" valueTone={alertes.length ? 'warning' : undefined} loading={loading}
-                 to="/stock?vue=alerte" value={`${alertes.length} article(s)`} sub="sous le stock minimum" />
+                 to="/stock?vue=alerte" value={`${alertes.length} article(s)`} sub="en rupture ou sous le stock minimum" />
         {voitLots ? (
           <KpiTile label="Péremption ≤ 90 jours" icon="expiry" tone="orange" valueTone={lotsExp.length ? 'danger' : undefined}
                    to="/stock?vue=peremption" value={`${lotsExp.length} lot(s)`}
